@@ -13,12 +13,12 @@ private const val SEALBYTES = PUBLICKEYBYTES + MACBYTES
 @kotlin.jvm.Throws(IllegalArgumentException::class)
 fun ByteArray.sealOpen(pk: ByteArray, sk: ByteArray): ByteArray {
 
-    if (this.size < SEALBYTES) {
+    if (size < SEALBYTES) {
         throw IllegalArgumentException("Ciphertext too short")
     }
 
-    val pkSender = this.copyOfRange(0, PUBLICKEYBYTES)
-    val cipherTextWitHmac = this.copyOfRange(PUBLICKEYBYTES, this.size)
+    val pkSender = copyOfRange(0, PUBLICKEYBYTES)
+    val cipherTextWitHmac = copyOfRange(PUBLICKEYBYTES, size)
     val nonce = pkSender.sealNonce(pk)
     val box = TweetNaclFast.Box(pkSender, sk)
 
@@ -51,7 +51,7 @@ private fun ByteArray.sealNonce(pubKey: ByteArray): ByteArray {
     val blake2b = Blake2bDigest(NONCEBYTES)
     val nonce = ByteArray(NONCEBYTES)
 
-    this.forEach { blake2b.update(it) }
+    forEach { blake2b.update(it) }
     pubKey.forEach { blake2b.update(it) }
     blake2b.doFinal(nonce, 0)
 

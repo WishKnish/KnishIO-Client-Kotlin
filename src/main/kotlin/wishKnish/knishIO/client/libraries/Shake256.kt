@@ -29,10 +29,12 @@ class Shake256 {
         }
     }
 
-    fun absorb(text: String) {
+    fun absorb(text: String): Shake256 {
         text.forEach {
             digest.update(it.code.toByte())
         }
+
+        return this
     }
 
     fun squeeze(length: Int): ByteArray {

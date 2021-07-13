@@ -35,8 +35,8 @@ private fun JsonArray.toList(): List<Any?> = map {
 
 fun JsonElement.decode(): Any {
     return when (this) {
-        is JsonArray -> this.toList()
-        is JsonObject -> this.toMap()
+        is JsonArray -> toList()
+        is JsonObject -> toMap()
         else -> this
     }
 }
@@ -45,12 +45,12 @@ fun Map<*, *>.toJsonElement(): JsonElement {
 
     val map: MutableMap<String, JsonElement> = mutableMapOf()
 
-    this.forEach {
+    forEach {
         val key = it.key as? String ?: return@forEach
         val value = it.value ?: return@forEach
 
         when(value) {
-            is Map<*, *> -> map[key] = (value).toJsonElement()
+            is Map<*, *> -> map[key] = value.toJsonElement()
             is List<*> -> map[key] = value.toJsonElement()
             else -> map[key] = JsonPrimitive(value.toString())
         }
@@ -62,11 +62,11 @@ fun Map<*, *>.toJsonElement(): JsonElement {
 fun List<*>.toJsonElement(): JsonElement {
     val list: MutableList<JsonElement> = mutableListOf()
 
-    this.forEach {
-        val value = it as? Any ?: return@forEach
+    forEach {
+        val value = it ?: return@forEach
 
         when(value) {
-            is Map<*, *> -> list.add((value).toJsonElement())
+            is Map<*, *> -> list.add(value.toJsonElement())
             is List<*> -> list.add(value.toJsonElement())
             else -> list.add(JsonPrimitive(value.toString()))
         }

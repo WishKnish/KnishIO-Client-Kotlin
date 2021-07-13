@@ -21,7 +21,7 @@ private inline fun <reified T : Enum<T>> enumContains(name: String): Boolean {
 private fun ByteArray.sha256(): ByteArray {
     val digest = SHA256Digest()
 
-    digest.update(this, 0, this.size)
+    digest.update(this, 0, size)
 
     val out = ByteArray(digest.digestSize)
 
@@ -157,7 +157,7 @@ fun String.decodeBase58WithChecksum(): ByteArray {
     val rawBytes = decodeBase58()
 
     if (rawBytes.size < CHECKSUM_SIZE) {
-        throw Exception("Too short for checksum: $this l:  ${rawBytes.size}")
+        throw IllegalArgumentException("Too short for checksum: $this l:  ${rawBytes.size}")
     }
 
     val checksum = rawBytes.copyOfRange(rawBytes.size - CHECKSUM_SIZE, rawBytes.size)
@@ -175,10 +175,8 @@ fun String.decodeBase58WithChecksum(): ByteArray {
 
 
 @Throws(IllegalArgumentException::class)
-fun String.toStringEncodeToBase58(characters: String = "GMP"): String =
-    this.toByteArray().encodeToBase58String(characters)
+fun String.toStringEncodeToBase58(characters: String = "GMP"): String = toByteArray().encodeToBase58String(characters)
 
 
 @Throws(IllegalArgumentException::class)
-fun String.toStringDecodeBase58(characters: String = "GMP"): String =
-    this.decodeBase58(characters).joinToString("") { "${it.toInt().toChar()}" }
+fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(characters).joinToString("") { "${it.toInt().toChar()}" }

@@ -6,6 +6,8 @@ import kotlin.reflect.KVisibility
 import kotlin.reflect.full.memberProperties
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import wishKnish.knishIO.client.data.MetaData
+import kotlin.jvm.Throws
 
 
 @Serializable
@@ -18,7 +20,7 @@ data class  Atom(
     var batchId: String? = null,
     var metaType: String? = null,
     var metaId: String? = null,
-    var meta: Map<String, String> = mutableMapOf<String, String>(),
+    var meta: List<MetaData> = mutableListOf(),
     var otsFragment: String? = null,
     var index: Int = 0
     ) {
@@ -46,7 +48,7 @@ data class  Atom(
 
         @JvmStatic
         private fun hash(atoms: List<Atom>) : Shake256 {
-            val atomList = this.sortAtoms(atoms)
+            val atomList = sortAtoms(atoms)
             val molecularSponge = Shake256.create()
             val numberOfAtoms = atomList.size.toString()
 
@@ -66,10 +68,10 @@ data class  Atom(
                         }
 
                         if (it.name == "meta") {
-                            (value as Map<*, *>).forEach { (key, content) ->
-                                content?.run {
-                                    molecularSponge.absorb(key.toString())
-                                    molecularSponge.absorb(toString())
+                            (value as List<MetaData>).forEach { MetaData ->
+                                MetaData.value?.run {
+                                    molecularSponge.absorb(MetaData.key)
+                                    molecularSponge.absorb(this)
                                 }
                             }
                             return@forEach
@@ -94,8 +96,9 @@ data class  Atom(
         }
 
         @JvmStatic
+        @Throws(IllegalArgumentException::class)
         fun hashAtoms(atoms: List<Atom>, output: String = "base17") : String? {
-            val molecularSponge = this.hash(atoms)
+            val molecularSponge = hash(atoms)
 
             return when(output) {
                 "hex" -> molecularSponge.hexString(32)
@@ -119,6 +122,6 @@ data class  Atom(
     }
 
     override fun toString(): String {
-        return this.toJson()
+        return toJson()
     }
 }

@@ -4,11 +4,13 @@ import java.math.BigInteger
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlin.jvm.Throws
 
 class Strings {
     companion object {
 
         @JvmStatic
+        @Throws(ArithmeticException::class)
         fun currentTimeMillis() : String {
             return ZonedDateTime.of(LocalDateTime.now(), ZoneId.systemDefault())
                 .toInstant()
@@ -17,6 +19,7 @@ class Strings {
         }
 
         @JvmStatic
+        @Throws(NoSuchElementException::class)
         fun randomString(length: Int, alphabet: String = "abcdef0123456789") : String {
             return (1..length)
                 .map { alphabet.toList().random() }
@@ -24,6 +27,7 @@ class Strings {
         }
 
         @JvmStatic
+        @Throws(IllegalArgumentException::class)
         fun charsetBaseConvert(
             src: String,
             fromBase: Int,
