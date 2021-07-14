@@ -48,7 +48,7 @@ private fun divmod(number: ByteArray, firstDigit: UInt, base: UInt, divisor: UIn
 
 
 @Throws(IllegalArgumentException::class)
-fun ByteArray.encodeToBase58String(characters: String = "GMP"): String {
+internal fun ByteArray.encodeToBase58String(characters: String = "GMP"): String {
     if (!enumContains<ALPHABET>(characters)) {
         throw IllegalArgumentException("there is no such ALPHABET [$characters]")
     }
@@ -90,7 +90,7 @@ fun ByteArray.encodeToBase58String(characters: String = "GMP"): String {
 
 
 @Throws(NumberFormatException::class, IllegalArgumentException::class)
-fun String.decodeBase58(characters: String = "GMP"): ByteArray {
+internal fun String.decodeBase58(characters: String = "GMP"): ByteArray {
 
     if (!enumContains<ALPHABET>(characters)) {
         throw IllegalArgumentException("there is no such ALPHABET [$characters]")
@@ -142,7 +142,7 @@ fun String.decodeBase58(characters: String = "GMP"): ByteArray {
 }
 
 @Throws(IllegalArgumentException::class)
-fun ByteArray.encodeToBase58WithChecksum() = ByteArray(size + CHECKSUM_SIZE).apply {
+internal fun ByteArray.encodeToBase58WithChecksum() = ByteArray(size + CHECKSUM_SIZE).apply {
     System.arraycopy(this@encodeToBase58WithChecksum, 0, this, 0, this@encodeToBase58WithChecksum.size)
 
     val checksum = this@encodeToBase58WithChecksum.sha256().sha256()
@@ -153,7 +153,7 @@ fun ByteArray.encodeToBase58WithChecksum() = ByteArray(size + CHECKSUM_SIZE).app
 
 
 @Throws(IllegalArgumentException::class, NumberFormatException::class)
-fun String.decodeBase58WithChecksum(): ByteArray {
+internal fun String.decodeBase58WithChecksum(): ByteArray {
     val rawBytes = decodeBase58()
 
     if (rawBytes.size < CHECKSUM_SIZE) {
@@ -175,8 +175,8 @@ fun String.decodeBase58WithChecksum(): ByteArray {
 
 
 @Throws(IllegalArgumentException::class)
-fun String.toStringEncodeToBase58(characters: String = "GMP"): String = toByteArray().encodeToBase58String(characters)
+internal fun String.toStringEncodeToBase58(characters: String = "GMP"): String = toByteArray().encodeToBase58String(characters)
 
 
 @Throws(IllegalArgumentException::class)
-fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(characters).joinToString("") { "${it.toInt().toChar()}" }
+internal fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(characters).joinToString("") { "${it.toInt().toChar()}" }

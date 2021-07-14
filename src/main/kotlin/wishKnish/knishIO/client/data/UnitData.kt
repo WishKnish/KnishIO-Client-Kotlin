@@ -9,6 +9,11 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class UnitData(val id:String, val name: String, val metas: List<String>) {
     companion object {
+        private val jsonFormat: Json
+            get() =  Json {
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+            }
 
         @JvmStatic
         fun create(id: String, name: String, metas: List<String>): UnitData {
@@ -17,18 +22,12 @@ data class UnitData(val id:String, val name: String, val metas: List<String>) {
 
         @JvmStatic
         fun jsonToObject(json: String): UnitData {
-            return Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-            }.decodeFromString(json)
+            return jsonFormat.decodeFromString(json)
         }
     }
 
     private fun toJson(): String {
-        return Json {
-            encodeDefaults = true
-            ignoreUnknownKeys = true
-        }.encodeToString(this)
+        return jsonFormat.encodeToString(this)
     }
 
     override fun toString(): String {

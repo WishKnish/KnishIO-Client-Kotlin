@@ -22,28 +22,29 @@ data class  Atom(
     var metaId: String? = null,
     var meta: List<MetaData> = mutableListOf(),
     var otsFragment: String? = null,
-    var index: Int = 0
+    var index: Int = 0,
+    val createdAt: String = Strings.currentTimeMillis()
     ) {
 
-    val createdAt = Strings.currentTimeMillis()
-
     companion object {
+        private val jsonFormat: Json
+            get() =  Json {
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+            }
 
         @JvmStatic
         fun jsonToObject(json: String): Atom {
-            return Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-            }.decodeFromString(json)
+            return jsonFormat.decodeFromString(json)
         }
 
         @JvmStatic
         fun sortAtoms(atoms: List<Atom>) : List<Atom> {
-            val atomList = ArrayList(atoms)
+            val atomList = atoms.toMutableList()
 
             atomList.sortBy { it.index }
 
-            return atomList;
+            return atomList.toList()
         }
 
         @JvmStatic
@@ -115,10 +116,7 @@ data class  Atom(
     }
 
     fun toJson(): String {
-        return Json {
-            encodeDefaults = true
-            ignoreUnknownKeys = true
-        }.encodeToString(this)
+        return jsonFormat.encodeToString(this)
     }
 
     override fun toString(): String {

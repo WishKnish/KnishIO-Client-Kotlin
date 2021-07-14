@@ -17,6 +17,23 @@ class Wallet(
     var batchId: String? = null,
     var characters: String? = null
 ) {
+
+    var balance: Double = 0.0
+    var key: String? = null
+    var address: String? = null
+    var privkey: String? = null
+    var pubkey: String? = null
+    var tokenUnits = arrayListOf<UnitData>()
+    var bundle: String? = null
+
+    init {
+        bundle = secret?.let {
+            position = position ?: Crypto.generateWalletPosition()
+            prepareKeys(it)
+            Crypto.generateBundleHash(it)
+        }
+    }
+
     companion object {
 
         @JvmStatic
@@ -95,22 +112,6 @@ class Wallet(
             }
 
             return Shake256.hash(digestSponge.hexString(1024), 32)
-        }
-    }
-
-    var balance: Double = 0.0
-    var key: String? = null
-    var address: String? = null
-    var privkey: String? = null
-    var pubkey: String? = null
-    var tokenUnits = arrayListOf<UnitData>()
-    var bundle: String? = null
-
-    init {
-        bundle = secret?.let {
-            position = position ?: Crypto.generateWalletPosition()
-            prepareKeys(it)
-            Crypto.generateBundleHash(it)
         }
     }
 

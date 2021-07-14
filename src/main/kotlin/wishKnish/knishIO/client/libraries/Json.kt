@@ -33,7 +33,7 @@ private fun JsonArray.toList(): List<Any?> = map {
 }
 
 
-fun JsonElement.decode(): Any {
+internal fun JsonElement.decode(): Any {
     return when (this) {
         is JsonArray -> toList()
         is JsonObject -> toMap()
@@ -41,7 +41,7 @@ fun JsonElement.decode(): Any {
     }
 }
 
-fun Map<*, *>.toJsonElement(): JsonElement {
+internal fun Map<*, *>.toJsonElement(): JsonElement {
 
     val map: MutableMap<String, JsonElement> = mutableMapOf()
 
@@ -59,7 +59,7 @@ fun Map<*, *>.toJsonElement(): JsonElement {
     return JsonObject(map)
 }
 
-fun List<*>.toJsonElement(): JsonElement {
+internal fun List<*>.toJsonElement(): JsonElement {
     val list: MutableList<JsonElement> = mutableListOf()
 
     forEach {
