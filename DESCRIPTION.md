@@ -1,5 +1,5 @@
 
-```Kotlin
+```kotlin=
 fun getClient(token: String? = null): HttpClient {
     // Certificate Authentication Stub
     class TrustAllX509TrustManager : X509TrustManager {
