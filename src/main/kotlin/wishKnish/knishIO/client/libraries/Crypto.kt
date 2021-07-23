@@ -1,3 +1,4 @@
+@file:JvmName("Crypto")
 package wishKnish.knishIO.client.libraries
 
 import kotlinx.serialization.SerializationException
@@ -70,7 +71,7 @@ class Crypto {
                 return this.generateBundleHash("$molecularHash$index")
             }
 
-            return Strings.randomString(64);
+            return Strings.randomString(64)
         }
 
         @JvmStatic

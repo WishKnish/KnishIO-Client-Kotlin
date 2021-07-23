@@ -3,4 +3,3 @@
 vendor/
 build/
 gradle/
-src/main/kotlin/main.kt

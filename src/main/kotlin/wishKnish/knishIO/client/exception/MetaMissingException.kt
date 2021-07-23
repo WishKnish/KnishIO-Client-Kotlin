@@ -1,3 +1,4 @@
+@file:JvmName("MetaMissingException")
 package wishKnish.knishIO.client.exception
 
 class MetaMissingException: BaseException {

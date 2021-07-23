@@ -1,3 +1,4 @@
+@file:JvmName("BaseException")
 package wishKnish.knishIO.client.exception
 
 open class BaseException: RuntimeException {

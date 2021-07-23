@@ -1,28 +1,28 @@
-@file:JvmName("UnitData")
-package wishKnish.knishIO.client.data
+@file:JvmName("ProposeMoleculeData")
+package wishKnish.knishIO.client.data.json
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-
 @Serializable
-data class UnitData(@JvmField val id:String, @JvmField val name: String, @JvmField val metas: List<String>) {
+class ResponseData(@JvmField var data: DataData? = null) {
     companion object {
         private val jsonFormat: Json
             get() =  Json {
                 encodeDefaults = true
                 ignoreUnknownKeys = true
+                coerceInputValues = true
             }
 
         @JvmStatic
-        fun create(id: String, name: String, metas: List<String>): UnitData {
-            return UnitData(id, name, metas)
+        fun create(data: DataData? = null): ResponseData {
+            return ResponseData(data)
         }
 
         @JvmStatic
-        fun jsonToObject(json: String): UnitData {
+        fun jsonToObject(json: String): ResponseData {
             return jsonFormat.decodeFromString(json)
         }
     }

@@ -1,3 +1,4 @@
+@file:JvmName("MetaData")
 package wishKnish.knishIO.client.data
 
 import kotlinx.serialization.Serializable
@@ -7,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 
 @Serializable
-data class MetaData(val key: String, val value: String? = null) {
+data class MetaData(@JvmField val key: String, @JvmField var value: String? = null) {
     companion object {
         private val jsonFormat: Json
             get() =  Json {

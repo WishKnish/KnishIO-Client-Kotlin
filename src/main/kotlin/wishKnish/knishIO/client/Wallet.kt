@@ -1,3 +1,4 @@
+@file:JvmName("Wallet")
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.SerializationException
@@ -12,19 +13,19 @@ import kotlin.jvm.Throws
 
 class Wallet(
     secret: String? = null,
-    var token: String = "USER",
-    var position: String? = null,
-    var batchId: String? = null,
-    var characters: String? = null
+    @JvmField var token: String = "USER",
+    @JvmField var position: String? = null,
+    @JvmField var batchId: String? = null,
+    @JvmField var characters: String? = null
 ) {
 
-    var balance: Double = 0.0
-    var key: String? = null
-    var address: String? = null
-    var privkey: String? = null
-    var pubkey: String? = null
-    var tokenUnits = arrayListOf<UnitData>()
-    var bundle: String? = null
+    @JvmField var balance: Double = 0.0
+    @JvmField var key: String? = null
+    @JvmField var address: String? = null
+    @JvmField var privkey: String? = null
+    @JvmField var pubkey: String? = null
+    @JvmField var tokenUnits = arrayListOf<UnitData>()
+    @JvmField var bundle: String? = null
 
     init {
         bundle = secret?.let {
@@ -75,13 +76,13 @@ class Wallet(
 
         @JvmStatic
         @Throws(NumberFormatException::class)
-        fun generatePrivateKey(secret: String, token: String? = null, position: String) : String {
+        fun generatePrivateKey(secret: String, token: String, position: String) : String {
             val bigIntSecret = BigInteger(secret, 16)
             val indexedKey = bigIntSecret.add(BigInteger(position, 16))
             val intermediateKeySponge = Shake256.create()
 
             intermediateKeySponge.absorb(indexedKey.toString(16))
-            token?.let { intermediateKeySponge.absorb(it) }
+            intermediateKeySponge.absorb(token)
 
             return Shake256.hash(intermediateKeySponge.hexString(1024), 1024)
         }
@@ -268,6 +269,7 @@ class Wallet(
             val message = Json.parseToJsonElement(
                 Base64.decode(data).joinToString("") { "${it.toInt().toChar()}" }
             ).decode()
+            @Suppress("UNCHECKED_CAST")
             val decrypt = (message as? Map<String, String>)?.let { decryptMyMessage(it) }
 
             decrypt ?: fallbackValue

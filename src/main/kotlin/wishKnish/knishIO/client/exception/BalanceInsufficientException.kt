@@ -1,3 +1,4 @@
+@file:JvmName("BalanceInsufficientException")
 package wishKnish.knishIO.client.exception
 
 class BalanceInsufficientException: BaseException {

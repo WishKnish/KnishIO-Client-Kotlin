@@ -1,3 +1,4 @@
+@file:JvmName("NegativeAmountException")
 package wishKnish.knishIO.client.exception
 
 class NegativeAmountException: BaseException {

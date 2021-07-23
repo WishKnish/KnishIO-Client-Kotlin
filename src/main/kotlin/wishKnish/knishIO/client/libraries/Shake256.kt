@@ -1,3 +1,4 @@
+@file:JvmName("Shake256")
 package wishKnish.knishIO.client.libraries
 
 import org.bouncycastle.crypto.digests.SHAKEDigest
@@ -16,13 +17,10 @@ class Shake256 {
         @JvmStatic
         fun hash(data: String, length: Int): String {
             val shaked = SHAKEDigest(256)
-
-            data.forEach {
-                shaked.update(it.code.toByte())
-            }
-
+            val dataByteArray = data.toByteArray()
             val output = ByteArray(length)
 
+            shaked.update(dataByteArray, 0, dataByteArray.size)
             shaked.doFinal(output, 0, length)
 
             return Hex.toHexString(output)
@@ -30,9 +28,9 @@ class Shake256 {
     }
 
     fun absorb(text: String): Shake256 {
-        text.forEach {
-            digest.update(it.code.toByte())
-        }
+        val dataByteArray = text.toByteArray()
+
+        digest.update(dataByteArray, 0, dataByteArray.size)
 
         return this
     }

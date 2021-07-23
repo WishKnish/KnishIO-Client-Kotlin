@@ -1,3 +1,4 @@
+@file:JvmName("Atom")
 package wishKnish.knishIO.client
 
 import wishKnish.knishIO.client.libraries.Shake256
@@ -12,26 +13,55 @@ import kotlin.jvm.Throws
 
 @Serializable
 data class  Atom(
-    var position: String,
-    var walletAddress: String,
-    var isotope: String,
-    var token: String? = null,
-    var value: String? = null,
-    var batchId: String? = null,
-    var metaType: String? = null,
-    var metaId: String? = null,
-    var meta: List<MetaData> = mutableListOf(),
-    var otsFragment: String? = null,
-    var index: Int = 0,
-    val createdAt: String = Strings.currentTimeMillis()
+    @JvmField var position: String,
+    @JvmField var walletAddress: String,
+    @JvmField var isotope: Char,
+    @JvmField var token: String,
+    @JvmField var value: String? = null,
+    @JvmField var batchId: String? = null,
+    @JvmField var metaType: String? = null,
+    @JvmField var metaId: String? = null,
+    @JvmField var meta: List<MetaData> = mutableListOf(),
+    @JvmField var otsFragment: String? = null,
+    @JvmField var index: Int = 0,
+    @JvmField val createdAt: String = Strings.currentTimeMillis()
     ) {
 
     companion object {
+        private val hashSchema
+            get() = mutableMapOf<String, Any?>(
+                "position" to null,
+                "walletAddress" to null,
+                "isotope" to null,
+                "token" to null,
+                "value" to null,
+                "batchId" to null,
+                "metaType" to null,
+                "metaId" to null,
+                "meta" to null,
+                "createdAt" to null
+            )
+
         private val jsonFormat: Json
             get() =  Json {
                 encodeDefaults = true
                 ignoreUnknownKeys = true
             }
+
+        @JvmStatic
+        private fun molecularHashSchema(atom: Atom): Map<String, Any?> {
+            val schema = hashSchema
+
+            atom::class.memberProperties.forEach {
+                if (it.visibility == KVisibility.PUBLIC) {
+                   if (schema.containsKey(it.name)) {
+                       schema[it.name] = it.getter.call(atom)
+                   }
+                }
+            }
+
+            return schema.toMap()
+        }
 
         @JvmStatic
         fun jsonToObject(json: String): Atom {
@@ -56,39 +86,32 @@ data class  Atom(
             for (atom in atomList) {
                 molecularSponge.absorb(numberOfAtoms)
 
-                atom::class.memberProperties.forEach {
-                    if (it.visibility == KVisibility.PUBLIC) {
-                        val value = it.getter.call(atom)
+                molecularHashSchema(atom).forEach { (property, value) ->
+                    if (value == null && property in arrayListOf("batchId", "pubkey", "characters")) {
+                        return@forEach
+                    }
 
-                        if (value == null && it.name in arrayListOf("batchId", "pubkey", "characters")) {
-                            return@forEach
-                        }
-
-                        if (it.name in arrayListOf("otsFragment", "index")) {
-                            return@forEach
-                        }
-
-                        if (it.name == "meta") {
-                            (value as List<MetaData>).forEach { MetaData ->
-                                MetaData.value?.run {
-                                    molecularSponge.absorb(MetaData.key)
-                                    molecularSponge.absorb(this)
-                                }
+                    if (property == "meta") {
+                        @Suppress("UNCHECKED_CAST")
+                        (value as List<MetaData>).forEach { MetaData ->
+                            MetaData.value?.run {
+                                molecularSponge.absorb(MetaData.key)
+                                molecularSponge.absorb(this)
                             }
-                            return@forEach
                         }
+                        return@forEach
+                    }
 
-                        if (it.name in arrayListOf("position", "walletAddress", "isotope")) {
-                            val content = value ?: ""
+                    if (property in arrayListOf("position", "walletAddress", "isotope")) {
+                        val content = value ?: ""
 
-                            molecularSponge.absorb(content.toString())
+                        molecularSponge.absorb(content.toString())
 
-                            return@forEach
-                        }
+                        return@forEach
+                    }
 
-                        value?.run {
-                            molecularSponge.absorb(toString())
-                        }
+                    value?.run {
+                        molecularSponge.absorb(toString())
                     }
                 }
             }

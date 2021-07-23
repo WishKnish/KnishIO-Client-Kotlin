@@ -1,5 +1,8 @@
+@file:JvmName("Strings")
 package wishKnish.knishIO.client.libraries
 
+import org.bouncycastle.util.encoders.Base64
+import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -8,6 +11,16 @@ import kotlin.jvm.Throws
 
 class Strings {
     companion object {
+
+        @JvmStatic
+        fun hexToBase64(str: String): String {
+            return Base64.toBase64String(Hex.decode(str))
+        }
+
+        @JvmStatic
+        fun base64ToHex(str: String): String {
+            return Hex.toHexString(Base64.decode(str))
+        }
 
         @JvmStatic
         @Throws(ArithmeticException::class)

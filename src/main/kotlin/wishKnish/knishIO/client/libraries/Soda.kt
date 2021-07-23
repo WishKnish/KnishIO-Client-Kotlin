@@ -1,3 +1,4 @@
+@file:JvmName("Soda")
 package wishKnish.knishIO.client.libraries
 
 import kotlinx.serialization.json.Json
