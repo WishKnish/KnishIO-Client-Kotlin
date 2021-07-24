@@ -1,4 +1,5 @@
 @file:JvmName("ProposeMoleculeData")
+
 package wishKnish.knishIO.client.data.json
 
 import kotlinx.serialization.Serializable
@@ -8,30 +9,30 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 class ResponseData(@JvmField var data: DataData? = null) {
-    companion object {
-        private val jsonFormat: Json
-            get() =  Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-                coerceInputValues = true
-            }
+  companion object {
+    private val jsonFormat: Json
+      get() = Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+      }
 
-        @JvmStatic
-        fun create(data: DataData? = null): ResponseData {
-            return ResponseData(data)
-        }
-
-        @JvmStatic
-        fun jsonToObject(json: String): ResponseData {
-            return jsonFormat.decodeFromString(json)
-        }
+    @JvmStatic
+    fun create(data: DataData? = null): ResponseData {
+      return ResponseData(data)
     }
 
-    private fun toJson(): String {
-        return jsonFormat.encodeToString(this)
+    @JvmStatic
+    fun jsonToObject(json: String): ResponseData {
+      return jsonFormat.decodeFromString(json)
     }
+  }
 
-    override fun toString(): String {
-        return toJson()
-    }
+  private fun toJson(): String {
+    return jsonFormat.encodeToString(this)
+  }
+
+  override fun toString(): String {
+    return toJson()
+  }
 }

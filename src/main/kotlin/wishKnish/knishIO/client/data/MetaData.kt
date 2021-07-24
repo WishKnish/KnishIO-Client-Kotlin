@@ -1,4 +1,5 @@
 @file:JvmName("MetaData")
+
 package wishKnish.knishIO.client.data
 
 import kotlinx.serialization.Serializable
@@ -9,29 +10,29 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class MetaData(@JvmField val key: String, @JvmField var value: String? = null) {
-    companion object {
-        private val jsonFormat: Json
-            get() =  Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-            }
+  companion object {
+    private val jsonFormat: Json
+      get() = Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+      }
 
-        @JvmStatic
-        fun create(key: String, value: String? = null): MetaData {
-            return MetaData(key, value)
-        }
-
-        @JvmStatic
-        fun jsonToObject(json: String): MetaData {
-            return jsonFormat.decodeFromString(json)
-        }
+    @JvmStatic
+    fun create(key: String, value: String? = null): MetaData {
+      return MetaData(key, value)
     }
 
-    private fun toJson(): String {
-        return jsonFormat.encodeToString(this)
+    @JvmStatic
+    fun jsonToObject(json: String): MetaData {
+      return jsonFormat.decodeFromString(json)
     }
+  }
 
-    override fun toString(): String {
-        return toJson()
-    }
+  private fun toJson(): String {
+    return jsonFormat.encodeToString(this)
+  }
+
+  override fun toString(): String {
+    return toJson()
+  }
 }

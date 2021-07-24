@@ -1,4 +1,5 @@
 @file:JvmName("Wallet")
+
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.SerializationException
@@ -12,287 +13,284 @@ import kotlin.jvm.Throws
 
 
 class Wallet(
-    secret: String? = null,
-    @JvmField var token: String = "USER",
-    @JvmField var position: String? = null,
-    @JvmField var batchId: String? = null,
-    @JvmField var characters: String? = null
+  secret: String? = null, @JvmField var token: String = "USER", @JvmField var position: String? = null, @JvmField var batchId: String? = null, @JvmField var characters: String? = null
 ) {
 
-    @JvmField var balance: Double = 0.0
-    @JvmField var key: String? = null
-    @JvmField var address: String? = null
-    @JvmField var privkey: String? = null
-    @JvmField var pubkey: String? = null
-    @JvmField var tokenUnits = arrayListOf<UnitData>()
-    @JvmField var bundle: String? = null
+  @JvmField
+  var balance: Double = 0.0
 
-    init {
+  @JvmField
+  var key: String? = null
+
+  @JvmField
+  var address: String? = null
+
+  @JvmField
+  var privkey: String? = null
+
+  @JvmField
+  var pubkey: String? = null
+
+  @JvmField
+  var tokenUnits = arrayListOf<UnitData>()
+
+  @JvmField
+  var bundle: String? = null
+
+  init {
+    bundle = secret?.let {
+      position = position ?: Crypto.generateWalletPosition()
+      prepareKeys(it)
+      Crypto.generateBundleHash(it)
+    }
+  }
+
+  companion object {
+
+    @JvmStatic
+    @Throws(NoSuchElementException::class)
+    fun create(
+      secretOrBundle: String? = null, token: String = "USER", batchId: String? = null, characters: String? = null
+    ): Wallet {
+      val secret = secretOrBundle?.let {
+        if (isBundleHash(it)) {
+          null
+        } else it
+      }
+
+      val position = secret?.let {
+        Crypto.generateWalletPosition()
+      }
+
+      return Wallet(
+        secret = secret, token = token, position = position, batchId = batchId, characters = characters
+      ).apply {
         bundle = secret?.let {
-            position = position ?: Crypto.generateWalletPosition()
-            prepareKeys(it)
-            Crypto.generateBundleHash(it)
-        }
+          Crypto.generateBundleHash(it)
+        } ?: secretOrBundle
+      }
     }
 
-    companion object {
+    @JvmStatic
+    fun getTokenUnits(unitsData: List<List<String>>): List<UnitData> {
+      val result = mutableListOf<UnitData>()
 
-        @JvmStatic
-        @Throws(NoSuchElementException::class)
-        fun create(
-            secretOrBundle: String? = null,
-            token: String = "USER",
-            batchId: String? = null,
-            characters: String? = null
-        ) : Wallet {
-            val secret = secretOrBundle?.let {
-                if (isBundleHash(it)) {
-                    null
-                }
-                else it
-            }
+      unitsData.forEach {
+        result.add(UnitData(id = it[0], name = it[1], metas = it))
+      }
 
-            val position = secret?.let {
-                Crypto.generateWalletPosition()
-            }
-
-            return  Wallet(secret = secret, token = token, position = position, batchId = batchId, characters = characters).apply {
-                bundle = secret?.let {
-                    Crypto.generateBundleHash(it)
-                } ?: secretOrBundle
-            }
-        }
-
-        @JvmStatic
-        fun getTokenUnits(unitsData: List<List<String>>): List<UnitData> {
-            val result = mutableListOf<UnitData>()
-
-            unitsData.forEach {
-                result.add(UnitData(id = it[0], name = it[1], metas = it))
-            }
-
-            return result.toList()
-        }
-
-        @JvmStatic
-        @Throws(NumberFormatException::class)
-        fun generatePrivateKey(secret: String, token: String, position: String) : String {
-            val bigIntSecret = BigInteger(secret, 16)
-            val indexedKey = bigIntSecret.add(BigInteger(position, 16))
-            val intermediateKeySponge = Shake256.create()
-
-            intermediateKeySponge.absorb(indexedKey.toString(16))
-            intermediateKeySponge.absorb(token)
-
-            return Shake256.hash(intermediateKeySponge.hexString(1024), 1024)
-        }
-
-        @JvmStatic
-        fun isBundleHash(code: String) : Boolean {
-            return code.length == 64 && code.matches(Regex("^(?:[a-fA-F0-9]+)?\$"))
-        }
-
-        @JvmStatic
-        @Throws(NoSuchElementException::class)
-        fun generateWalletPosition(saltLength:  Int = 64) : String {
-            return Strings.randomString(saltLength)
-        }
-
-        @JvmStatic
-        fun generatePublicKey(key: String) : String {
-            val digestSponge = Shake256.create()
-
-            key.chunked(128).forEach {
-                var workingFragment = it
-
-                (1..16).forEach { _ ->
-                    workingFragment = Shake256.hash(workingFragment, 64)
-                }
-
-                digestSponge.absorb(workingFragment)
-            }
-
-            return Shake256.hash(digestSponge.hexString(1024), 32)
-        }
+      return result.toList()
     }
 
-    private fun prepareKeys(secret: String) {
-        if (key == null && address == null) {
+    @JvmStatic
+    @Throws(NumberFormatException::class)
+    fun generatePrivateKey(secret: String, token: String, position: String): String {
+      val bigIntSecret = BigInteger(secret, 16)
+      val indexedKey = bigIntSecret.add(BigInteger(position, 16))
+      val intermediateKeySponge = Shake256.create()
 
-            key = generatePrivateKey(
-                secret = secret,
-                token = token,
-                position = position as String
-            )
-            address = generatePublicKey(key = key as String)
-        }
+      intermediateKeySponge.absorb(indexedKey.toString(16))
+      intermediateKeySponge.absorb(token)
+
+      return Shake256.hash(intermediateKeySponge.hexString(1024), 1024)
     }
 
-    fun initBatchId(sourceWallet: Wallet, remainder: Boolean = false) {
-        sourceWallet.batchId?.let {
-            batchId = if (remainder) it else Crypto.generateBatchId()
-        }
+    @JvmStatic
+    fun isBundleHash(code: String): Boolean {
+      return code.length == 64 && code.matches(Regex("^(?:[a-fA-F0-9]+)?\$"))
     }
 
-    fun isShadow(): Boolean {
-        return position == null && address == null
+    @JvmStatic
+    @Throws(NoSuchElementException::class)
+    fun generateWalletPosition(saltLength: Int = 64): String {
+      return Strings.randomString(saltLength)
     }
 
-    fun hasTokenUnits(): Boolean {
-        return tokenUnits.isNotEmpty()
-    }
+    @JvmStatic
+    fun generatePublicKey(key: String): String {
+      val digestSponge = Shake256.create()
 
-    fun tokenUnitsJson(): String? {
-        if (hasTokenUnits()) {
-            val result = arrayListOf<List<String>>()
-            tokenUnits.forEach {
-                result.add(listOf(it.id, it.name) + it.metas)
-            }
+      key.chunked(128).forEach {
+        var workingFragment = it
 
-            return result.toJsonElement().toString()
-        }
-
-        return null
-    }
-
-    fun splitUnits(units: List<UnitData>, remainderWallet: Wallet, recipientWallet: Wallet? = null) {
-
-        // No units supplied, nothing to split
-        if (units.isEmpty()) {
-            return
+        (1..16).forEach { _ ->
+          workingFragment = Shake256.hash(workingFragment, 64)
         }
 
-        // Init recipient & remainder token units
-        val recipientTokenUnits = arrayListOf<UnitData>()
-        val remainderTokenUnits = arrayListOf<UnitData>()
+        digestSponge.absorb(workingFragment)
+      }
 
-        tokenUnits.forEach {
+      return Shake256.hash(digestSponge.hexString(1024), 32)
+    }
+  }
 
-            units.filter { unit ->
-                it.id == unit.id
-            }.forEach { unit ->
-                recipientTokenUnits.add(unit)
-            }
+  private fun prepareKeys(secret: String) {
+    if (key == null && address == null) {
 
-            units.filter { unit ->
-                it.id != unit.id
-            }.forEach { unit ->
-                remainderTokenUnits.add(unit)
-            }
-        }
+      key = generatePrivateKey(
+        secret = secret, token = token, position = position as String
+      )
+      address = generatePublicKey(key = key as String)
+    }
+  }
 
-        // Reset token units to the sending value
-        tokenUnits = recipientTokenUnits
+  fun initBatchId(sourceWallet: Wallet, remainder: Boolean = false) {
+    sourceWallet.batchId?.let {
+      batchId = if (remainder) it else Crypto.generateBatchId()
+    }
+  }
 
-        recipientWallet?.let {
-            it.tokenUnits = recipientTokenUnits
-        }
+  fun isShadow(): Boolean {
+    return position == null && address == null
+  }
 
-        remainderWallet.tokenUnits = remainderTokenUnits
+  fun hasTokenUnits(): Boolean {
+    return tokenUnits.isNotEmpty()
+  }
+
+  fun tokenUnitsJson(): String? {
+    if (hasTokenUnits()) {
+      val result = arrayListOf<List<String>>()
+      tokenUnits.forEach {
+        result.add(listOf(it.id, it.name) + it.metas)
+      }
+
+      return result.toJsonElement().toString()
     }
 
-    @Throws(IllegalArgumentException::class)
-    fun getMyEncPrivateKey(): String? {
-        if (privkey == null) {
-            key?.let {
-                privkey = Crypto.generateEncPrivateKey(it, characters ?: "GMP")
-            }
-        }
+    return null
+  }
 
-        return privkey
+  fun splitUnits(units: List<UnitData>, remainderWallet: Wallet, recipientWallet: Wallet? = null) {
+
+    // No units supplied, nothing to split
+    if (units.isEmpty()) {
+      return
     }
 
-    @Throws(IllegalArgumentException::class, NumberFormatException::class)
-    fun getMyEncPublicKey(): String? {
-        val privateKey = getMyEncPrivateKey()
+    // Init recipient & remainder token units
+    val recipientTokenUnits = arrayListOf<UnitData>()
+    val remainderTokenUnits = arrayListOf<UnitData>()
 
-        if (pubkey == null) {
-            privateKey?.let {
-                pubkey = Crypto.generateEncPublicKey(it, characters ?: "GMP")
-            }
-        }
+    tokenUnits.forEach {
 
-        return pubkey
+      units.filter { unit ->
+        it.id == unit.id
+      }.forEach { unit ->
+        recipientTokenUnits.add(unit)
+      }
+
+      units.filter { unit ->
+        it.id != unit.id
+      }.forEach { unit ->
+        remainderTokenUnits.add(unit)
+      }
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMyMessage(message: List<*>, vararg publicKeys: String): Map<String, String> {
-        val encrypt = mutableMapOf<String, String>()
+    // Reset token units to the sending value
+    tokenUnits = recipientTokenUnits
 
-        publicKeys.forEach {
-            encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
-                message,
-                it,
-                characters ?: "GMP"
-            )
-        }
-
-        return encrypt.toMap()
+    recipientWallet?.let {
+      it.tokenUnits = recipientTokenUnits
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMyMessage(message: Map<*, *>, vararg publicKeys: String): Map<String, String> {
-        val encrypt = mutableMapOf<String, String>()
+    remainderWallet.tokenUnits = remainderTokenUnits
+  }
 
-        publicKeys.forEach {
-            encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
-                message,
-                it,
-                characters ?: "GMP"
-            )
-        }
-
-        return encrypt.toMap()
+  @Throws(IllegalArgumentException::class)
+  fun getMyEncPrivateKey(): String? {
+    if (privkey == null) {
+      key?.let {
+        privkey = Crypto.generateEncPrivateKey(it, characters ?: "GMP")
+      }
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptString(message: String, vararg publicKeys: String): String {
-        val keys = publicKeys.toMutableList()
-        val encrypt = mutableMapOf<String, String>()
-        getMyEncPublicKey()?.let {
-            keys.add(it)
-        }
-        keys.forEach {
-            encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
-                message,
-                it,
-                characters ?: "GMP"
-            )
-        }
+    return privkey
+  }
 
-        return Base64.toBase64String(encrypt.toJsonElement().toString().toByteArray())
+  @Throws(IllegalArgumentException::class, NumberFormatException::class)
+  fun getMyEncPublicKey(): String? {
+    val privateKey = getMyEncPrivateKey()
+
+    if (pubkey == null) {
+      privateKey?.let {
+        pubkey = Crypto.generateEncPublicKey(it, characters ?: "GMP")
+      }
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
-    fun decryptString(data: String, fallbackValue: String? = null): Any? {
-        return try {
-            val message = Json.parseToJsonElement(
-                Base64.decode(data).joinToString("") { "${it.toInt().toChar()}" }
-            ).decode()
-            @Suppress("UNCHECKED_CAST")
-            val decrypt = (message as? Map<String, String>)?.let { decryptMyMessage(it) }
+    return pubkey
+  }
 
-            decrypt ?: fallbackValue
-        } catch (e: Exception){
-            fallbackValue
-        }
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
+  fun encryptMyMessage(message: List<*>, vararg publicKeys: String): Map<String, String> {
+    val encrypt = mutableMapOf<String, String>()
+
+    publicKeys.forEach {
+      encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
+        message, it, characters ?: "GMP"
+      )
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
-    fun decryptMyMessage(message: String): Any? {
-        val privateKey = getMyEncPrivateKey() ?: ""
-        val publicKey = getMyEncPublicKey() ?: ""
+    return encrypt.toMap()
+  }
 
-        return Crypto.decryptMessage(message, privateKey, publicKey, characters ?: "GMP")
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
+  fun encryptMyMessage(message: Map<*, *>, vararg publicKeys: String): Map<String, String> {
+    val encrypt = mutableMapOf<String, String>()
+
+    publicKeys.forEach {
+      encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
+        message, it, characters ?: "GMP"
+      )
     }
 
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
-    fun decryptMyMessage(message: Map<String, String>): Any? {
-        val publicKey = getMyEncPublicKey() ?: ""
-        val privateKey = getMyEncPrivateKey() ?: ""
-        val encrypt = message[Crypto.hashShare(publicKey)] ?: ""
+    return encrypt.toMap()
+  }
 
-        return Crypto.decryptMessage(encrypt, privateKey, publicKey, characters ?: "GMP")
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
+  fun encryptString(message: String, vararg publicKeys: String): String {
+    val keys = publicKeys.toMutableList()
+    val encrypt = mutableMapOf<String, String>()
+    getMyEncPublicKey()?.let {
+      keys.add(it)
     }
+    keys.forEach {
+      encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
+        message, it, characters ?: "GMP"
+      )
+    }
+
+    return Base64.toBase64String(encrypt.toJsonElement().toString().toByteArray())
+  }
+
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
+  fun decryptString(data: String, fallbackValue: String? = null): Any? {
+    return try {
+      val message = Json.parseToJsonElement(Base64.decode(data).joinToString("") { "${it.toInt().toChar()}" }).decode()
+
+      @Suppress("UNCHECKED_CAST") val decrypt = (message as? Map<String, String>)?.let { decryptMyMessage(it) }
+
+      decrypt ?: fallbackValue
+    } catch (e: Exception) {
+      fallbackValue
+    }
+  }
+
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
+  fun decryptMyMessage(message: String): Any? {
+    val privateKey = getMyEncPrivateKey() ?: ""
+    val publicKey = getMyEncPublicKey() ?: ""
+
+    return Crypto.decryptMessage(message, privateKey, publicKey, characters ?: "GMP")
+  }
+
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
+  fun decryptMyMessage(message: Map<String, String>): Any? {
+    val publicKey = getMyEncPublicKey() ?: ""
+    val privateKey = getMyEncPrivateKey() ?: ""
+    val encrypt = message[Crypto.hashShare(publicKey)] ?: ""
+
+    return Crypto.decryptMessage(encrypt, privateKey, publicKey, characters ?: "GMP")
+  }
 
 }

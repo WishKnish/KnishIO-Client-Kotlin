@@ -1,4 +1,5 @@
 @file:JvmName("Shake256")
+
 package wishKnish.knishIO.client.libraries
 
 import org.bouncycastle.crypto.digests.SHAKEDigest
@@ -6,44 +7,44 @@ import org.bouncycastle.util.encoders.Hex
 
 
 class Shake256 {
-    private val digest = SHAKEDigest(256)
+  private val digest = SHAKEDigest(256)
 
-    companion object {
-        @JvmStatic
-        fun create(): Shake256 {
-            return Shake256()
-        }
-
-        @JvmStatic
-        fun hash(data: String, length: Int): String {
-            val shaked = SHAKEDigest(256)
-            val dataByteArray = data.toByteArray()
-            val output = ByteArray(length)
-
-            shaked.update(dataByteArray, 0, dataByteArray.size)
-            shaked.doFinal(output, 0, length)
-
-            return Hex.toHexString(output)
-        }
+  companion object {
+    @JvmStatic
+    fun create(): Shake256 {
+      return Shake256()
     }
 
-    fun absorb(text: String): Shake256 {
-        val dataByteArray = text.toByteArray()
+    @JvmStatic
+    fun hash(data: String, length: Int): String {
+      val shaked = SHAKEDigest(256)
+      val dataByteArray = data.toByteArray()
+      val output = ByteArray(length)
 
-        digest.update(dataByteArray, 0, dataByteArray.size)
+      shaked.update(dataByteArray, 0, dataByteArray.size)
+      shaked.doFinal(output, 0, length)
 
-        return this
+      return Hex.toHexString(output)
     }
+  }
 
-    fun squeeze(length: Int): ByteArray {
-        val output = ByteArray(length)
+  fun absorb(text: String): Shake256 {
+    val dataByteArray = text.toByteArray()
 
-        digest.doFinal(output, 0, length)
+    digest.update(dataByteArray, 0, dataByteArray.size)
 
-        return output
-    }
+    return this
+  }
 
-    fun hexString(length: Int): String {
-        return Hex.toHexString(this.squeeze(length))
-    }
+  fun squeeze(length: Int): ByteArray {
+    val output = ByteArray(length)
+
+    digest.doFinal(output, 0, length)
+
+    return output
+  }
+
+  fun hexString(length: Int): String {
+    return Hex.toHexString(this.squeeze(length))
+  }
 }

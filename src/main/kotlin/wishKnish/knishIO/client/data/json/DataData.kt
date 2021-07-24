@@ -7,30 +7,30 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class DataData(@JvmField var ProposeMolecule: ProposeMoleculeData? = null) {
-    companion object {
-        private val jsonFormat: Json
-            get() =  Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-                coerceInputValues = true
-            }
+  companion object {
+    private val jsonFormat: Json
+      get() = Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+      }
 
-        @JvmStatic
-        fun create(ProposeMolecule: ProposeMoleculeData? = null): DataData {
-            return DataData(ProposeMolecule)
-        }
-
-        @JvmStatic
-        fun jsonToObject(json: String): DataData {
-            return jsonFormat.decodeFromString(json)
-        }
+    @JvmStatic
+    fun create(ProposeMolecule: ProposeMoleculeData? = null): DataData {
+      return DataData(ProposeMolecule)
     }
 
-    private fun toJson(): String {
-        return jsonFormat.encodeToString(this)
+    @JvmStatic
+    fun jsonToObject(json: String): DataData {
+      return jsonFormat.decodeFromString(json)
     }
+  }
 
-    override fun toString(): String {
-        return toJson()
-    }
+  private fun toJson(): String {
+    return jsonFormat.encodeToString(this)
+  }
+
+  override fun toString(): String {
+    return toJson()
+  }
 }

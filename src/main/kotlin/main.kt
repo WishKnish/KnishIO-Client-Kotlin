@@ -1,4 +1,3 @@
-
 import com.google.gson.Gson
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.MetaData
@@ -38,163 +37,157 @@ var authToken: String? = null
 
 suspend fun main(args: Array<String>) {
 
-    print("#### AUTHORIZING ####\r\n")
-    authToken = authorizationToken()
-    print("Authorization Token: [$authToken]\r\n")
+  print("#### AUTHORIZING ####\r\n")
+  authToken = authorizationToken()
+  print("Authorization Token: [$authToken]\r\n")
 
-    // print("\r\n#### CREATING META ####\r\n")
-    // createMeta()
+  // print("\r\n#### CREATING META ####\r\n")
+  // createMeta()
 
-    // print("\r\n#### CREATING TOKEN ####\r\n")
-    // createToken()
+  // print("\r\n#### CREATING TOKEN ####\r\n")
+  // createToken()
 
-    print("\r\n#### TRANSFERRING TOKEN ####\r\n")
-    transferTokens()
+  print("\r\n#### TRANSFERRING TOKEN ####\r\n")
+  transferTokens()
 
 }
 
 suspend fun transferTokens(): Boolean {
 
-    // Designating sender wallet
-    val sourceWallet = balanceQuery(Crypto.generateBundleHash(secret), tokenSlug)
-        ?: throw IllegalArgumentException("You do not have a token $tokenSlug balance")
+  // Designating sender wallet
+  val sourceWallet = balanceQuery(Crypto.generateBundleHash(secret), tokenSlug) ?: throw IllegalArgumentException("You do not have a token $tokenSlug balance")
 
-    // Designating recipient wallet
-    val recipientWallet = Wallet(secret2, tokenSlug);
+  // Designating recipient wallet
+  val recipientWallet = Wallet(secret2, tokenSlug);
 
-    // Creating molecule
-    val molecule = Molecule(secret, sourceWallet, null, cellSlug)
-    molecule.initValue(recipientWallet, 10)
+  // Creating molecule
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initValue(recipientWallet, 10)
 
-    // Signing molecule
-    molecule.sign()
-    print("transferTokens() - Signed molecule:\r\n$molecule\r\n");
+  // Signing molecule
+  molecule.sign()
+  print("transferTokens() - Signed molecule:\r\n$molecule\r\n");
 
-    // Getting broadcast response
-    val response = moleculeMutation(molecule, sourceWallet);
-    val responseMolecule = extractMolecule(response)
+  // Getting broadcast response
+  val response = moleculeMutation(molecule, sourceWallet);
+  val responseMolecule = extractMolecule(response)
 
-    // Verifying status
-    if (responseMolecule.status.lowercase() !== "accepted") {
-        throw IllegalArgumentException(responseMolecule.reason)
-    }
+  // Verifying status
+  if (responseMolecule.status.lowercase() !== "accepted") {
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
 
-    return true;
+  return true;
 }
 
 suspend fun createToken(): Boolean {
 
-    // Token metadata
-    val meta = mutableListOf(
-        MetaData("name", "$tokenSlug token"),
-        MetaData("fungibility", "stackable"),
-        MetaData("supply", "replenishable"),
-        MetaData("decimals", "0")
-    )
+  // Token metadata
+  val meta = mutableListOf(
+    MetaData("name", "$tokenSlug token"), MetaData("fungibility", "stackable"), MetaData("supply", "replenishable"), MetaData("decimals", "0")
+  )
 
-    // Defining signing wallet
-    val sourceWallet = Wallet(secret)
+  // Defining signing wallet
+  val sourceWallet = Wallet(secret)
 
-    // Creating wallet to receive tokens
-    val recipientWallet = Wallet(secret, tokenSlug)
+  // Creating wallet to receive tokens
+  val recipientWallet = Wallet(secret, tokenSlug)
 
-    // Creating molecule mutation
-    val molecule = Molecule(secret, sourceWallet, null, cellSlug)
-    molecule.initTokenCreation(recipientWallet, tokenAmount, meta)
+  // Creating molecule mutation
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initTokenCreation(recipientWallet, tokenAmount, meta)
 
-    // Signing molecule
-    molecule.sign()
-    print("createToken() - Signed molecule:\r\n$molecule\r\n");
+  // Signing molecule
+  molecule.sign()
+  print("createToken() - Signed molecule:\r\n$molecule\r\n");
 
-    // Getting broadcast response
-    val response = moleculeMutation(molecule);
-    val responseMolecule = extractMolecule(response)
+  // Getting broadcast response
+  val response = moleculeMutation(molecule);
+  val responseMolecule = extractMolecule(response)
 
-    // Verifying status
-    if (responseMolecule.status.lowercase() !== "accepted") {
-        throw IllegalArgumentException(responseMolecule.reason)
-    }
+  // Verifying status
+  if (responseMolecule.status.lowercase() !== "accepted") {
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
 
-    return true
+  return true
 }
 
 suspend fun createMeta(): Boolean {
 
-    // Defining meta asset parameters
-    val metaType = "artifact"
-    val metaId = "1"
-    val meta = mutableListOf(
-        MetaData("logo", "data:image/jpeg;base64,*")
-    )
+  // Defining meta asset parameters
+  val metaType = "artifact"
+  val metaId = "1"
+  val meta = mutableListOf(
+    MetaData("logo", "data:image/jpeg;base64,*")
+  )
 
-    // Defining signing wallet
-    val sourceWallet = Wallet(secret);
+  // Defining signing wallet
+  val sourceWallet = Wallet(secret);
 
-    // Creating molecule mutation
-    val molecule = Molecule(secret, sourceWallet, null, cellSlug)
-    molecule.initMeta(meta, metaType, metaId)
+  // Creating molecule mutation
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initMeta(meta, metaType, metaId)
 
-    // Signing molecule
-    molecule.sign()
-    print("createMeta() - Signed molecule:\r\n$molecule\r\n");
+  // Signing molecule
+  molecule.sign()
+  print("createMeta() - Signed molecule:\r\n$molecule\r\n");
 
-    // Getting broadcast response
-    val response = moleculeMutation(molecule);
-    val responseMolecule = extractMolecule(response)
+  // Getting broadcast response
+  val response = moleculeMutation(molecule);
+  val responseMolecule = extractMolecule(response)
 
-    // Verifying status
-    if (responseMolecule.status.lowercase() != "accepted") {
-        throw IllegalArgumentException(responseMolecule.reason)
-    }
+  // Verifying status
+  if (responseMolecule.status.lowercase() != "accepted") {
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
 
-    return true
+  return true
 }
 
 suspend fun authorizationToken(): String {
 
-    // Defining authorization parameters
-    val meta = mutableListOf(
-        MetaData("encrypt", "false")
-    )
+  // Defining authorization parameters
+  val meta = mutableListOf(
+    MetaData("encrypt", "false")
+  )
 
-    // Creating wallet for authorization
-    val authWallet = Wallet(secret, "AUTH")
+  // Creating wallet for authorization
+  val authWallet = Wallet(secret, "AUTH")
 
-    // Creating molecule mutation
-    val molecule = Molecule(secret, authWallet, null, cellSlug)
-    molecule.initAuthorization(meta)
+  // Creating molecule mutation
+  val molecule = Molecule(secret, authWallet, null, cellSlug)
+  molecule.initAuthorization(meta)
 
-    // Signing molecule
-    molecule.sign()
-    print("authorizationToken() - Signed molecule:\r\n$molecule\r\n");
+  // Signing molecule
+  molecule.sign()
+  print("authorizationToken() - Signed molecule:\r\n$molecule\r\n");
 
-    // Getting broadcast response
-    val response = moleculeMutation(molecule)
-    val responseMolecule = extractMolecule(response)
+  // Getting broadcast response
+  val response = moleculeMutation(molecule)
+  val responseMolecule = extractMolecule(response)
 
-    // Verifying status
-    if (responseMolecule.status.lowercase() == "accepted") {
+  // Verifying status
+  if (responseMolecule.status.lowercase() == "accepted") {
 
-        // proposeMolecule.payload = {
-        //   token="8d2c5c44-9700-48b1-8d35-3ccf956a51ab",
-        //   time=172800000, expiresAt=1627136089,
-        //   key="DmiNUTlYY0YKnUS0i8FhG4BZkYm5ZFsOSktBuUU2oINI",
-        //   encrypt=false
-        // }
-        return Gson().fromJson(responseMolecule.payload, Map::class.java)["token"]?.toString()
-            ?: throw IllegalArgumentException("Invalid response format")
-    }
+    // proposeMolecule.payload = {
+    //   token="8d2c5c44-9700-48b1-8d35-3ccf956a51ab",
+    //   time=172800000, expiresAt=1627136089,
+    //   key="DmiNUTlYY0YKnUS0i8FhG4BZkYm5ZFsOSktBuUU2oINI",
+    //   encrypt=false
+    // }
+    return Gson().fromJson(responseMolecule.payload, Map::class.java)["token"]?.toString() ?: throw IllegalArgumentException("Invalid response format")
+  }
 
-    throw IllegalArgumentException("An error occurred during authorization")
+  throw IllegalArgumentException("An error occurred during authorization")
 }
 
-fun extractMolecule (response: String): ProposeMoleculeData {
-    return ResponseData.jsonToObject(response)
-        .data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
+fun extractMolecule(response: String): ProposeMoleculeData {
+  return ResponseData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
 }
 
 suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
-    val query = """
+  val query = """
     query( ${'$'}address: String, ${'$'}bundleHash: String, ${'$'}token: String, ${'$'}position: String ) {
       Balance( address: ${'$'}address, bundleHash: ${'$'}bundleHash, token: ${'$'}token, position: ${'$'}position ) {
         address,
@@ -215,145 +208,151 @@ suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
     }
     """.trimIndent()
 
-    // Defining query parameters
-    val variables = mapOf(
-        "bundleHash" to bundleHash,
-        "token" to token
-    )
+  // Defining query parameters
+  val variables = mapOf(
+    "bundleHash" to bundleHash, "token" to token
+  )
 
-    // Getting query response
-    val responseJson = graphqlQuery(query, variables);
-    print("balanceQuery() - JSON response:\r\n$responseJson\r\n");
+  // Getting query response
+  val responseJson = graphqlQuery(query, variables);
+  print("balanceQuery() - JSON response:\r\n$responseJson\r\n");
 
-    // Converting to GSON
-    val responseGson = Gson().fromJson(responseJson, Map::class.java)
-    print("balanceQuery() - GSON response: \r\n$responseGson\r\n");
+  // Converting to GSON
+  val responseGson = Gson().fromJson(responseJson, Map::class.java)
+  print("balanceQuery() - GSON response: \r\n$responseGson\r\n");
 
-    // Mapping to wallet objects
-    val responseMapped = responseGson["data"]?.let { item ->
-        (item as Map<*, *>)["Balance"]?.let {
-            val walletMap = it as Map<*, *>
-            val wallet = Wallet.create(
-                walletMap["bundleHash"] as String,
-                walletMap["tokenSlug"] as String,
-                walletMap["batchId"] as String?,
-                walletMap["characters"] as String?
-            )
-            wallet.address = walletMap["address"] as String?
-            wallet.position = walletMap["position"] as String?
-            wallet.balance = (walletMap["amount"] as String).toDouble()
-            wallet.pubkey = walletMap["pubkey"] as String?
-            wallet
-        }
+  // Mapping to wallet objects
+  val responseMapped = responseGson["data"]?.let { item ->
+    (item as Map<*, *>)["Balance"]?.let {
+      val walletMap = it as Map<*, *>
+
+      val bundleHash = walletMap["bundleHash"] as String
+      val tokenSlug = walletMap["tokenSlug"] as String
+      val batchId = walletMap["batchId"] as String?
+      val characters = walletMap["characters"] as String?
+      val address = walletMap["address"] as String?
+      val position = walletMap["position"] as String?
+      val amount = (walletMap["amount"] as String).toDouble()
+      val pubkey = walletMap["pubkey"] as String?
+
+      val wallet = Wallet.create(bundleHash, tokenSlug, batchId, characters)
+      wallet.address = address
+      wallet.position = position
+      wallet.balance = amount
+      wallet.pubkey = pubkey
+
+      print("\r\n\r\n$wallet\r\n\r\n")
+      wallet
     }
-    print("balanceQuery() - Mapped response: \r\n$responseMapped\r\n");
+  }
+  print("balanceQuery() - Mapped response: \r\n$responseMapped\r\n");
 
-    return responseMapped
+  return responseMapped
 }
 
 suspend fun graphqlQuery(query: String, variables: Map<String, String>): String {
 
-    val client = getClient()
-    val response: HttpResponse = client.post(endpoint) {
-        contentType(ContentType.Application.Json)
-        body = GraphqlQueryData(query, variables)
-    }
-    val content = response.readText()
-    client.close()
-    return content
+  val client = getClient()
+  val response: HttpResponse = client.post(endpoint) {
+    contentType(ContentType.Application.Json)
+    body = GraphqlQueryData(query, variables)
+  }
+  val content = response.readText()
+  client.close()
+  return content
 
 }
 
 suspend fun moleculeMutation(molecule: Molecule, wallet: Wallet? = null): String {
 
-    if (molecule.check(wallet)) {
+  if (molecule.check(wallet)) {
 
-        val client = getClient()
-        val response: HttpResponse = client.post(endpoint) {
-            contentType(ContentType.Application.Json)
-            body = MoleculeMutationQuery(molecule)
-        }
-        val content = response.readText()
-
-        client.close()
-
-        return content
+    val client = getClient()
+    val response: HttpResponse = client.post(endpoint) {
+      contentType(ContentType.Application.Json)
+      body = MoleculeMutationQuery(molecule)
     }
+    val content = response.readText()
 
-    throw IllegalArgumentException("Molecule check error")
+    client.close()
+
+    return content
+  }
+
+  throw IllegalArgumentException("Molecule check error")
 }
 
 fun getClient(): HttpClient {
 
-    // Certificate Authentication Stub
-    class TrustAllX509TrustManager : X509TrustManager {
-        override fun getAcceptedIssuers(): Array<X509Certificate?> = arrayOfNulls(0)
-        override fun checkClientTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
-        override fun checkServerTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
-    }
+  // Certificate Authentication Stub
+  class TrustAllX509TrustManager : X509TrustManager {
+    override fun getAcceptedIssuers(): Array<X509Certificate?> = arrayOfNulls(0)
+    override fun checkClientTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
+    override fun checkServerTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
+  }
 
-    val jsonFormat = KotlinJson {
-        encodeDefaults = true
-        ignoreUnknownKeys = true
-    }
+  val jsonFormat = KotlinJson {
+    encodeDefaults = true
+    ignoreUnknownKeys = true
+  }
 
-    return HttpClient(CIO) {
-        engine {
-            headersOf("X-Auth-Token", authToken ?: "")
-            maxConnectionsCount = 1000
-            endpoint {
-                maxConnectionsPerRoute = 100
-                pipelineMaxSize = 20
-                keepAliveTime = 5000
-                connectTimeout = 5000
-                connectAttempts = 5
-            }
-            https {
-                // Certificate Authentication Stub
-                https {
-                    serverName = "lumen.loc"
-                    cipherSuites = CIOCipherSuites.SupportedSuites
-                    trustManager = TrustAllX509TrustManager()
-                    random = SecureRandom()
-                }
-            }
+  return HttpClient(CIO) {
+    engine {
+      headersOf("X-Auth-Token", authToken ?: "")
+      maxConnectionsCount = 1000
+      endpoint {
+        maxConnectionsPerRoute = 100
+        pipelineMaxSize = 20
+        keepAliveTime = 5000
+        connectTimeout = 5000
+        connectAttempts = 5
+      }
+      https {
+        // Certificate Authentication Stub
+        https {
+          serverName = "lumen.loc"
+          cipherSuites = CIOCipherSuites.SupportedSuites
+          trustManager = TrustAllX509TrustManager()
+          random = SecureRandom()
         }
-        install(JsonFeature) {
-            serializer = KotlinxSerializer(jsonFormat)
-        }
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.NONE
-        }
+      }
     }
+    install(JsonFeature) {
+      serializer = KotlinxSerializer(jsonFormat)
+    }
+    install(Logging) {
+      logger = Logger.DEFAULT
+      level = LogLevel.NONE
+    }
+  }
 }
 
 @Serializable
 data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables: Map<String, String>) {
-    companion object {
-        private val jsonFormat: kotlinx.serialization.json.Json
-            get() = kotlinx.serialization.json.Json {
-                encodeDefaults = true
-                ignoreUnknownKeys = true
-                coerceInputValues = true
-            }
+  companion object {
+    private val jsonFormat: kotlinx.serialization.json.Json
+      get() = kotlinx.serialization.json.Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+      }
 
-        @JvmStatic
-        fun create(query: String, variables: Map<String, String>): GraphqlQueryData {
-            return GraphqlQueryData(query, variables)
-        }
-
-        @JvmStatic
-        fun jsonToObject(json: String): GraphqlQueryData {
-            return jsonFormat.decodeFromString(json)
-        }
+    @JvmStatic
+    fun create(query: String, variables: Map<String, String>): GraphqlQueryData {
+      return GraphqlQueryData(query, variables)
     }
 
-    private fun toJson(): String {
-        return jsonFormat.encodeToString(this)
+    @JvmStatic
+    fun jsonToObject(json: String): GraphqlQueryData {
+      return jsonFormat.decodeFromString(json)
     }
+  }
 
-    override fun toString(): String {
-        return toJson()
-    }
+  private fun toJson(): String {
+    return jsonFormat.encodeToString(this)
+  }
+
+  override fun toString(): String {
+    return toJson()
+  }
 }
