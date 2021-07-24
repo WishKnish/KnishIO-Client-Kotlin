@@ -37,12 +37,12 @@ class CheckMolecule {
 
       missing(molecule)
 
-      val subscription = molecule.atoms.first()
-      if (subscription.isotope == 'V' && subscription.batchId.isNullOrEmpty()) {
+      val signingAtom = molecule.atoms.first()
+      if (signingAtom.isotope == 'V' && !signingAtom.batchId.isNullOrEmpty()) {
         val atoms = molecule.atoms.filter { it.isotope == 'V' }
-        val remainder = atoms.last()
+        val remainderAtom = atoms.last()
 
-        if (subscription.batchId != remainder.batchId) {
+        if (signingAtom.batchId != remainderAtom.batchId) {
           throw BatchIdException()
         }
 
