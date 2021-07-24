@@ -34,7 +34,12 @@ private fun ByteArray.sha256(): ByteArray {
 }
 
 
-private fun divmod(number: ByteArray, firstDigit: UInt, base: UInt, divisor: UInt): UInt {
+private fun divmod(
+  number: ByteArray,
+  firstDigit: UInt,
+  base: UInt,
+  divisor: UInt
+): UInt {
 
   var remainder = 0.toUInt()
 
@@ -92,7 +97,9 @@ internal fun ByteArray.encodeToBase58String(characters: String = "GMP"): String 
 }
 
 
-@Throws(NumberFormatException::class, IllegalArgumentException::class)
+@Throws(
+  NumberFormatException::class, IllegalArgumentException::class
+)
 internal fun String.decodeBase58(characters: String = "GMP"): ByteArray {
 
   if (! enumContains<ALPHABET>(characters)) {
@@ -155,7 +162,9 @@ internal fun ByteArray.encodeToBase58WithChecksum() = ByteArray(size + CHECKSUM_
 }.encodeToBase58String()
 
 
-@Throws(IllegalArgumentException::class, NumberFormatException::class)
+@Throws(
+  IllegalArgumentException::class, NumberFormatException::class
+)
 internal fun String.decodeBase58WithChecksum(): ByteArray {
   val rawBytes = decodeBase58()
 
@@ -183,4 +192,6 @@ internal fun String.toStringEncodeToBase58(characters: String = "GMP"): String =
 
 
 @Throws(IllegalArgumentException::class)
-internal fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(characters).joinToString("") { "${it.toInt().toChar()}" }
+internal fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(
+  characters
+).joinToString("") { "${it.toInt().toChar()}" }

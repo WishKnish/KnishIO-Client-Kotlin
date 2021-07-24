@@ -31,14 +31,21 @@ class Strings {
 
     @JvmStatic
     @Throws(NoSuchElementException::class)
-    fun randomString(length: Int, alphabet: String = "abcdef0123456789"): String {
+    fun randomString(
+      length: Int,
+      alphabet: String = "abcdef0123456789"
+    ): String {
       return (1..length).map { alphabet.toList().random() }.joinToString("")
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class)
     fun charsetBaseConvert(
-      src: String, fromBase: Int, toBase: Int, srcSymbolTable: String? = null, destSymbolTable: String? = null
+      src: String,
+      fromBase: Int,
+      toBase: Int,
+      srcSymbolTable: String? = null,
+      destSymbolTable: String? = null
     ): String {
       val baseSymbols =
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~`!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?¿¡"

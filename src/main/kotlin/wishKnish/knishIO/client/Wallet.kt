@@ -1,3 +1,50 @@
+/*
+                               (
+                              (/(
+                              (//(
+                              (///(
+                             (/////(
+                             (//////(                          )
+                            (////////(                        (/)
+                            (////////(                       (///)
+                           (//////////(                      (////)
+                           (//////////(                     (//////)
+                          (////////////(                    (///////)
+                         (/////////////(                   (/////////)
+                        (//////////////(                  (///////////)
+                        (///////////////(                (/////////////)
+                       (////////////////(               (//////////////)
+                      (((((((((((((((((((              (((((((((((((((
+                     (((((((((((((((((((              ((((((((((((((
+                     (((((((((((((((((((            ((((((((((((((
+                    ((((((((((((((((((((           (((((((((((((
+                    ((((((((((((((((((((          ((((((((((((
+                    (((((((((((((((((((         ((((((((((((
+                    (((((((((((((((((((        ((((((((((
+                    ((((((((((((((((((/      (((((((((
+                    ((((((((((((((((((     ((((((((
+                    (((((((((((((((((    (((((((
+                   ((((((((((((((((((  (((((
+                   #################  ##
+                   ################  #
+                  ################# ##
+                 %################  ###
+                 ###############(   ####
+                ###############      ####
+               ###############       ######
+              %#############(        (#######
+             %#############           #########
+            ############(              ##########
+           ###########                  #############
+          #########                      ##############
+        %######
+
+        Powered by Knish.IO: Connecting a Decentralized World
+
+Please visit https://github.com/WishKnish/KnishIO-Client-Kotlin for information.
+
+License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
+*/
 @file:JvmName("Wallet")
 
 package wishKnish.knishIO.client
@@ -11,31 +58,25 @@ import java.math.BigInteger
 import java.security.GeneralSecurityException
 import kotlin.jvm.Throws
 
-
+/**
+ * Wallet class represents the set of public and private
+ * keys to sign Molecules
+ */
 class Wallet(
-  secret: String? = null, @JvmField var token: String = "USER", @JvmField var position: String? = null, @JvmField var batchId: String? = null, @JvmField var characters: String? = null
+  secret: String? = null, // typically a 2048-character biometric hash
+  @JvmField var token: String = "USER", // slug for the token this wallet is intended for
+  @JvmField var position: String? = null, // hexadecimal string used to salt the secret and produce one-time signatures
+  @JvmField var batchId: String? = null,
+  @JvmField var characters: String? = null
 ) {
 
-  @JvmField
-  var balance: Double = 0.0
-
-  @JvmField
-  var key: String? = null
-
-  @JvmField
-  var address: String? = null
-
-  @JvmField
-  var privkey: String? = null
-
-  @JvmField
-  var pubkey: String? = null
-
-  @JvmField
-  var tokenUnits = arrayListOf<UnitData>()
-
-  @JvmField
-  var bundle: String? = null
+  @JvmField var balance: Double = 0.0
+  @JvmField var key: String? = null
+  @JvmField var address: String? = null
+  @JvmField var privkey: String? = null
+  @JvmField var pubkey: String? = null
+  @JvmField var tokenUnits = arrayListOf<UnitData>()
+  @JvmField var bundle: String? = null
 
   init {
     bundle = secret?.let {
@@ -50,8 +91,12 @@ class Wallet(
     @JvmStatic
     @Throws(NoSuchElementException::class)
     fun create(
-      secretOrBundle: String? = null, token: String = "USER", batchId: String? = null, characters: String? = null
+      secretOrBundle: String? = null,
+      token: String = "USER",
+      batchId: String? = null,
+      characters: String? = null
     ): Wallet {
+
       val secret = secretOrBundle?.let {
         if (isBundleHash(it)) {
           null
@@ -62,8 +107,9 @@ class Wallet(
         Crypto.generateWalletPosition()
       }
 
+      // Wallet initialization
       return Wallet(
-        secret = secret, token = token, position = position, batchId = batchId, characters = characters
+        secret, token, position, batchId, characters
       ).apply {
         bundle = secret?.let {
           Crypto.generateBundleHash(it)
@@ -71,27 +117,44 @@ class Wallet(
       }
     }
 
+    /**
+     * Get formatted token units from the raw data
+     */
     @JvmStatic
     fun getTokenUnits(unitsData: List<List<String>>): List<UnitData> {
       val result = mutableListOf<UnitData>()
 
       unitsData.forEach {
-        result.add(UnitData(id = it[0], name = it[1], metas = it))
+        result.add(UnitData(it[0], it[1], it))
       }
 
       return result.toList()
     }
 
+    /**
+     * Generates a private key for the given parameters
+     */
     @JvmStatic
     @Throws(NumberFormatException::class)
-    fun generatePrivateKey(secret: String, token: String, position: String): String {
+    fun generatePrivateKey(
+      secret: String,
+      token: String,
+      position: String
+    ): String {
+
+      // Converting secret to bigInt
       val bigIntSecret = BigInteger(secret, 16)
+
+      // Adding new position to the user secret to produce the indexed key
       val indexedKey = bigIntSecret.add(BigInteger(position, 16))
+
+      // Hashing the indexed key to produce the intermediate key
       val intermediateKeySponge = Shake256.create()
 
       intermediateKeySponge.absorb(indexedKey.toString(16))
       intermediateKeySponge.absorb(token)
 
+      // Hashing the intermediate key to produce the private key
       return Shake256.hash(intermediateKeySponge.hexString(1024), 1024)
     }
 
@@ -106,10 +169,16 @@ class Wallet(
       return Strings.randomString(saltLength)
     }
 
+    /**
+     * Generates a public key (wallet address)
+     */
     @JvmStatic
     fun generatePublicKey(key: String): String {
+
+      // Generating wallet digest
       val digestSponge = Shake256.create()
 
+      // Subdivide private key into 16 fragments of 128 characters each
       key.chunked(128).forEach {
         var workingFragment = it
 
@@ -120,30 +189,14 @@ class Wallet(
         digestSponge.absorb(workingFragment)
       }
 
+      // Producing wallet address
       return Shake256.hash(digestSponge.hexString(1024), 32)
     }
   }
 
-  private fun prepareKeys(secret: String) {
-    if (key == null && address == null) {
-
-      key = generatePrivateKey(
-        secret = secret, token = token, position = position as String
-      )
-      address = generatePublicKey(key = key as String)
-    }
-  }
-
-  fun initBatchId(sourceWallet: Wallet, remainder: Boolean = false) {
-    sourceWallet.batchId?.let {
-      batchId = if (remainder) it else Crypto.generateBatchId()
-    }
-  }
-
-  fun isShadow(): Boolean {
-    return position == null && address == null
-  }
-
+  /**
+   * Has token units?
+   */
   fun hasTokenUnits(): Boolean {
     return tokenUnits.isNotEmpty()
   }
@@ -161,7 +214,14 @@ class Wallet(
     return null
   }
 
-  fun splitUnits(units: List<UnitData>, remainderWallet: Wallet, recipientWallet: Wallet? = null) {
+  /**
+   * Split token units
+   */
+  fun splitUnits(
+    units: List<UnitData>,
+    remainderWallet: Wallet,
+    recipientWallet: Wallet? = null
+  ) {
 
     // No units supplied, nothing to split
     if (units.isEmpty()) {
@@ -190,13 +250,45 @@ class Wallet(
     // Reset token units to the sending value
     tokenUnits = recipientTokenUnits
 
+    // Set token units to recipient & remainder
     recipientWallet?.let {
       it.tokenUnits = recipientTokenUnits
     }
-
     remainderWallet.tokenUnits = remainderTokenUnits
   }
 
+  fun isShadow(): Boolean {
+    return position == null && address == null
+  }
+
+  /**
+   * Sets up a batch ID - either using the sender's, or a new one
+   */
+  fun initBatchId(
+    sourceWallet: Wallet,
+    remainder: Boolean = false
+  ) {
+    sourceWallet.batchId?.let {
+      batchId = if (remainder) it else Crypto.generateBatchId()
+    }
+  }
+
+  /**
+   * Prepares wallet for signing by generating all required keys
+   */
+  private fun prepareKeys(secret: String) {
+    if (key == null && address == null) {
+
+      key = generatePrivateKey(
+        secret = secret, token = token, position = position as String
+      )
+      address = generatePublicKey(key = key as String)
+    }
+  }
+
+  /**
+   * Derives a private key for encrypting data with this wallet's key
+   */
   @Throws(IllegalArgumentException::class)
   fun getMyEncPrivateKey(): String? {
     if (privkey == null) {
@@ -208,6 +300,9 @@ class Wallet(
     return privkey
   }
 
+  /**
+   * Derives a public key for encrypting data for this wallet's consumption
+   */
   @Throws(IllegalArgumentException::class, NumberFormatException::class)
   fun getMyEncPublicKey(): String? {
     val privateKey = getMyEncPrivateKey()
@@ -221,8 +316,14 @@ class Wallet(
     return pubkey
   }
 
+  /**
+   * Encrypts a message for this wallet instance
+   */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptMyMessage(message: List<*>, vararg publicKeys: String): Map<String, String> {
+  fun encryptMyMessage(
+    message: List<*>,
+    vararg publicKeys: String
+  ): Map<String, String> {
     val encrypt = mutableMapOf<String, String>()
 
     publicKeys.forEach {
@@ -234,8 +335,14 @@ class Wallet(
     return encrypt.toMap()
   }
 
+  /**
+   * Encrypts a message for this wallet instance
+   */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptMyMessage(message: Map<*, *>, vararg publicKeys: String): Map<String, String> {
+  fun encryptMyMessage(
+    message: Map<*, *>,
+    vararg publicKeys: String
+  ): Map<String, String> {
     val encrypt = mutableMapOf<String, String>()
 
     publicKeys.forEach {
@@ -247,36 +354,61 @@ class Wallet(
     return encrypt.toMap()
   }
 
+  /**
+   * Encrypts a string for the given public keys
+   */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptString(message: String, vararg publicKeys: String): String {
+  fun encryptString(
+    message: String,
+    vararg publicKeys: String
+  ): String {
     val keys = publicKeys.toMutableList()
     val encrypt = mutableMapOf<String, String>()
+
+    // Retrieving sender's encryption public key
     getMyEncPublicKey()?.let {
       keys.add(it)
     }
+
+    // Encrypting message
     keys.forEach {
       encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
         message, it, characters ?: "GMP"
       )
     }
-
     return Base64.toBase64String(encrypt.toJsonElement().toString().toByteArray())
   }
 
-  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
-  fun decryptString(data: String, fallbackValue: String? = null): Any? {
+  /**
+   * Attempts to decrypt the given string
+   */
+  @Throws(
+    IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
+  )
+  fun decryptString(
+    data: String,
+    fallbackValue: String? = null
+  ): Any? {
     return try {
+
       val message = Json.parseToJsonElement(Base64.decode(data).joinToString("") { "${it.toInt().toChar()}" }).decode()
-
       @Suppress("UNCHECKED_CAST") val decrypt = (message as? Map<String, String>)?.let { decryptMyMessage(it) }
-
       decrypt ?: fallbackValue
+
     } catch (e: Exception) {
+
+      // Probably not actually encrypted
       fallbackValue
+
     }
   }
 
-  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
+  /**
+   * Uses the current wallet's private key to decrypt the given message
+   */
+  @Throws(
+    IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
+  )
   fun decryptMyMessage(message: String): Any? {
     val privateKey = getMyEncPrivateKey() ?: ""
     val publicKey = getMyEncPublicKey() ?: ""
@@ -284,7 +416,12 @@ class Wallet(
     return Crypto.decryptMessage(message, privateKey, publicKey, characters ?: "GMP")
   }
 
-  @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
+  /**
+   * Uses the current wallet's private key to decrypt the given message
+   */
+  @Throws(
+    IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
+  )
   fun decryptMyMessage(message: Map<String, String>): Any? {
     val publicKey = getMyEncPublicKey() ?: ""
     val privateKey = getMyEncPrivateKey() ?: ""

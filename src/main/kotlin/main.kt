@@ -34,7 +34,7 @@ const val secret2 =
 const val secret3 =
   "4c562299fc74f0efa958cb3cdfea4cf40a7f7b32adf9c8c14e7705f0a54a33a5bc71c9bc33c92d5b731e9d4cf1620899de3069cf81897cdcf572a98c562adb8ccb55b4d3c1e991617ecb501f56e651464cda1e3741b0ad9aa48108b958f46d1953015a5462cdf9ef9a11ecada441155739e511a5945b26d3687b88f3aef6a26f1de3171dc9d3b93784f57058f797be504bdcf69ee8f75dacb20f41a15328d9f3eb6c87adc289d3ffe1fd3bb6b47b37a7bbbca02f566b458f64ba14c92a64d6ef03fd8c15416d6bcd6068d54aa7737cedaa4979ed6a0b164e33bdcf71fd37bcaf0eb5aca4caa76565d91c10c7270083c215e7659f52ac2257522ed959a2941bb9eda2de912bb321145daffeda23a9472a809a2616fb6b2d58f2782d8b1575770b2f28920e8a39bcaec6e1e1d24500b441ae39be8585ec4f7f65d0015739eb63b84ed147e625265c68bfb66e45609010b1fd924d334c81f74d5384c4ca1621324b7f19bac494df248a635bae493d287018da5c9a1a364f1f406ed8baa78426cc42ea92c45a331b2a2ede6835098948251561d209aeef3d92335b0d020cc4837bd98ca977007434240f69823c856b0b1452cb6cf9d5714e740d527ca29895a45a4786f817e4363fc466cb0bf5c0a9e2f9ce4763ed16fed3a260b0aea861c061a78bb97c73baf5335a5b90e817ae9345564318fab0ab38718a1d55170fd0ff73487e06f468fd73f99b89c6c06c6285ae2af34a48116878fb46d469750184d30ad800842c6809761f04cca23f9bad12b60e37e3b58ca8d8f443a51fc49548906d09ebaf016888516be9c5fe68a4e62b8996796f624ffccbbd7fcfdd8aac09dda216b4a2c06c67ee07e19ce722dc3daa566cc5fd4b24293f02552e9881e576a694915aa9e0e1a4b0d3ef90ba873fe63b1151c4e9cdfffd7d93196349c08dab2cd615ea93b051e35e7967e7b119a903ed70a25c49ede190d1cfc6f2b4bcfc8fbd4f6b89a8f09a294bbb7abf45f039bb1dca5e0ebe59bb56afbf432f18d336a54e99c552aa2717067364f9d7e43f7568b9bade7d6685ba69d06c18260316d870ceb9514cb574f4d68fda7f5bef8e56c4de11aaf35b9e6647e330c9cb56282f4da1bcbcebcc1023bd9805322b365bc5da1741778e9d4f7f2d28f0c4557e99d25c9297079852c80a2994fe1753f7995163dd7de0d370fc0c3449f7bb2a57eac0c41dacfee157fe5980d11da756c66ac703abc50468d24cbd88f34b1fd4704de8700b3df934bac38c3d1f3dbb9a69fe2848316f301d3dd1639caf146c05f9d2fb86a414b4eb69aa3ab816b05f248f001846c52114373da5dfe3e416c654cc328b3c091e3f6228142bbed32edd883618fce30d6f3be47a41b54409ffa92fa8c0c2cc2805d272053cf95161a1d63c9e1d7e9573b9aa0c2b535fde8e502d6b372f99a4344256e9"
 const val cellSlug = "TESTCELL"
-const val tokenSlug = "BYTECOIN"
+const val tokenSlug = "TOKENTEST3"
 const val tokenAmount = 10000
 var authToken: String? = null
 
@@ -78,7 +78,8 @@ suspend fun transferTokens(): Boolean {
   val responseMolecule = extractMolecule(response)
 
   // Verifying status
-  if (responseMolecule.status.lowercase() !== "accepted") {
+  if (responseMolecule.status.lowercase() != "accepted") {
+    print("transferTokens() - Error response:\r\n$responseMolecule\r\n");
     throw IllegalArgumentException(responseMolecule.reason)
   }
 
@@ -90,7 +91,7 @@ suspend fun createToken(): Boolean {
   // Token metadata
   val meta = mutableListOf(
     MetaData("name", "$tokenSlug token"),
-    MetaData("fungibility", "stackable"),
+    MetaData("fungibility", "fungible"),
     MetaData("supply", "replenishable"),
     MetaData("decimals", "0")
   )
@@ -114,7 +115,8 @@ suspend fun createToken(): Boolean {
   val responseMolecule = extractMolecule(response)
 
   // Verifying status
-  if (responseMolecule.status.lowercase() !== "accepted") {
+  if (responseMolecule.status.lowercase() != "accepted") {
+    print("createToken() - Error response:\r\n$responseMolecule\r\n");
     throw IllegalArgumentException(responseMolecule.reason)
   }
 
@@ -196,7 +198,10 @@ fun extractMolecule(response: String): ProposeMoleculeData {
   return ResponseData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
 }
 
-suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
+suspend fun balanceQuery(
+  bundleHash: String,
+  token: String
+): Wallet? {
   val query = """
     query( ${'$'}address: String, ${'$'}bundleHash: String, ${'$'}token: String, ${'$'}position: String ) {
       Balance( address: ${'$'}address, bundleHash: ${'$'}bundleHash, token: ${'$'}token, position: ${'$'}position ) {
@@ -229,7 +234,6 @@ suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
 
   // Converting to GSON
   val responseGson = Gson().fromJson(responseJson, Map::class.java)
-  print("balanceQuery() - GSON response: \r\n$responseGson\r\n");
 
   // Mapping to wallet objects
   val responseMapped = responseGson["data"]?.let { item ->
@@ -251,7 +255,6 @@ suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
       wallet.balance = amount
       wallet.pubkey = pubkey
 
-      print("\r\n\r\n$wallet\r\n\r\n")
       wallet
     }
   }
@@ -260,7 +263,10 @@ suspend fun balanceQuery(bundleHash: String, token: String): Wallet? {
   return responseMapped
 }
 
-suspend fun graphqlQuery(query: String, variables: Map<String, String>): String {
+suspend fun graphqlQuery(
+  query: String,
+  variables: Map<String, String>
+): String {
 
   val client = getClient()
   val response: HttpResponse = client.post(endpoint) {
@@ -273,7 +279,10 @@ suspend fun graphqlQuery(query: String, variables: Map<String, String>): String 
 
 }
 
-suspend fun moleculeMutation(molecule: Molecule, wallet: Wallet? = null): String {
+suspend fun moleculeMutation(
+  molecule: Molecule,
+  wallet: Wallet? = null
+): String {
 
   if (molecule.check(wallet)) {
 
@@ -297,8 +306,17 @@ fun getClient(): HttpClient {
   // Certificate Authentication Stub
   class TrustAllX509TrustManager : X509TrustManager {
     override fun getAcceptedIssuers(): Array<X509Certificate?> = arrayOfNulls(0)
-    override fun checkClientTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
-    override fun checkServerTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
+    override fun checkClientTrusted(
+      certs: Array<X509Certificate?>?,
+      authType: String?
+    ) {
+    }
+
+    override fun checkServerTrusted(
+      certs: Array<X509Certificate?>?,
+      authType: String?
+    ) {
+    }
   }
 
   val jsonFormat = KotlinJson {
@@ -337,8 +355,10 @@ fun getClient(): HttpClient {
   }
 }
 
-@Serializable
-data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables: Map<String, String>) {
+@Serializable data class GraphqlQueryData(
+  @JvmField var query: String,
+  @JvmField var variables: Map<String, String>
+) {
   companion object {
     private val jsonFormat: kotlinx.serialization.json.Json
       get() = kotlinx.serialization.json.Json {
@@ -348,7 +368,10 @@ data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables
       }
 
     @JvmStatic
-    fun create(query: String, variables: Map<String, String>): GraphqlQueryData {
+    fun create(
+      query: String,
+      variables: Map<String, String>
+    ): GraphqlQueryData {
       return GraphqlQueryData(query, variables)
     }
 

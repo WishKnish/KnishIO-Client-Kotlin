@@ -11,7 +11,10 @@ private const val MACBYTES = 10
 private const val SEALBYTES = PUBLICKEYBYTES + MACBYTES
 
 @kotlin.jvm.Throws(IllegalArgumentException::class)
-internal fun ByteArray.sealOpen(pk: ByteArray, sk: ByteArray): ByteArray {
+internal fun ByteArray.sealOpen(
+  pk: ByteArray,
+  sk: ByteArray
+): ByteArray {
 
   if (size < SEALBYTES) {
     throw IllegalArgumentException("Ciphertext too short")
@@ -26,7 +29,9 @@ internal fun ByteArray.sealOpen(pk: ByteArray, sk: ByteArray): ByteArray {
 }
 
 
-@kotlin.jvm.Throws(GeneralSecurityException::class, IllegalArgumentException::class)
+@kotlin.jvm.Throws(
+  GeneralSecurityException::class, IllegalArgumentException::class
+)
 internal fun ByteArray.seal(pubKey: ByteArray): ByteArray {
   val ephKeyPair = TweetNaclFast.Box.keyPair()
   val ephPubKey = ephKeyPair.publicKey

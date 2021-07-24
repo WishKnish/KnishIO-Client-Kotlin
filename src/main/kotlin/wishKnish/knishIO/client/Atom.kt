@@ -12,9 +12,19 @@ import wishKnish.knishIO.client.data.MetaData
 import kotlin.jvm.Throws
 
 
-@Serializable
-data class Atom(
-  @JvmField var position: String, @JvmField var walletAddress: String, @JvmField var isotope: Char, @JvmField var token: String, @JvmField var value: String? = null, @JvmField var batchId: String? = null, @JvmField var metaType: String? = null, @JvmField var metaId: String? = null, @JvmField var meta: List<MetaData> = mutableListOf(), @JvmField var otsFragment: String? = null, @JvmField var index: Int = 0, @JvmField val createdAt: String = Strings.currentTimeMillis()
+@Serializable data class Atom(
+  @JvmField var position: String,
+  @JvmField var walletAddress: String,
+  @JvmField var isotope: Char,
+  @JvmField var token: String,
+  @JvmField var value: String? = null,
+  @JvmField var batchId: String? = null,
+  @JvmField var metaType: String? = null,
+  @JvmField var metaId: String? = null,
+  @JvmField var meta: List<MetaData> = mutableListOf(),
+  @JvmField var otsFragment: String? = null,
+  @JvmField var index: Int = 0,
+  @JvmField val createdAt: String = Strings.currentTimeMillis()
 ) {
 
   companion object {
@@ -110,7 +120,10 @@ data class Atom(
 
     @JvmStatic
     @Throws(IllegalArgumentException::class)
-    fun hashAtoms(atoms: List<Atom>, output: String = "base17"): String? {
+    fun hashAtoms(
+      atoms: List<Atom>,
+      output: String = "base17"
+    ): String? {
       val molecularSponge = hash(atoms)
 
       return when (output) {

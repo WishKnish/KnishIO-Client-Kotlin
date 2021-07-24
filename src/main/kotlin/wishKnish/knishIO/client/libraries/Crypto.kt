@@ -11,43 +11,71 @@ class Crypto {
 
     @JvmStatic
     @Throws(IllegalArgumentException::class)
-    fun hashShare(key: String, characters: String = "GMP"): String {
+    fun hashShare(
+      key: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).shortHash(key)
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class, NumberFormatException::class)
-    fun generateEncPublicKey(privateKey: String, characters: String = "GMP"): String {
+    fun generateEncPublicKey(
+      privateKey: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).generatePublicKey(privateKey)
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class)
-    fun generateEncPrivateKey(key: String, characters: String = "GMP"): String {
+    fun generateEncPrivateKey(
+      key: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).generatePrivateKey(key)
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMessage(message: Map<*, *>, recipientPublicKey: String, characters: String = "GMP"): String {
+    fun encryptMessage(
+      message: Map<*, *>,
+      recipientPublicKey: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).encrypt(message, recipientPublicKey)
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMessage(message: List<*>, recipientPublicKey: String, characters: String = "GMP"): String {
+    fun encryptMessage(
+      message: List<*>,
+      recipientPublicKey: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).encrypt(message, recipientPublicKey)
     }
 
     @JvmStatic
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMessage(message: String, recipientPublicKey: String, characters: String = "GMP"): String {
+    fun encryptMessage(
+      message: String,
+      recipientPublicKey: String,
+      characters: String = "GMP"
+    ): String {
       return Soda(characters).encrypt(message, recipientPublicKey)
     }
 
     @JvmStatic
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class)
-    fun decryptMessage(message: String, privateKey: String, publicKey: String, characters: String = "GMP"): Any? {
+    @Throws(
+      IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
+    )
+    fun decryptMessage(
+      message: String,
+      privateKey: String,
+      publicKey: String,
+      characters: String = "GMP"
+    ): Any? {
       return Soda(characters).decrypt(message, privateKey, publicKey)
     }
 
@@ -58,7 +86,10 @@ class Crypto {
 
     @JvmStatic
     @Throws(NoSuchElementException::class)
-    fun generateSecret(seed: String? = null, length: Int = 2048): String {
+    fun generateSecret(
+      seed: String? = null,
+      length: Int = 2048
+    ): String {
       return when (seed) {
         null -> Strings.randomString(length)
         else -> Shake256.hash(seed, length / 4)
@@ -67,7 +98,10 @@ class Crypto {
 
     @JvmStatic
     @Throws(NoSuchElementException::class)
-    fun generateBatchId(molecularHash: String? = null, index: Int? = null): String {
+    fun generateBatchId(
+      molecularHash: String? = null,
+      index: Int? = null
+    ): String {
       if (molecularHash != null && index != null) {
         return this.generateBundleHash("$molecularHash$index")
       }

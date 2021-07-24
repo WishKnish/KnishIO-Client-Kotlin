@@ -8,8 +8,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-@Serializable
-data class MetaData(@JvmField val key: String, @JvmField var value: String? = null) {
+@Serializable data class MetaData(
+  @JvmField val key: String,
+  @JvmField var value: String? = null
+) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -18,7 +20,10 @@ data class MetaData(@JvmField val key: String, @JvmField var value: String? = nu
       }
 
     @JvmStatic
-    fun create(key: String, value: String? = null): MetaData {
+    fun create(
+      key: String,
+      value: String? = null
+    ): MetaData {
       return MetaData(key, value)
     }
 

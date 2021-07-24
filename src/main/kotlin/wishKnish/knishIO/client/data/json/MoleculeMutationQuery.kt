@@ -6,10 +6,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import wishKnish.knishIO.client.Molecule
 
-@Serializable
-data class MoleculeMutationQuery(@Transient val molecule: Molecule? = null) {
-  @JvmField
-  val query = """
+@Serializable data class MoleculeMutationQuery(@Transient val molecule: Molecule? = null) {
+  @JvmField val query = """
         mutation(${'$'}molecule: MoleculeInput! ) {
           ProposeMolecule( molecule: ${'$'}molecule ) {
             molecularHash,
@@ -26,8 +24,7 @@ data class MoleculeMutationQuery(@Transient val molecule: Molecule? = null) {
         }
     """.trimIndent()
 
-  @JvmField
-  val variables: MutableMap<String, Molecule?> = mutableMapOf("molecule" to null)
+  @JvmField val variables: MutableMap<String, Molecule?> = mutableMapOf("molecule" to null)
 
   init {
     requireNotNull(molecule) { "Molecule is a required parameter" }

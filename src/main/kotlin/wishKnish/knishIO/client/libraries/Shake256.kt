@@ -16,7 +16,10 @@ class Shake256 {
     }
 
     @JvmStatic
-    fun hash(data: String, length: Int): String {
+    fun hash(
+      data: String,
+      length: Int
+    ): String {
       val shaked = SHAKEDigest(256)
       val dataByteArray = data.toByteArray()
       val output = ByteArray(length)

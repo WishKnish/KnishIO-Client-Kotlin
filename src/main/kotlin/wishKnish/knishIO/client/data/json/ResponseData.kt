@@ -7,8 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable
-class ResponseData(@JvmField var data: DataData? = null) {
+@Serializable class ResponseData(@JvmField var data: DataData? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

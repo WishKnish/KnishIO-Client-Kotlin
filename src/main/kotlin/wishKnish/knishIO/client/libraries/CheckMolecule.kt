@@ -12,6 +12,47 @@ import kotlin.jvm.Throws
 
 class CheckMolecule {
   companion object {
+
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class
+    )
+    fun continuId(molecule: Molecule): Boolean {
+      missing(molecule)
+
+      val firstAtom = molecule.atoms.first();
+
+      if (firstAtom.token == "USER" && molecule.atoms.none { it.isotope == 'I' }) {
+        throw AtomsMissingException("Check::continuId() - Molecule is missing required ContinuID Atom!")
+      }
+
+      return true
+    }
+
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class, BatchIdException::class
+    )
+    fun batchId(molecule: Molecule): Boolean {
+
+      missing(molecule)
+
+      val subscription = molecule.atoms.first()
+      if (subscription.isotope == 'V' && subscription.batchId.isNullOrEmpty()) {
+        val atoms = molecule.atoms.filter { it.isotope == 'V' }
+        val remainder = atoms.last()
+
+        if (subscription.batchId != remainder.batchId) {
+          throw BatchIdException()
+        }
+
+        if (atoms.any { it.batchId.isNullOrEmpty() }) {
+          throw BatchIdException()
+        }
+      }
+      return true
+    }
+
     @JvmStatic
     fun normalizedHash(hash: String): Map<Int, Int> {
       return normalize(enumerate(hash))
@@ -70,7 +111,9 @@ class CheckMolecule {
     }
 
     @JvmStatic
-    @Throws(MolecularHashMissingException::class, AtomsMissingException::class)
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class
+    )
     fun missing(molecule: Molecule) {
       // No molecular hash?
       if (molecule.molecularHash.isNullOrEmpty()) {
@@ -80,40 +123,6 @@ class CheckMolecule {
       if (molecule.atoms.isEmpty()) {
         throw AtomsMissingException()
       }
-    }
-
-    @JvmStatic
-    @Throws(MolecularHashMissingException::class, AtomsMissingException::class)
-    fun continuId(molecule: Molecule): Boolean {
-      missing(molecule)
-
-      val firstAtom = molecule.atoms.first();
-
-      if (firstAtom.token == "USER" && molecule.atoms.none { it.isotope == 'I' }) {
-        throw AtomsMissingException("Check::continuId() - Molecule is missing required ContinuID Atom!")
-      }
-
-      return true
-    }
-
-    @JvmStatic
-    @Throws(MolecularHashMissingException::class, AtomsMissingException::class, BatchIdException::class)
-    fun batchId(molecule: Molecule): Boolean {
-      missing(molecule)
-      val subscription = molecule.atoms.first()
-      if (subscription.isotope == 'V' && subscription.batchId.isNullOrEmpty()) {
-        val atoms = molecule.atoms.filter { it.isotope == 'V' }
-        val remainder = atoms.last()
-
-        if (subscription.batchId != remainder.batchId) {
-          throw BatchIdException()
-        }
-
-        if (atoms.any { it.batchId.isNullOrEmpty() }) {
-          throw BatchIdException()
-        }
-      }
-      return true
     }
 
     @JvmStatic
@@ -288,7 +297,10 @@ class CheckMolecule {
       TransferBalanceException::class,
       TransferRemainderException::class
     )
-    fun isotopeV(molecule: Molecule, sourceWallet: Wallet? = null): Boolean {
+    fun isotopeV(
+      molecule: Molecule,
+      sourceWallet: Wallet? = null
+    ): Boolean {
       missing(molecule)
       if (molecule.atoms.none { it.isotope == 'V' }) {
         return true

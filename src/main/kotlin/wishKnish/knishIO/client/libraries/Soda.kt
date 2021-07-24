@@ -12,22 +12,35 @@ import kotlin.jvm.Throws
 class Soda(private val base: String = "GMP") {
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encrypt(message: List<*>, publicKey: String): String {
+  fun encrypt(
+    message: List<*>,
+    publicKey: String
+  ): String {
     return encode(message.toJsonElement().toString().toByteArray().seal(decode(publicKey)))
   }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encrypt(message: Map<*, *>, publicKey: String): String {
+  fun encrypt(
+    message: Map<*, *>,
+    publicKey: String
+  ): String {
     return encode(message.toJsonElement().toString().toByteArray().seal(decode(publicKey)))
   }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encrypt(message: String, publicKey: String): String {
+  fun encrypt(
+    message: String,
+    publicKey: String
+  ): String {
     return encode(message.toByteArray().seal(decode(publicKey)))
   }
 
   @Throws(NumberFormatException::class, IllegalArgumentException::class, SerializationException::class)
-  fun decrypt(decrypted: String, privateKey: String, publicKey: String): Any? {
+  fun decrypt(
+    decrypted: String,
+    privateKey: String,
+    publicKey: String
+  ): Any? {
     val data = decode(decrypted).sealOpen(decode(publicKey), decode(privateKey))
 
     if (data.isEmpty()) {
@@ -44,7 +57,9 @@ class Soda(private val base: String = "GMP") {
     return encode(sponge.squeeze(TweetNaclFast.Box.secretKeyLength))
   }
 
-  @Throws(NumberFormatException::class, IllegalArgumentException::class)
+  @Throws(
+    NumberFormatException::class, IllegalArgumentException::class
+  )
   fun generatePublicKey(privateKey: String): String {
     return encode(TweetNaclFast.Box.keyPair_fromSecretKey(decode(privateKey)).publicKey)
   }

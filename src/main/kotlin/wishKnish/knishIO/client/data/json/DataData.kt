@@ -5,8 +5,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable
-data class DataData(@JvmField var ProposeMolecule: ProposeMoleculeData? = null) {
+@Serializable data class DataData(@JvmField var ProposeMolecule: ProposeMoleculeData? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

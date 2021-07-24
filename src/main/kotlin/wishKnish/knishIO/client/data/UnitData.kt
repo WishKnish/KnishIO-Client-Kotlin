@@ -8,8 +8,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-@Serializable
-data class UnitData(@JvmField val id: String, @JvmField val name: String, @JvmField val metas: List<String>) {
+@Serializable data class UnitData(
+  @JvmField val id: String,
+  @JvmField val name: String,
+  @JvmField val metas: List<String>
+) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -18,7 +21,11 @@ data class UnitData(@JvmField val id: String, @JvmField val name: String, @JvmFi
       }
 
     @JvmStatic
-    fun create(id: String, name: String, metas: List<String>): UnitData {
+    fun create(
+      id: String,
+      name: String,
+      metas: List<String>
+    ): UnitData {
       return UnitData(id, name, metas)
     }
 

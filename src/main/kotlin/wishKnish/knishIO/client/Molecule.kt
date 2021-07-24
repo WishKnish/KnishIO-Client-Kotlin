@@ -17,25 +17,22 @@ import kotlin.reflect.KVisibility
 import kotlin.reflect.full.memberProperties
 
 
-@Serializable
-data class Molecule(
-  @Transient val secret: String? = null, @Transient var sourceWallet: Wallet = Wallet(), @Transient var remainderWallet: Wallet? = null, @JvmField var cellSlug: String? = null
+@Serializable data class Molecule(
+  @Transient val secret: String? = null,
+  @Transient var sourceWallet: Wallet = Wallet(),
+  @Transient var remainderWallet: Wallet? = null,
+  @JvmField var cellSlug: String? = null
 ) {
 
-  @JvmField
-  var createdAt: String = Strings.currentTimeMillis()
+  @JvmField var createdAt: String = Strings.currentTimeMillis()
 
-  @JvmField
-  var status: String? = null
+  @JvmField var status: String? = null
 
-  @JvmField
-  var bundle: String? = null
+  @JvmField var bundle: String? = null
 
-  @JvmField
-  var molecularHash: String? = null
+  @JvmField var molecularHash: String? = null
 
-  @JvmField
-  var atoms: MutableList<Atom> = mutableListOf()
+  @JvmField var atoms: MutableList<Atom> = mutableListOf()
 
   init {
     if (sourceWallet.position == null && molecularHash == null) {
@@ -54,8 +51,7 @@ data class Molecule(
     }
   }
 
-  @Transient
-  var cellSlugOrigin = cellSlug
+  @Transient var cellSlugOrigin = cellSlug
   val continuIdMetaType
     get() = "walletBundle"
   val cellSlugDelimiter
@@ -97,7 +93,10 @@ data class Molecule(
       MetaMissingException::class,
       WrongTokenTypeException::class
     )
-    fun verify(molecule: Molecule, sourceWallet: Wallet? = null): Boolean {
+    fun verify(
+      molecule: Molecule,
+      sourceWallet: Wallet? = null
+    ): Boolean {
       return CheckMolecule.molecularHash(molecule) && CheckMolecule.ots(molecule) && CheckMolecule.index(molecule) && CheckMolecule.batchId(
         molecule
       ) && CheckMolecule.continuId(molecule) && CheckMolecule.isotopeM(molecule) && CheckMolecule.isotopeT(molecule) && CheckMolecule.isotopeC(
@@ -162,7 +161,10 @@ data class Molecule(
     return this
   }
 
-  fun finalMetas(metas: MutableList<MetaData> = mutableListOf(), wallet: Wallet? = null): List<MetaData> {
+  fun finalMetas(
+    metas: MutableList<MetaData> = mutableListOf(),
+    wallet: Wallet? = null
+  ): List<MetaData> {
     return metas.also {
       (wallet ?: sourceWallet).let { wallet ->
         if (wallet.hasTokenUnits()) {
@@ -175,7 +177,10 @@ data class Molecule(
     }.toList()
   }
 
-  fun contextMetas(metas: MutableList<MetaData> = mutableListOf(), context: String? = null): List<MetaData> {
+  fun contextMetas(
+    metas: MutableList<MetaData> = mutableListOf(),
+    context: String? = null
+  ): List<MetaData> {
     return metas.also {
       if (USE_META_CONTEXT) {
         it.add(MetaData(key = "context", value = context ?: DEFAULT_META_CONTEXT))
@@ -203,7 +208,11 @@ data class Molecule(
   }
 
   @Throws(MetaMissingException::class)
-  fun replenishTokens(amount: Number, token: String, metas: MutableList<MetaData> = mutableListOf()): Molecule {
+  fun replenishTokens(
+    amount: Number,
+    token: String,
+    metas: MutableList<MetaData> = mutableListOf()
+  ): Molecule {
     val meta = metas.also {
       setOf("address", "position", "batchId").forEach { key ->
         it.forEach { metaData ->
@@ -234,7 +243,10 @@ data class Molecule(
   }
 
   @Throws(NegativeAmountException::class)
-  fun burnToken(amount: Number, walletBundle: String?): Molecule {
+  fun burnToken(
+    amount: Number,
+    walletBundle: String?
+  ): Molecule {
     if (amount.toDouble() < 0.0) {
       throw NegativeAmountException("Molecule::burnToken() - Amount to burn must be positive!")
     }
@@ -274,7 +286,10 @@ data class Molecule(
   }
 
   @Throws(BalanceInsufficientException::class)
-  fun initValue(recipientWallet: Wallet, amount: Number): Molecule {
+  fun initValue(
+    recipientWallet: Wallet,
+    amount: Number
+  ): Molecule {
     if (sourceWallet.balance - amount.toDouble() < 0) {
       throw BalanceInsufficientException()
     }
@@ -355,7 +370,9 @@ data class Molecule(
   }
 
   fun initTokenCreation(
-    recipientWallet: Wallet, amount: Number, meta: MutableList<MetaData> = mutableListOf()
+    recipientWallet: Wallet,
+    amount: Number,
+    meta: MutableList<MetaData> = mutableListOf()
   ): Molecule {
     val metas = meta.also {
       setOf("walletAddress", "walletPosition", "walletPubkey", "walletCharacters").forEach { key ->
@@ -392,7 +409,11 @@ data class Molecule(
   }
 
   @Throws(MetaMissingException::class)
-  fun createRule(metaType: String, metaId: String, meta: MutableList<MetaData>): Molecule {
+  fun createRule(
+    metaType: String,
+    metaId: String,
+    meta: MutableList<MetaData>
+  ): Molecule {
     setOf("conditions", "callback", "rule").forEach { key ->
       if (meta.none { mataData -> mataData.key == key }) {
         throw MetaMissingException("Molecule::createRule() - Value for required meta key $key in missing!")
@@ -415,7 +436,10 @@ data class Molecule(
     return addUserRemainderAtom(remainderWallet !!)
   }
 
-  fun initShadowWalletClaim(token: String, wallet: Wallet): Molecule {
+  fun initShadowWalletClaim(
+    token: String,
+    wallet: Wallet
+  ): Molecule {
     val metas = mutableListOf(
       MetaData(key = "tokenSlug", value = token),
       MetaData(key = "walletAddress", value = wallet.address),
@@ -439,7 +463,11 @@ data class Molecule(
     return addUserRemainderAtom(remainderWallet !!)
   }
 
-  fun initIdentifierCreation(type: String, contact: String, code: String): Molecule {
+  fun initIdentifierCreation(
+    type: String,
+    contact: String,
+    code: String
+  ): Molecule {
     val metas = mutableListOf(
       MetaData(key = "code", value = code), MetaData(key = "hash", value = Crypto.generateBundleHash(contact))
     )
@@ -460,7 +488,11 @@ data class Molecule(
     return addUserRemainderAtom(remainderWallet !!)
   }
 
-  fun initMeta(meta: MutableList<MetaData>, metaType: String, metaId: String): Molecule {
+  fun initMeta(
+    meta: MutableList<MetaData>,
+    metaType: String,
+    metaId: String
+  ): Molecule {
     addAtom(
       Atom(
         position = sourceWallet.position !!,
@@ -479,7 +511,12 @@ data class Molecule(
   }
 
   fun initTokenRequest(
-    token: String, amount: Number, metaType: String, metaId: String, meta: MutableList<MetaData> = mutableListOf(), batchId: String?
+    token: String,
+    amount: Number,
+    metaType: String,
+    metaId: String,
+    meta: MutableList<MetaData> = mutableListOf(),
+    batchId: String?
   ): Molecule {
     meta.find { mataData -> mataData.key == "token" }?.run { value = token } ?: meta.add(MetaData("token", token))
 
@@ -516,7 +553,10 @@ data class Molecule(
   }
 
   @Throws(AtomsMissingException::class, IllegalArgumentException::class)
-  fun sign(anonymous: Boolean = false, compressed: Boolean = true): String? {
+  fun sign(
+    anonymous: Boolean = false,
+    compressed: Boolean = true
+  ): String? {
 
     requireNotNull(secret) {
       "The molecule was created without a secret signature. The operation is not possible."
@@ -557,7 +597,10 @@ data class Molecule(
     return lastPosition
   }
 
-  fun signatureFragments(key: String, encode: Boolean = true): String {
+  fun signatureFragments(
+    key: String,
+    encode: Boolean = true
+  ): String {
     // Subdivide Kk into 16 segments of 256 bytes (128 characters) each
     val keyChunks = key.chunked(128)
     // Convert Hm to numeric notation, and then normalize
