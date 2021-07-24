@@ -92,11 +92,14 @@ suspend fun createToken(): Boolean {
         MetaData("decimals", "0")
     )
 
+    // Defining signing wallet
+    val sourceWallet = Wallet(secret)
+
     // Creating wallet to receive tokens
     val recipientWallet = Wallet(secret, tokenSlug)
 
     // Creating molecule mutation
-    val molecule = Molecule(secret, Wallet(secret), null, cellSlug)
+    val molecule = Molecule(secret, sourceWallet, null, cellSlug)
     molecule.initTokenCreation(recipientWallet, tokenAmount, meta)
 
     // Signing molecule
@@ -121,12 +124,15 @@ suspend fun createMeta(): Boolean {
     val metaType = "artifact"
     val metaId = "1"
     val meta = mutableListOf(
-        MetaData(key = "logo", value = "data:image/jpeg;base64,*")
+        MetaData("logo", "data:image/jpeg;base64,*")
     )
 
+    // Defining signing wallet
+    val sourceWallet = Wallet(secret);
+
     // Creating molecule mutation
-    val molecule = Molecule(secret, Wallet(secret), null, cellSlug)
-    molecule.initMeta(meta = meta, metaType = metaType, metaId = metaId)
+    val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+    molecule.initMeta(meta, metaType, metaId)
 
     // Signing molecule
     molecule.sign()
