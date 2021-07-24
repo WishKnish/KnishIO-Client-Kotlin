@@ -21,6 +21,7 @@ import wishKnish.knishIO.client.data.json.MoleculeMutationQuery
 import wishKnish.knishIO.client.data.json.ProposeMoleculeData
 import wishKnish.knishIO.client.data.json.ResponseData
 import wishKnish.knishIO.client.libraries.Crypto
+import java.lang.Exception
 import kotlinx.serialization.json.Json as KotlinJson
 import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
@@ -40,19 +41,25 @@ var authToken: String? = null
 
 suspend fun main(args: Array<String>) {
 
-  print("#### AUTHORIZING ####\r\n")
-  authToken = authorizationToken()
-  print("main() - Authorization Token: [$authToken]\r\n")
+  try {
+    print("#### AUTHORIZING ####\r\n")
+    authToken = authorizationToken()
+    print("main() - Authorization Token: [$authToken]\r\n")
 
-  // print("\r\n#### CREATING META ####\r\n")
-  // createMeta()
+    // print("\r\n#### CREATING META ####\r\n")
+    // createMeta()
 
-  // print("\r\n#### CREATING TOKEN ####\r\n")
-  // createToken()
+    // print("\r\n#### CREATING TOKEN ####\r\n")
+    // createToken()
 
-  print("\r\n#### TRANSFERRING TOKEN ####\r\n")
-  transferTokens()
-
+    print("\r\n#### TRANSFERRING TOKEN ####\r\n")
+    transferTokens()
+  }
+  catch (e: Exception) {
+    print("\r\n#### EXCEPTION CAUGHT ####\r\n$e\r\n")
+    print("\r\n#### BEGIN STACK TRACE ####\r\n")
+    e.printStackTrace()
+  }
 }
 
 suspend fun transferTokens(): Boolean {
@@ -83,6 +90,7 @@ suspend fun transferTokens(): Boolean {
     throw IllegalArgumentException(responseMolecule.reason)
   }
 
+  print("transferTokens() - Successful response:\r\n$responseMolecule\r\n");
   return true;
 }
 
@@ -120,6 +128,7 @@ suspend fun createToken(): Boolean {
     throw IllegalArgumentException(responseMolecule.reason)
   }
 
+  print("createToken() - Successful response:\r\n$responseMolecule\r\n");
   return true
 }
 
@@ -152,6 +161,7 @@ suspend fun createMeta(): Boolean {
     throw IllegalArgumentException(responseMolecule.reason)
   }
 
+  print("createMeta() - Successful response:\r\n$responseMolecule\r\n");
   return true
 }
 
@@ -186,6 +196,8 @@ suspend fun authorizationToken(): String {
     //   key="DmiNUTlYY0YKnUS0i8FhG4BZkYm5ZFsOSktBuUU2oINI",
     //   encrypt=false
     // }
+
+    print("authorizationToken() - Successful response:\r\n$responseMolecule\r\n");
     return Gson().fromJson(
       responseMolecule.payload, Map::class.java
     )["token"]?.toString() ?: throw IllegalArgumentException("Invalid response format")
