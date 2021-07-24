@@ -40,7 +40,8 @@ class Strings {
     fun charsetBaseConvert(
       src: String, fromBase: Int, toBase: Int, srcSymbolTable: String? = null, destSymbolTable: String? = null
     ): String {
-      val baseSymbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~`!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?¿¡"
+      val baseSymbols =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~`!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?¿¡"
       val srcTable = srcSymbolTable ?: baseSymbols
       val destTable = destSymbolTable ?: srcTable
 

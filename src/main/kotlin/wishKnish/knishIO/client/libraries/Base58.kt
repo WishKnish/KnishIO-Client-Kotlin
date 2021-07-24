@@ -7,7 +7,13 @@ private const val ENCODED_ZERO = '1'
 private const val CHECKSUM_SIZE = 4
 
 private enum class ALPHABET(val value: String) {
-  IPFS("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"), RIPPLE("rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"), FLICKR("123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"), BITCOIN("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"), GMP("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv")
+  IPFS("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"),
+  RIPPLE("rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"),
+  FLICKR(
+    "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+  ),
+  BITCOIN("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"),
+  GMP("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv")
 }
 
 
@@ -171,7 +177,9 @@ internal fun String.decodeBase58WithChecksum(): ByteArray {
 
 
 @Throws(IllegalArgumentException::class)
-internal fun String.toStringEncodeToBase58(characters: String = "GMP"): String = toByteArray().encodeToBase58String(characters)
+internal fun String.toStringEncodeToBase58(characters: String = "GMP"): String = toByteArray().encodeToBase58String(
+  characters
+)
 
 
 @Throws(IllegalArgumentException::class)

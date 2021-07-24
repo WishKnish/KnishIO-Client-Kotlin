@@ -20,7 +20,23 @@ class CheckMolecule {
     @JvmStatic
     fun enumerate(hash: String): Map<Int, Int> {
       val mapped = mapOf(
-        '0' to - 8, '1' to - 7, '2' to - 6, '3' to - 5, '4' to - 4, '5' to - 3, '6' to - 2, '7' to - 1, '8' to 0, '9' to 1, 'a' to 2, 'b' to 3, 'c' to 4, 'd' to 5, 'e' to 6, 'f' to 7, 'g' to 8
+        '0' to - 8,
+        '1' to - 7,
+        '2' to - 6,
+        '3' to - 5,
+        '4' to - 4,
+        '5' to - 3,
+        '6' to - 2,
+        '7' to - 1,
+        '8' to 0,
+        '9' to 1,
+        'a' to 2,
+        'b' to 3,
+        'c' to 4,
+        'd' to 5,
+        'e' to 6,
+        'f' to 7,
+        'g' to 8
       )
 
       return mutableMapOf<Int, Int>().also {
@@ -102,7 +118,10 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, WrongTokenTypeException::class, AtomIndexException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      WrongTokenTypeException::class,
+      AtomIndexException::class
     )
     fun isotopeI(molecule: Molecule): Boolean {
       missing(molecule)
@@ -119,7 +138,10 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, WrongTokenTypeException::class, AtomIndexException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      WrongTokenTypeException::class,
+      AtomIndexException::class
     )
     fun isotopeU(molecule: Molecule): Boolean {
       missing(molecule)
@@ -137,7 +159,10 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, WrongTokenTypeException::class, MetaMissingException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      WrongTokenTypeException::class,
+      MetaMissingException::class
     )
     fun isotopeM(molecule: Molecule): Boolean {
       missing(molecule)
@@ -155,7 +180,10 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, WrongTokenTypeException::class, AtomIndexException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      WrongTokenTypeException::class,
+      AtomIndexException::class
     )
     fun isotopeC(molecule: Molecule): Boolean {
       missing(molecule)
@@ -173,7 +201,11 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, WrongTokenTypeException::class, AtomIndexException::class, MetaMissingException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      WrongTokenTypeException::class,
+      AtomIndexException::class,
+      MetaMissingException::class
     )
     fun isotopeT(molecule: Molecule): Boolean {
       missing(molecule)
@@ -214,7 +246,8 @@ class CheckMolecule {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'R' }.forEach {
         setOf("callback", "conditions", "rule").forEach { key ->
-          val metaData = it.meta.find { metaData -> metaData.key == key } ?: throw MetaMissingException("Check::isotopeR() - Required meta field \"${key}\" is missing!")
+          val metaData =
+            it.meta.find { metaData -> metaData.key == key } ?: throw MetaMissingException("Check::isotopeR() - Required meta field \"${key}\" is missing!")
 
           if (key == "conditions") {
             metaData.value?.let { value ->
@@ -246,7 +279,14 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, TransferMismatchedException::class, TransferMalformedException::class, IllegalArgumentException::class, TransferToSelfException::class, TransferBalanceException::class, TransferRemainderException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      TransferMismatchedException::class,
+      TransferMalformedException::class,
+      IllegalArgumentException::class,
+      TransferToSelfException::class,
+      TransferBalanceException::class,
+      TransferRemainderException::class
     )
     fun isotopeV(molecule: Molecule, sourceWallet: Wallet? = null): Boolean {
       missing(molecule)
@@ -354,7 +394,10 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, SignatureMalformedException::class, SignatureMismatchException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      SignatureMalformedException::class,
+      SignatureMismatchException::class
     )
     fun ots(molecule: Molecule): Boolean {
       missing(molecule)

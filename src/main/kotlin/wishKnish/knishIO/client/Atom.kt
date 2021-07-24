@@ -20,7 +20,16 @@ data class Atom(
   companion object {
     private val hashSchema
       get() = mutableMapOf<String, Any?>(
-        "position" to null, "walletAddress" to null, "isotope" to null, "token" to null, "value" to null, "batchId" to null, "metaType" to null, "metaId" to null, "meta" to null, "createdAt" to null
+        "position" to null,
+        "walletAddress" to null,
+        "isotope" to null,
+        "token" to null,
+        "value" to null,
+        "batchId" to null,
+        "metaType" to null,
+        "metaId" to null,
+        "meta" to null,
+        "createdAt" to null
       )
 
     private val jsonFormat: Json

@@ -44,7 +44,10 @@ data class Molecule(
 
     if (molecularHash == null) {
       remainderWallet = remainderWallet ?: Wallet.create(
-        secretOrBundle = secret, token = sourceWallet.token, batchId = sourceWallet.batchId, characters = sourceWallet.characters
+        secretOrBundle = secret,
+        token = sourceWallet.token,
+        batchId = sourceWallet.batchId,
+        characters = sourceWallet.characters
       )
 
       clear()
@@ -79,10 +82,29 @@ data class Molecule(
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, AtomIndexException::class, TransferMismatchedException::class, TransferMalformedException::class, IllegalArgumentException::class, TransferToSelfException::class, TransferBalanceException::class, TransferRemainderException::class, SignatureMalformedException::class, SignatureMismatchException::class, MolecularHashMismatchException::class, MetaMissingException::class, WrongTokenTypeException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      AtomIndexException::class,
+      TransferMismatchedException::class,
+      TransferMalformedException::class,
+      IllegalArgumentException::class,
+      TransferToSelfException::class,
+      TransferBalanceException::class,
+      TransferRemainderException::class,
+      SignatureMalformedException::class,
+      SignatureMismatchException::class,
+      MolecularHashMismatchException::class,
+      MetaMissingException::class,
+      WrongTokenTypeException::class
     )
     fun verify(molecule: Molecule, sourceWallet: Wallet? = null): Boolean {
-      return CheckMolecule.molecularHash(molecule) && CheckMolecule.ots(molecule) && CheckMolecule.index(molecule) && CheckMolecule.batchId(molecule) && CheckMolecule.continuId(molecule) && CheckMolecule.isotopeM(molecule) && CheckMolecule.isotopeT(molecule) && CheckMolecule.isotopeC(molecule) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeR(molecule) && CheckMolecule.isotopeV(molecule, sourceWallet)
+      return CheckMolecule.molecularHash(molecule) && CheckMolecule.ots(molecule) && CheckMolecule.index(molecule) && CheckMolecule.batchId(
+        molecule
+      ) && CheckMolecule.continuId(molecule) && CheckMolecule.isotopeM(molecule) && CheckMolecule.isotopeT(molecule) && CheckMolecule.isotopeC(
+        molecule
+      ) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeR(molecule) && CheckMolecule.isotopeV(
+        molecule, sourceWallet
+      )
     }
   }
 
@@ -99,7 +121,20 @@ data class Molecule(
   }
 
   @Throws(
-    MolecularHashMissingException::class, AtomsMissingException::class, AtomIndexException::class, TransferMismatchedException::class, TransferMalformedException::class, IllegalArgumentException::class, TransferToSelfException::class, TransferBalanceException::class, TransferRemainderException::class, SignatureMalformedException::class, SignatureMismatchException::class, MolecularHashMismatchException::class, MetaMissingException::class, WrongTokenTypeException::class
+    MolecularHashMissingException::class,
+    AtomsMissingException::class,
+    AtomIndexException::class,
+    TransferMismatchedException::class,
+    TransferMalformedException::class,
+    IllegalArgumentException::class,
+    TransferToSelfException::class,
+    TransferBalanceException::class,
+    TransferRemainderException::class,
+    SignatureMalformedException::class,
+    SignatureMismatchException::class,
+    MolecularHashMismatchException::class,
+    MetaMissingException::class,
+    WrongTokenTypeException::class
   )
   fun check(sourceWallet: Wallet? = null): Boolean {
     return verify(this, sourceWallet)
@@ -151,7 +186,14 @@ data class Molecule(
   fun addUserRemainderAtom(userRemainderWallet: Wallet): Molecule {
     return addAtom(
       Atom(
-        position = userRemainderWallet.position !!, walletAddress = userRemainderWallet.address !!, isotope = 'I', token = userRemainderWallet.token, metaType = "walletBundle", metaId = userRemainderWallet.bundle, meta = finalMetas(wallet = userRemainderWallet), index = generateIndex()
+        position = userRemainderWallet.position !!,
+        walletAddress = userRemainderWallet.address !!,
+        isotope = 'I',
+        token = userRemainderWallet.token,
+        metaType = "walletBundle",
+        metaId = userRemainderWallet.bundle,
+        meta = finalMetas(wallet = userRemainderWallet),
+        index = generateIndex()
       )
     )
   }
@@ -175,7 +217,16 @@ data class Molecule(
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'C', token = sourceWallet.token, value = amount.toString(), batchId = sourceWallet.batchId, metaType = "token", metaId = token, meta = finalMetas(meta), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'C',
+        token = sourceWallet.token,
+        value = amount.toString(),
+        batchId = sourceWallet.batchId,
+        metaType = "token",
+        metaId = token,
+        meta = finalMetas(meta),
+        index = generateIndex()
       )
     )
 
@@ -195,13 +246,29 @@ data class Molecule(
     // Initializing a new Atom to remove tokens from source
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'V', token = sourceWallet.token, value = (- amount.toDouble()).toString(), batchId = sourceWallet.batchId, meta = finalMetas(), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = (- amount.toDouble()).toString(),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
       )
     )
 
     return addAtom(
       Atom(
-        position = remainderWallet !!.position !!, walletAddress = remainderWallet !!.address !!, isotope = 'V', token = sourceWallet.token, value = (sourceWallet.balance - amount.toDouble()).toString(), batchId = remainderWallet !!.batchId, metaType = walletBundle?.let { "walletBundle" }, metaId = walletBundle, meta = finalMetas(wallet = remainderWallet), index = generateIndex()
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = (sourceWallet.balance - amount.toDouble()).toString(),
+        batchId = remainderWallet !!.batchId,
+        metaType = walletBundle?.let { "walletBundle" },
+        metaId = walletBundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
       )
     )
   }
@@ -215,34 +282,72 @@ data class Molecule(
     // Initializing a new Atom to remove tokens from source
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'V', token = sourceWallet.token, value = (- amount.toDouble()).toString(), batchId = sourceWallet.batchId, meta = finalMetas(), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = (- amount.toDouble()).toString(),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
       )
     )
 
     // Initializing a new Atom to add tokens to recipient
     addAtom(
       Atom(
-        position = recipientWallet.position !!, walletAddress = recipientWallet.address !!, isotope = 'V', token = sourceWallet.token, value = amount.toDouble().toString(), batchId = recipientWallet.batchId, metaType = "walletBundle", metaId = recipientWallet.bundle, meta = finalMetas(wallet = recipientWallet), index = generateIndex()
+        position = recipientWallet.position !!,
+        walletAddress = recipientWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = amount.toDouble().toString(),
+        batchId = recipientWallet.batchId,
+        metaType = "walletBundle",
+        metaId = recipientWallet.bundle,
+        meta = finalMetas(wallet = recipientWallet),
+        index = generateIndex()
       )
     )
 
     return addAtom(
       Atom(
-        position = remainderWallet !!.position !!, walletAddress = remainderWallet !!.address !!, isotope = 'V', token = sourceWallet.token, value = (sourceWallet.balance - amount.toDouble()).toString(), batchId = remainderWallet !!.batchId, metaType = "walletBundle", metaId = sourceWallet.bundle, meta = finalMetas(wallet = remainderWallet), index = generateIndex()
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = (sourceWallet.balance - amount.toDouble()).toString(),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = sourceWallet.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
       )
     )
   }
 
   fun initWalletCreation(newWallet: Wallet): Molecule {
     val metas = mutableListOf(
-      MetaData(key = "address", value = newWallet.address), MetaData(key = "token", value = newWallet.token), MetaData(key = "bundle", value = newWallet.bundle), MetaData(key = "position", value = newWallet.position), MetaData(key = "amount", value = "0"), MetaData(key = "batchId", value = newWallet.batchId)
+      MetaData(key = "address", value = newWallet.address),
+      MetaData(key = "token", value = newWallet.token),
+      MetaData(key = "bundle", value = newWallet.bundle),
+      MetaData(key = "position", value = newWallet.position),
+      MetaData(key = "amount", value = "0"),
+      MetaData(key = "batchId", value = newWallet.batchId)
     )
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'C', token = sourceWallet.token, batchId = sourceWallet.batchId, metaType = "wallet", metaId = sourceWallet.address, meta = finalMetas(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'C',
+        token = sourceWallet.token,
+        batchId = sourceWallet.batchId,
+        metaType = "wallet",
+        metaId = sourceWallet.address,
+        meta = finalMetas(
           metas = contextMetas(metas).toMutableList(), wallet = newWallet
-        ), index = generateIndex()
+        ),
+        index = generateIndex()
       )
     )
 
@@ -270,7 +375,16 @@ data class Molecule(
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'C', token = sourceWallet.token, value = amount.toString(), batchId = recipientWallet.batchId, metaType = "token", metaId = recipientWallet.token, meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = sourceWallet), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'C',
+        token = sourceWallet.token,
+        value = amount.toString(),
+        batchId = recipientWallet.batchId,
+        metaType = "token",
+        metaId = recipientWallet.token,
+        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = sourceWallet),
+        index = generateIndex()
       )
     )
 
@@ -287,7 +401,14 @@ data class Molecule(
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'R', token = sourceWallet.token, metaType = metaType, metaId = metaId, meta = finalMetas(metas = meta, wallet = sourceWallet), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'R',
+        token = sourceWallet.token,
+        metaType = metaType,
+        metaId = metaId,
+        meta = finalMetas(metas = meta, wallet = sourceWallet),
+        index = generateIndex()
       )
     )
 
@@ -296,12 +417,22 @@ data class Molecule(
 
   fun initShadowWalletClaim(token: String, wallet: Wallet): Molecule {
     val metas = mutableListOf(
-      MetaData(key = "tokenSlug", value = token), MetaData(key = "walletAddress", value = wallet.address), MetaData(key = "walletPosition", value = wallet.position), MetaData(key = "batchId", value = wallet.batchId)
+      MetaData(key = "tokenSlug", value = token),
+      MetaData(key = "walletAddress", value = wallet.address),
+      MetaData(key = "walletPosition", value = wallet.position),
+      MetaData(key = "batchId", value = wallet.batchId)
     )
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'C', token = sourceWallet.token, metaType = "wallet", metaId = wallet.address, meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = wallet), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'C',
+        token = sourceWallet.token,
+        metaType = "wallet",
+        metaId = wallet.address,
+        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = wallet),
+        index = generateIndex()
       )
     )
 
@@ -315,7 +446,14 @@ data class Molecule(
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'C', token = sourceWallet.token, metaType = "identifier", metaId = type, meta = finalMetas(metas = metas, wallet = sourceWallet), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'C',
+        token = sourceWallet.token,
+        metaType = "identifier",
+        metaId = type,
+        meta = finalMetas(metas = metas, wallet = sourceWallet),
+        index = generateIndex()
       )
     )
 
@@ -325,7 +463,15 @@ data class Molecule(
   fun initMeta(meta: MutableList<MetaData>, metaType: String, metaId: String): Molecule {
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'M', token = sourceWallet.token, batchId = sourceWallet.batchId, metaType = metaType, metaId = metaId, meta = finalMetas(metas = meta, wallet = sourceWallet), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'M',
+        token = sourceWallet.token,
+        batchId = sourceWallet.batchId,
+        metaType = metaType,
+        metaId = metaId,
+        meta = finalMetas(metas = meta, wallet = sourceWallet),
+        index = generateIndex()
       )
     )
 
@@ -339,7 +485,16 @@ data class Molecule(
 
     addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'T', token = sourceWallet.token, value = amount.toString(), batchId = batchId, metaType = metaType, metaId = metaId, meta = finalMetas(metas = meta), index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'T',
+        token = sourceWallet.token,
+        value = amount.toString(),
+        batchId = batchId,
+        metaType = metaType,
+        metaId = metaId,
+        meta = finalMetas(metas = meta),
+        index = generateIndex()
       )
     )
 
@@ -349,7 +504,13 @@ data class Molecule(
   fun initAuthorization(meta: MutableList<MetaData>): Molecule {
     return addAtom(
       Atom(
-        position = sourceWallet.position !!, walletAddress = sourceWallet.address !!, isotope = 'U', token = sourceWallet.token, batchId = sourceWallet.batchId, meta = meta, index = generateIndex()
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'U',
+        token = sourceWallet.token,
+        batchId = sourceWallet.batchId,
+        meta = meta,
+        index = generateIndex()
       )
     )
   }
