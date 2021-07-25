@@ -11,7 +11,9 @@ import kotlinx.serialization.json.*
 import wishKnish.knishIO.client.data.MetaData
 import kotlin.jvm.Throws
 
-
+/**
+ * Atom class used to form micro-transactions within a Molecule
+ */
 @Serializable data class Atom(
   @JvmField var position: String,
   @JvmField var walletAddress: String,
@@ -48,6 +50,10 @@ import kotlin.jvm.Throws
         ignoreUnknownKeys = true
       }
 
+    /**
+     * Populates and returns a schema object according to hash priority list
+     * to ensure consistent hashing results across multiple platforms
+     */
     @JvmStatic
     private fun molecularHashSchema(atom: Atom): Map<String, Any?> {
       val schema = hashSchema
@@ -63,34 +69,49 @@ import kotlin.jvm.Throws
       return schema.toMap()
     }
 
+    /**
+     * Converts a compliant JSON string into an Atom class instance
+     */
     @JvmStatic
     fun jsonToObject(json: String): Atom {
       return jsonFormat.decodeFromString(json)
     }
 
+    /**
+     * Sort the atoms in a Molecule
+     */
     @JvmStatic
     fun sortAtoms(atoms: List<Atom>): List<Atom> {
       val atomList = atoms.toMutableList()
 
+      // Sort based on atomic index
       atomList.sortBy { it.index }
 
       return atomList.toList()
     }
 
+    /**
+     * Produces a hash of the atoms inside a molecule.
+     * Used to generate the molecularHash field for Molecules.
+     */
     @JvmStatic
     private fun hash(atoms: List<Atom>): Shake256 {
       val atomList = sortAtoms(atoms)
       val molecularSponge = Shake256.create()
       val numberOfAtoms = atomList.size.toString()
 
+      // Hashing each atom in the molecule to produce a molecular hash
       for (atom in atomList) {
         molecularSponge.absorb(numberOfAtoms)
 
         molecularHashSchema(atom).forEach { (property, value) ->
+
+          // Old atoms support (without batch_id field)
           if (value == null && property in arrayListOf("batchId", "pubkey", "characters")) {
             return@forEach
           }
 
+          // Hashing individual meta keys and values
           if (property == "meta") {
             @Suppress("UNCHECKED_CAST") (value as List<MetaData>).forEach { MetaData ->
               MetaData.value?.run {
@@ -118,12 +139,17 @@ import kotlin.jvm.Throws
       return molecularSponge
     }
 
+    /**
+     * Produces a hash of the atoms inside a molecule.
+     * Used to generate the molecularHash field for Molecules.
+     */
     @JvmStatic
     @Throws(IllegalArgumentException::class)
     fun hashAtoms(
       atoms: List<Atom>,
       output: String = "base17"
     ): String? {
+
       val molecularSponge = hash(atoms)
 
       return when (output) {
