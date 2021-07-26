@@ -1,7 +1,53 @@
+/*
+                               (
+                              (/(
+                              (//(
+                              (///(
+                             (/////(
+                             (//////(                          )
+                            (////////(                        (/)
+                            (////////(                       (///)
+                           (//////////(                      (////)
+                           (//////////(                     (//////)
+                          (////////////(                    (///////)
+                         (/////////////(                   (/////////)
+                        (//////////////(                  (///////////)
+                        (///////////////(                (/////////////)
+                       (////////////////(               (//////////////)
+                      (((((((((((((((((((              (((((((((((((((
+                     (((((((((((((((((((              ((((((((((((((
+                     (((((((((((((((((((            ((((((((((((((
+                    ((((((((((((((((((((           (((((((((((((
+                    ((((((((((((((((((((          ((((((((((((
+                    (((((((((((((((((((         ((((((((((((
+                    (((((((((((((((((((        ((((((((((
+                    ((((((((((((((((((/      (((((((((
+                    ((((((((((((((((((     ((((((((
+                    (((((((((((((((((    (((((((
+                   ((((((((((((((((((  (((((
+                   #################  ##
+                   ################  #
+                  ################# ##
+                 %################  ###
+                 ###############(   ####
+                ###############      ####
+               ###############       ######
+              %#############(        (#######
+             %#############           #########
+            ############(              ##########
+           ###########                  #############
+          #########                      ##############
+        %######
+
+        Powered by Knish.IO: Connecting a Decentralized World
+
+Please visit https://github.com/WishKnish/KnishIO-Client-Kotlin for information.
+
+License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
+*/
 @file:JvmName("Molecule")
 
 package wishKnish.knishIO.client
-
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -16,7 +62,9 @@ import kotlin.math.ceil
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.memberProperties
 
-
+/**
+ * Molecule class used for committing changes to the ledger
+ */
 @Serializable data class Molecule(
   @Transient val secret: String? = null,
   @Transient var sourceWallet: Wallet = Wallet(),
@@ -25,13 +73,9 @@ import kotlin.reflect.full.memberProperties
 ) {
 
   @JvmField var createdAt: String = Strings.currentTimeMillis()
-
   @JvmField var status: String? = null
-
   @JvmField var bundle: String? = null
-
   @JvmField var molecularHash: String? = null
-
   @JvmField var atoms: MutableList<Atom> = mutableListOf()
 
   init {
@@ -40,6 +84,7 @@ import kotlin.reflect.full.memberProperties
     }
 
     if (molecularHash == null) {
+      // Set the remainder wallet for this transaction
       remainderWallet = remainderWallet ?: Wallet.create(
         secretOrBundle = secret,
         token = sourceWallet.token,
@@ -52,8 +97,13 @@ import kotlin.reflect.full.memberProperties
   }
 
   @Transient var cellSlugOrigin = cellSlug
+
+  /**
+   * Returns the Meta Type for ContinuID
+   */
   val continuIdMetaType
     get() = "walletBundle"
+
   val cellSlugDelimiter
     get() = "."
 
@@ -64,6 +114,9 @@ import kotlin.reflect.full.memberProperties
         ignoreUnknownKeys = true
       }
 
+    /**
+     * Generates the next atomic index
+     */
     @JvmStatic
     fun generateNextAtomIndex(atoms: List<Atom>): Int {
       val length = atoms.size - 1
@@ -139,6 +192,9 @@ import kotlin.reflect.full.memberProperties
     return verify(this, sourceWallet)
   }
 
+  /**
+   * Clears the instance of the data, leads the instance to a state equivalent to that after new Molecule()
+   */
   fun clear(): Molecule {
     createdAt = Strings.currentTimeMillis()
     bundle = null
@@ -149,10 +205,16 @@ import kotlin.reflect.full.memberProperties
     return this
   }
 
+  /**
+   * Fills a Molecule's properties with the provided object
+   */
   fun fill(molecule: Molecule): Molecule {
     return this merge molecule
   }
 
+  /**
+   * Adds an atom to an existing Molecule
+   */
   fun addAtom(atom: Atom): Molecule {
     molecularHash = null
     atoms.add(atom)
@@ -161,6 +223,9 @@ import kotlin.reflect.full.memberProperties
     return this
   }
 
+  /**
+   * Final meta array
+   */
   fun finalMetas(
     metas: MutableList<MetaData> = mutableListOf(),
     wallet: Wallet? = null
@@ -188,6 +253,9 @@ import kotlin.reflect.full.memberProperties
     }.toList()
   }
 
+  /**
+   * Add user remainder atom for ContinuID
+   */
   fun addUserRemainderAtom(userRemainderWallet: Wallet): Molecule {
     return addAtom(
       Atom(
@@ -203,10 +271,16 @@ import kotlin.reflect.full.memberProperties
     )
   }
 
+  /**
+   * Generates the next atomic index
+   */
   fun generateIndex(): Int {
     return generateNextAtomIndex(atoms)
   }
 
+  /**
+   * Replenishes non-finite token supplies
+   */
   @Throws(MetaMissingException::class)
   fun replenishTokens(
     amount: Number,
@@ -242,6 +316,9 @@ import kotlin.reflect.full.memberProperties
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Burns some amount of tokens from a wallet
+   */
   @Throws(NegativeAmountException::class)
   fun burnToken(
     amount: Number,
@@ -285,6 +362,10 @@ import kotlin.reflect.full.memberProperties
     )
   }
 
+  /**
+   * Initialize a V-type molecule to transfer value from one wallet to another, with a third,
+   * regenerated wallet receiving the remainder
+   */
   @Throws(BalanceInsufficientException::class)
   fun initValue(
     recipientWallet: Wallet,
@@ -340,6 +421,9 @@ import kotlin.reflect.full.memberProperties
     )
   }
 
+  /**
+   * Builds Atoms to define a new wallet on the ledger
+   */
   fun initWalletCreation(newWallet: Wallet): Molecule {
     val metas = mutableListOf(
       MetaData(key = "address", value = newWallet.address),
@@ -369,6 +453,9 @@ import kotlin.reflect.full.memberProperties
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Initialize a C-type molecule to issue a new type of token
+   */
   fun initTokenCreation(
     recipientWallet: Wallet,
     amount: Number,
@@ -390,6 +477,7 @@ import kotlin.reflect.full.memberProperties
       }
     }
 
+    // The primary atom tells the ledger that a certain amount of the new token is being issued.
     addAtom(
       Atom(
         position = sourceWallet.position !!,
@@ -405,6 +493,7 @@ import kotlin.reflect.full.memberProperties
       )
     )
 
+    // User remainder atom
     return addUserRemainderAtom(remainderWallet !!)
   }
 
@@ -433,13 +522,19 @@ import kotlin.reflect.full.memberProperties
       )
     )
 
+    // User remainder atom
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Init shadow wallet claim
+   */
   fun initShadowWalletClaim(
     token: String,
     wallet: Wallet
   ): Molecule {
+
+    // Generate a wallet metas
     val metas = mutableListOf(
       MetaData(key = "tokenSlug", value = token),
       MetaData(key = "walletAddress", value = wallet.address),
@@ -447,6 +542,7 @@ import kotlin.reflect.full.memberProperties
       MetaData(key = "batchId", value = wallet.batchId)
     )
 
+    // Create an 'C' atom
     addAtom(
       Atom(
         position = sourceWallet.position !!,
@@ -460,12 +556,16 @@ import kotlin.reflect.full.memberProperties
       )
     )
 
+    // User remainder atom
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Builds Atoms to define a new identifier on the ledger
+   */
   fun initIdentifierCreation(
-    type: String,
-    contact: String,
+    type: String, // phone or email
+    contact: String, // phone number or email string
     code: String
   ): Molecule {
     val metas = mutableListOf(
@@ -488,11 +588,16 @@ import kotlin.reflect.full.memberProperties
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Initialize an M-type molecule with the given data
+   */
   fun initMeta(
     meta: MutableList<MetaData>,
     metaType: String,
     metaId: String
   ): Molecule {
+
+    // Initializing a new Atom to hold our metadata
     addAtom(
       Atom(
         position = sourceWallet.position !!,
@@ -507,9 +612,13 @@ import kotlin.reflect.full.memberProperties
       )
     )
 
+    // User remainder atom
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Arranges atoms to request tokens from the node itself
+   */
   fun initTokenRequest(
     token: String,
     amount: Number,
@@ -535,10 +644,16 @@ import kotlin.reflect.full.memberProperties
       )
     )
 
+    // User remainder atom
     return addUserRemainderAtom(remainderWallet !!)
   }
 
+  /**
+   * Arranges atoms to request an authorization token from the node
+   */
   fun initAuthorization(meta: MutableList<MetaData>): Molecule {
+
+    // Initializing a new Atom to hold our metadata
     return addAtom(
       Atom(
         position = sourceWallet.position !!,
@@ -552,6 +667,10 @@ import kotlin.reflect.full.memberProperties
     )
   }
 
+  /**
+   * Creates a one-time signature for a molecule and breaks it up across multiple atoms within that
+   * molecule. Resulting 4096 byte (2048 character) string is the one-time signature, which is then compressed.
+   */
   @Throws(AtomsMissingException::class, IllegalArgumentException::class)
   fun sign(
     anonymous: Boolean = false,
@@ -566,16 +685,20 @@ import kotlin.reflect.full.memberProperties
     if (atoms.isEmpty()) {
       throw AtomsMissingException()
     }
+
     // Derive the user's bundle
     if (! anonymous) {
       bundle = Crypto.generateBundleHash(secret)
     }
+
     // Hash atoms to get molecular hash
     molecularHash = Atom.hashAtoms(atoms = atoms)
-    // Determine first atom
-    val firstAtom = atoms.first()
+
+    // Determine signing atom
+    val signingAtom = atoms.first()
+
     // Generate the private signing key for this molecule
-    val key = Wallet.generatePrivateKey(secret = secret, token = firstAtom.token, position = firstAtom.position)
+    val key = Wallet.generatePrivateKey(secret = secret, token = signingAtom.token, position = signingAtom.position)
 
     // Building a one-time-signature
     var signatureFragments = signatureFragments(key)
@@ -586,6 +709,7 @@ import kotlin.reflect.full.memberProperties
     }
 
     var lastPosition: String? = null
+
     // Chunking the signature across multiple atoms
     signatureFragments.chunked(
       ceil(signatureFragments.length.toDouble() / atoms.size).toInt()
@@ -601,8 +725,10 @@ import kotlin.reflect.full.memberProperties
     key: String,
     encode: Boolean = true
   ): String {
+
     // Subdivide Kk into 16 segments of 256 bytes (128 characters) each
     val keyChunks = key.chunked(128)
+
     // Convert Hm to numeric notation, and then normalize
     val normalizedHash = CheckMolecule.normalizedHash(molecularHash !!)
 
