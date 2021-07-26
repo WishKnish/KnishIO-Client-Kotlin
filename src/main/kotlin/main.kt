@@ -17,9 +17,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import wishKnish.knishIO.client.data.json.MoleculeMutationQuery
-import wishKnish.knishIO.client.data.json.ProposeMoleculeData
-import wishKnish.knishIO.client.data.json.ResponseData
+import wishKnish.knishIO.client.data.json.molecule.mutation.MoleculeMutation
+import wishKnish.knishIO.client.data.json.molecule.response.ProposeMoleculeData
+import wishKnish.knishIO.client.data.json.molecule.response.ResponseMoleculeData
 import wishKnish.knishIO.client.libraries.Crypto
 import java.lang.Exception
 import kotlinx.serialization.json.Json as KotlinJson
@@ -207,7 +207,7 @@ suspend fun authorizationToken(): String {
 }
 
 fun extractMolecule(response: String): ProposeMoleculeData {
-  return ResponseData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
+  return ResponseMoleculeData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
 }
 
 suspend fun balanceQuery(
@@ -301,7 +301,7 @@ suspend fun moleculeMutation(
     val client = getClient()
     val response: HttpResponse = client.post(endpoint) {
       contentType(ContentType.Application.Json)
-      body = MoleculeMutationQuery(molecule)
+      body = MoleculeMutation(molecule)
     }
     val content = response.readText()
 
@@ -350,7 +350,7 @@ fun getClient(): HttpClient {
       https {
         // Certificate Authentication Stub
         https {
-          serverName = "lumen.loc"
+          serverName = "knishnode.knishio"
           cipherSuites = CIOCipherSuites.SupportedSuites
           trustManager = TrustAllX509TrustManager()
           random = SecureRandom()
