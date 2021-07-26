@@ -1,12 +1,12 @@
 @file:JvmName("MoleculeMutationQuery")
 
-package wishKnish.knishIO.client.data.json
+package wishKnish.knishIO.client.data.json.molecule.mutation
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import wishKnish.knishIO.client.Molecule
 
-@Serializable data class MoleculeMutationQuery(@Transient val molecule: Molecule? = null) {
+@Serializable data class MoleculeMutation(@Transient val molecule: Molecule? = null) {
   @JvmField val query = """
         mutation(${'$'}molecule: MoleculeInput! ) {
           ProposeMolecule( molecule: ${'$'}molecule ) {

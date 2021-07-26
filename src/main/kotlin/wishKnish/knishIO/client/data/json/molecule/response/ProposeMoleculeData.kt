@@ -1,6 +1,6 @@
 @file:JvmName("ProposeMoleculeData")
 
-package wishKnish.knishIO.client.data.json
+package wishKnish.knishIO.client.data.json.molecule.response
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString

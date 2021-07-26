@@ -1,13 +1,13 @@
 @file:JvmName("ProposeMoleculeData")
 
-package wishKnish.knishIO.client.data.json
+package wishKnish.knishIO.client.data.json.molecule.response
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable class ResponseData(@JvmField var data: DataData? = null) {
+@Serializable class ResponseMoleculeData(@JvmField var data: DataData? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -17,12 +17,12 @@ import kotlinx.serialization.json.Json
       }
 
     @JvmStatic
-    fun create(data: DataData? = null): ResponseData {
-      return ResponseData(data)
+    fun create(data: DataData? = null): ResponseMoleculeData {
+      return ResponseMoleculeData(data)
     }
 
     @JvmStatic
-    fun jsonToObject(json: String): ResponseData {
+    fun jsonToObject(json: String): ResponseMoleculeData {
       return jsonFormat.decodeFromString(json)
     }
   }

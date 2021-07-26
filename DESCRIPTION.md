@@ -42,7 +42,7 @@ fun getClient(): HttpClient {
             https {
                 // Certificate Authentication Stub
                 https {
-                    serverName = "lumen.loc"
+                    serverName = "example.loc"
                     cipherSuites = CIOCipherSuites.SupportedSuites
                     trustManager = TrustAllX509TrustManager()
                     random = SecureRandom()
@@ -77,7 +77,7 @@ suspend fun moleculeMutation(
         val client = getClient()
         val response: HttpResponse = client.post(endpoint) {
             contentType(ContentType.Application.Json)
-            body = MoleculeMutationQuery(molecule)
+            body = MoleculeMutation(molecule)
         }
         val content = response.readText()
 
@@ -94,10 +94,10 @@ suspend fun moleculeMutation(
 В случаи ошибки метод возбудить исключение. `sourceWallet` необходим только при переводе токенов.
 Перевод токенов осуществляется вызовам метода `initValue(recipientWallet: Wallet, amount: Number): Molecule`.
 
-Вы можете увидеть выше, что мы передаем в body объект `MoleculeMutationQuery`, он служит обверткой
+Вы можете увидеть выше, что мы передаем в body объект `MoleculeMutation`, он служит обверткой
 для мутации молекулы который содержит graphql запрос, а так же, чтобы привести body к формату
-`{"query": String, "variables": Map}`. `MoleculeMutationQuery` импортируется из пространства имен 
-`wishKnish.knishIO.client.data.json`
+`{"query": String, "variables": Map}`. `MoleculeMutation` импортируется из пространства имен 
+`wishKnish.knishIO.client.data.json.molecule.mutation`
 
 Пример дата класса, что бы привести тело запроса к формату `{"query": String, "variables": Map}`
 ```kotlin
@@ -422,7 +422,7 @@ suspend fun balanceQuery(
 Для упрощения работы с ответом сервера для молекул в примерах использовался метод `extractMolecule`:
 ```kotlin
 fun extractMolecule(response: String): ProposeMoleculeData {
-  return ResponseData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
+  return ResponseMoleculeData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
 }
 ```
-`ResponseData` можно импортировать из пространства имен `wishKnish.knishIO.client.data.json`
+`ResponseMoleculeData` можно импортировать из пространства имен `wishKnish.knishIO.client.data.json.molecule.response`
