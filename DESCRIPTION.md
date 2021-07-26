@@ -5,12 +5,22 @@
 
 Пример инициализации http клиента:
 ```kotlin
-fun getClient(token: String? = null): HttpClient {
+fun getClient(): HttpClient {
+
     // Certificate Authentication Stub
     class TrustAllX509TrustManager : X509TrustManager {
         override fun getAcceptedIssuers(): Array<X509Certificate?> = arrayOfNulls(0)
-        override fun checkClientTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
-        override fun checkServerTrusted(certs: Array<X509Certificate?>?, authType: String?) {}
+        override fun checkClientTrusted(
+            certs: Array<X509Certificate?>?,
+            authType: String?
+        ) {
+        }
+
+        override fun checkServerTrusted(
+            certs: Array<X509Certificate?>?,
+            authType: String?
+        ) {
+        }
     }
 
     val jsonFormat = KotlinJson {
@@ -20,7 +30,7 @@ fun getClient(token: String? = null): HttpClient {
 
     return HttpClient(CIO) {
         engine {
-            headersOf("X-Auth-Token", token ?: "")
+            headersOf("X-Auth-Token", authToken ?: "")
             maxConnectionsCount = 1000
             endpoint {
                 maxConnectionsPerRoute = 100
@@ -32,7 +42,7 @@ fun getClient(token: String? = null): HttpClient {
             https {
                 // Certificate Authentication Stub
                 https {
-                    serverName = "example.loc"
+                    serverName = "lumen.loc"
                     cipherSuites = CIOCipherSuites.SupportedSuites
                     trustManager = TrustAllX509TrustManager()
                     random = SecureRandom()
@@ -44,7 +54,7 @@ fun getClient(token: String? = null): HttpClient {
         }
         install(Logging) {
             logger = Logger.DEFAULT
-            level = LogLevel.INFO
+            level = LogLevel.NONE
         }
     }
 }
@@ -57,12 +67,15 @@ kotlinx-serialization-json поэтому настраиваем сериали�
 
 Пример метода отправки запроса с молекулой:
 ```kotlin
-suspend fun moleculeQuery(molecule: Molecule, token: String? = null, wallet: Wallet? = null): String {
+suspend fun moleculeMutation(
+    molecule: Molecule,
+    wallet: Wallet? = null
+): String {
 
     if (molecule.check(wallet)) {
 
-        val client = getClient(token)
-        val response: HttpResponse = client.post("https://example.loc/graphql") {
+        val client = getClient()
+        val response: HttpResponse = client.post(endpoint) {
             contentType(ContentType.Application.Json)
             body = MoleculeMutationQuery(molecule)
         }
@@ -88,8 +101,10 @@ suspend fun moleculeQuery(molecule: Molecule, token: String? = null, wallet: Wal
 
 Пример дата класса, что бы привести тело запроса к формату `{"query": String, "variables": Map}`
 ```kotlin
-@Serializable
-data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables: Map<String, String>) {
+@Serializable data class GraphqlQueryData(
+    @JvmField var query: String,
+    @JvmField var variables: Map<String, String>
+) {
     companion object {
         private val jsonFormat: kotlinx.serialization.json.Json
             get() = kotlinx.serialization.json.Json {
@@ -99,7 +114,10 @@ data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables
             }
 
         @JvmStatic
-        fun create(query: String, variables: Map<String, String>): GraphqlQueryData {
+        fun create(
+            query: String,
+            variables: Map<String, String>
+        ): GraphqlQueryData {
             return GraphqlQueryData(query, variables)
         }
 
@@ -121,36 +139,53 @@ data class GraphqlQueryData(@JvmField var query: String, @JvmField var variables
 
 Пример общего метода для запросов использующий `GraphqlQueryData` класс:
 ```kotlin
-suspend fun graphqlQuery(query: String, variables: Map<String, String>, authToken: String? = null): String {
+suspend fun graphqlQuery(
+    query: String,
+    variables: Map<String, String>
+): String {
 
-    val client = getClient(authToken)
-    val response: HttpResponse = client.post("https://example.loc/graphql") {
+    val client = getClient()
+    val response: HttpResponse = client.post(endpoint) {
         contentType(ContentType.Application.Json)
         body = GraphqlQueryData(query, variables)
     }
     val content = response.readText()
-
     client.close()
-
     return content
+
 }
 ```
 Для того чтобы что-то отправлять или запрашивать от сервера нужно получить токен
 авторизации. Осуществляется это с помощью молекулы с атомом изотопа 'U'.
-Что бы получить такую молекулу нужно вызвать у экземпляра метод 
+Что бы получить такую молекулу необходима вызвать у экземпляра метод 
 `initAuthorization(meta: MutableList<MetaData>): Molecule`
 
 Пример метода получения токена авторизации:
 ```kotlin
 suspend fun authorizationToken(): String {
-    val molecule = Molecule(secret = secret, sourceWallet = Wallet(secret = secret, token = "AUTH"))
 
-    molecule.initAuthorization(mutableListOf(MetaData(key = "encrypt", value = "false")))
+    // Defining authorization parameters
+    val meta = mutableListOf(
+        MetaData("encrypt", "false")
+    )
+
+    // Creating wallet for authorization
+    val authWallet = Wallet(secret, "AUTH")
+
+    // Creating molecule mutation
+    val molecule = Molecule(secret, authWallet, null, cellSlug)
+    molecule.initAuthorization(meta)
+
+    // Signing molecule
     molecule.sign()
+    print("authorizationToken() - Signed molecule:\r\n$molecule\r\n");
 
-    val proposeMolecule = extractMolecule(moleculeQuery(molecule))
+    // Getting broadcast response
+    val response = moleculeMutation(molecule)
+    val responseMolecule = extractMolecule(response)
 
-    if (proposeMolecule.status.lowercase() == "accepted") {
+    // Verifying status
+    if (responseMolecule.status.lowercase() == "accepted") {
 
         // proposeMolecule.payload = {
         //   token="8d2c5c44-9700-48b1-8d35-3ccf956a51ab",
@@ -160,19 +195,234 @@ suspend fun authorizationToken(): String {
         //   encrypt=false
         // }
 
-        return Gson().fromJson(proposeMolecule.payload, Map::class.java)["token"]?.toString()
-            ?: throw IllegalArgumentException("Invalid response format")
+        print("authorizationToken() - Successful response:\r\n$responseMolecule\r\n");
+        return Gson().fromJson(
+            responseMolecule.payload, Map::class.java
+        )["token"]?.toString() ?: throw IllegalArgumentException("Invalid response format")
     }
 
     throw IllegalArgumentException("An error occurred during authorization")
 }
 ```
-Чтобы создать экземпляр молекулы для получения токена авторизации мы инициализируем конструктор класса секретом,
-который является HEX строкой из 2048 символов и `sourceWallet` кошельком, конструктор которого инициализируется секретом
-и указанием параметра token "AUTH".
+Чтобы создать экземпляр молекулы для получения токена авторизации мы инициализируем конструктор класса `Molecule` секретом,
+который является HEX строкой из 2048 символов и `authWallet` кошельком, параметр token которого должен быть установлен 
+значением "AUTH".
 
 После этого вызываем у экземпляра метод `initAuthorization` передавая ему список с
-метаданными в котором указываем будет ли для данного токена применятся шифрования.
+метаданными в котором указываем серверу тип общения, с шифрованием или без.
 
-Прежде чем отравлять молекулу на сервер одна должна быть подписана методом экземпляра 
-`sign(anonymous: Boolean = false, compressed: Boolean = true): String?`.
+Прежде чем отравлять молекулу на сервер одна должна быть подписана 
+`sign(anonymous: Boolean = false, compressed: Boolean = true): String?`. Так же не забудьте проверить молекулу на 
+соответствия правилам методом `check()`. Поле чего можно отправлять на сервер.
+
+Ответ сервера на принятую молекулу имеет следующий вид:
+```json
+{
+  "molecularHash": "0367eg429cbf2g2eb8231a0a674bd5a88bac98d92ff9fb91c457gb74a683g7a5",
+  "height": 35,
+  "depth": 0,
+  "status": "accepted",
+  "reason": "",
+  "payload": "{\"token\":\"d678adb0-49b8-4a60-a973-0678bea693d4\",\"time\":172800000,\"expiresAt\":1627463377,\"key\":\"FGd6aB7QHrWtj06IALDNmTGKS1FIPm255m6Vree33uE6\",\"encrypt\":false}",
+  "createdAt": "1627290571268",
+  "receivedAt": "1627290575255",
+  "processedAt": "1627290575625",
+  "broadcastedAt": ""
+}
+```
+Поле `status` может иметь значение _**accepted**_ в случаи принятия и выполнения молекулы или _**rejected**_, если молекула отклонена
+сервером. В поле `reason` содержится сообщения от сервера или описание ошибки. Поле `payload` служит для возращения 
+клиенту данных если они предусмотрены. Для токена авторизации это JSON строка с полями `token` в котором хранится сам
+токен, `key` - открытый ключ шифрования сервера, `encrypt` хранит логическое значение работы с шифрованием трафика, `expiresAt`
+метка времени истечения актуальности токена.
+
+Для создания и хранения разнообразной информации или сущностей используется молекула с изотопами 'M'.
+Пример создания и отправки молекулы с метаинформацией:
+```kotlin
+suspend fun createMeta(): Boolean {
+
+  // Defining meta asset parameters
+  val metaType = "artifact"
+  val metaId = "1"
+  val meta = mutableListOf(
+    MetaData("logo", "data:image/jpeg;base64,*")
+  )
+
+  // Defining signing wallet
+  val sourceWallet = Wallet(secret);
+
+  // Creating molecule mutation
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initMeta(meta, metaType, metaId)
+
+  // Signing molecule
+  molecule.sign()
+  print("createMeta() - Signed molecule:\r\n$molecule\r\n");
+
+  // Getting broadcast response
+  val response = moleculeMutation(molecule);
+  val responseMolecule = extractMolecule(response)
+
+  // Verifying status
+  if (responseMolecule.status.lowercase() != "accepted") {
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
+
+  print("createMeta() - Successful response:\r\n$responseMolecule\r\n");
+  return true
+}
+```
+
+Для создания токенов используется молекула изотопа 'C'.
+Пример создания токена:
+```kotlin
+suspend fun createToken(): Boolean {
+
+  // Token metadata
+  val meta = mutableListOf(
+    MetaData("name", "$tokenSlug token"),
+    MetaData("fungibility", "fungible"),
+    MetaData("supply", "replenishable"),
+    MetaData("decimals", "0")
+  )
+
+  // Defining signing wallet
+  val sourceWallet = Wallet(secret)
+
+  // Creating wallet to receive tokens
+  val recipientWallet = Wallet(secret, tokenSlug)
+
+  // Creating molecule mutation
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initTokenCreation(recipientWallet, tokenAmount, meta)
+
+  // Signing molecule
+  molecule.sign()
+  print("createToken() - Signed molecule:\r\n$molecule\r\n");
+
+  // Getting broadcast response
+  val response = moleculeMutation(molecule);
+  val responseMolecule = extractMolecule(response)
+
+  // Verifying status
+  if (responseMolecule.status.lowercase() != "accepted") {
+    print("createToken() - Error response:\r\n$responseMolecule\r\n");
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
+
+  print("createToken() - Successful response:\r\n$responseMolecule\r\n");
+  return true
+}
+```
+Перечисление имеющихся токенов осуществляется с использованием молекулы с изотопами 'V'.
+Пример создания молекулы для перечисления токенов.
+```kotlin
+suspend fun transferTokens(): Boolean {
+
+  // Designating sender wallet
+  val sourceWallet = balanceQuery(
+    Crypto.generateBundleHash(secret), tokenSlug
+  ) ?: throw IllegalArgumentException("You do not have a token $tokenSlug balance")
+
+  // Designating recipient wallet
+  val recipientWallet = Wallet(secret2, tokenSlug);
+
+  // Creating molecule
+  val molecule = Molecule(secret, sourceWallet, null, cellSlug)
+  molecule.initValue(recipientWallet, 10)
+
+  // Signing molecule
+  molecule.sign()
+  print("transferTokens() - Signed molecule:\r\n$molecule\r\n");
+
+  // Getting broadcast response
+  val response = moleculeMutation(molecule, sourceWallet);
+  val responseMolecule = extractMolecule(response)
+
+  // Verifying status
+  if (responseMolecule.status.lowercase() != "accepted") {
+    print("transferTokens() - Error response:\r\n$responseMolecule\r\n");
+    throw IllegalArgumentException(responseMolecule.reason)
+  }
+
+  print("transferTokens() - Successful response:\r\n$responseMolecule\r\n");
+  return true;
+}
+```
+Для того чтобы перечислить токены, мы должны знать наш балансовый кошелек который содержит остаток имеющихся у нас 
+токенов. В примере выше мы его получаем методом `balanceQuery`.
+
+Пример `balanceQuery`:
+```kotlin
+suspend fun balanceQuery(
+  bundleHash: String,
+  token: String
+): Wallet? {
+  val query = """
+    query( ${'$'}address: String, ${'$'}bundleHash: String, ${'$'}token: String, ${'$'}position: String ) {
+      Balance( address: ${'$'}address, bundleHash: ${'$'}bundleHash, token: ${'$'}token, position: ${'$'}position ) {
+        address,
+        bundleHash,
+        tokenSlug,
+        batchId,
+        position,
+        amount,
+        characters,
+        pubkey,
+        createdAt,
+        tokenUnits {
+          id,
+          name,
+          metas
+        }
+      }
+    }
+    """.trimIndent()
+
+  // Defining query parameters
+  val variables = mapOf(
+    "bundleHash" to bundleHash, "token" to token
+  )
+
+  // Getting query response
+  val responseJson = graphqlQuery(query, variables);
+  print("balanceQuery() - JSON response:\r\n$responseJson\r\n");
+
+  // Converting to GSON
+  val responseGson = Gson().fromJson(responseJson, Map::class.java)
+
+  // Mapping to wallet objects
+  val responseMapped = responseGson["data"]?.let { item ->
+    (item as Map<*, *>)["Balance"]?.let {
+      val walletMap = it as Map<*, *>
+
+      val bundleHash = walletMap["bundleHash"] as String
+      val tokenSlug = walletMap["tokenSlug"] as String
+      val batchId = walletMap["batchId"] as String?
+      val characters = walletMap["characters"] as String?
+      val address = walletMap["address"] as String?
+      val position = walletMap["position"] as String?
+      val amount = (walletMap["amount"] as String).toDouble()
+      val pubkey = walletMap["pubkey"] as String?
+
+      val wallet = Wallet.create(bundleHash, tokenSlug, batchId, characters)
+      wallet.address = address
+      wallet.position = position
+      wallet.balance = amount
+      wallet.pubkey = pubkey
+
+      wallet
+    }
+  }
+  print("balanceQuery() - Mapped response: \r\n$responseMapped\r\n");
+
+  return responseMapped
+}
+```
+Для упрощения работы с ответом сервера для молекул в примерах использовался метод `extractMolecule`:
+```kotlin
+fun extractMolecule(response: String): ProposeMoleculeData {
+  return ResponseData.jsonToObject(response).data?.ProposeMolecule ?: throw IllegalArgumentException("Invalid response format")
+}
+```
+`ResponseData` можно импортировать из пространства имен `wishKnish.knishIO.client.data.json`
