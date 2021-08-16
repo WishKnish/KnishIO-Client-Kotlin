@@ -8,7 +8,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-@Serializable data class MetaData(
+@Serializable data class MetaData @JvmOverloads constructor(
   @JvmField val key: String,
   @JvmField var value: String? = null
 ) {

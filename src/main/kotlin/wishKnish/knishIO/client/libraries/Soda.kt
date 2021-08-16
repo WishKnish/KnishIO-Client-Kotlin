@@ -6,25 +6,19 @@ import kotlinx.serialization.json.Json
 import com.iwebpp.crypto.TweetNaclFast
 import kotlinx.serialization.SerializationException
 import java.security.GeneralSecurityException
+import com.google.gson.Gson
 import kotlin.jvm.Throws
 
 
 class Soda(private val base: String = "GMP") {
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encrypt(
-    message: List<*>,
+  fun <T: Collection<*>>encrypt(
+    message: T,
     publicKey: String
   ): String {
-    return encode(message.toJsonElement().toString().toByteArray().seal(decode(publicKey)))
-  }
 
-  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encrypt(
-    message: Map<*, *>,
-    publicKey: String
-  ): String {
-    return encode(message.toJsonElement().toString().toByteArray().seal(decode(publicKey)))
+    return encode(Gson().toJson(message).toByteArray().seal(decode(publicKey)))
   }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)

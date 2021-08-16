@@ -65,7 +65,7 @@ import kotlin.reflect.full.memberProperties
 /**
  * Molecule class used for committing changes to the ledger
  */
-@Serializable data class Molecule(
+@Serializable data class Molecule @JvmOverloads constructor(
   @Transient val secret: String? = null,
   @Transient var sourceWallet: Wallet = Wallet(),
   @Transient var remainderWallet: Wallet? = null,
@@ -322,7 +322,7 @@ import kotlin.reflect.full.memberProperties
   @Throws(NegativeAmountException::class)
   fun burnToken(
     amount: Number,
-    walletBundle: String?
+    walletBundle: String? = null
   ): Molecule {
     if (amount.toDouble() < 0.0) {
       throw NegativeAmountException("Molecule::burnToken() - Amount to burn must be positive!")
@@ -622,10 +622,10 @@ import kotlin.reflect.full.memberProperties
   fun initTokenRequest(
     token: String,
     amount: Number,
-    metaType: String,
-    metaId: String,
+    metaType: String? = null,
+    metaId: String? = null,
     meta: MutableList<MetaData> = mutableListOf(),
-    batchId: String?
+    batchId: String? = null
   ): Molecule {
     meta.find { mataData -> mataData.key == "token" }?.run { value = token } ?: meta.add(MetaData("token", token))
 

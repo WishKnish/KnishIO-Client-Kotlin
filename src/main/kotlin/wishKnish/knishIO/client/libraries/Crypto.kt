@@ -38,18 +38,8 @@ class Crypto {
 
     @JvmStatic
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMessage(
-      message: Map<*, *>,
-      recipientPublicKey: String,
-      characters: String = "GMP"
-    ): String {
-      return Soda(characters).encrypt(message, recipientPublicKey)
-    }
-
-    @JvmStatic
-    @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun encryptMessage(
-      message: List<*>,
+    fun <T: Collection<*>>encryptMessage(
+      message: T,
       recipientPublicKey: String,
       characters: String = "GMP"
     ): String {

@@ -1,11 +1,14 @@
-package wishKnish.knishIO.client.data.json.molecule.response
+@file:JvmName("BalanceResponse")
+package wishKnish.knishIO.client.data.json.response.query.balance
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import wishKnish.knishIO.client.data.json.response.IResponse
 
-@Serializable data class DataData(@JvmField var ProposeMolecule: ProposeMoleculeData? = null) {
+
+@Serializable data class BalanceResponse(@JvmField var data: Data? = null): IResponse {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -15,12 +18,12 @@ import kotlinx.serialization.json.Json
       }
 
     @JvmStatic
-    fun create(ProposeMolecule: ProposeMoleculeData? = null): DataData {
-      return DataData(ProposeMolecule)
+    fun create(data: Data? = null): BalanceResponse {
+      return BalanceResponse(data)
     }
 
     @JvmStatic
-    fun jsonToObject(json: String): DataData {
+    fun jsonToObject(json: String): BalanceResponse {
       return jsonFormat.decodeFromString(json)
     }
   }

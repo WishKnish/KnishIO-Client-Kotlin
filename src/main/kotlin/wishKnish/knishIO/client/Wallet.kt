@@ -53,7 +53,8 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.bouncycastle.util.encoders.Base64
 import wishKnish.knishIO.client.libraries.*
-import wishKnish.knishIO.client.data.UnitData
+import wishKnish.knishIO.client.data.graphql.types.TokenUnit
+import wishKnish.knishIO.client.data.graphql.types.Molecule
 import java.math.BigInteger
 import java.security.GeneralSecurityException
 import kotlin.jvm.Throws
@@ -62,7 +63,7 @@ import kotlin.jvm.Throws
  * Wallet class represents the set of public and private
  * keys to sign Molecules
  */
-class Wallet(
+class Wallet @JvmOverloads constructor(
   secret: String? = null, // typically a 2048-character biometric hash
   @JvmField var token: String = "USER", // slug for the token this wallet is intended for
   @JvmField var position: String? = null, // hexadecimal string used to salt the secret and produce one-time signatures
@@ -75,8 +76,15 @@ class Wallet(
   @JvmField var address: String? = null
   @JvmField var privkey: String? = null
   @JvmField var pubkey: String? = null
-  @JvmField var tokenUnits = arrayListOf<UnitData>()
+  @JvmField var tokenUnits = mutableListOf<TokenUnit>()
   @JvmField var bundle: String? = null
+  @JvmField var molecules:List<Molecule> = listOf()
+
+  @JvmField var createdAt: String? = null
+  @JvmField var tokenName: String? = null
+  @JvmField var tokenAmount: String? = null
+  @JvmField var tokenSupply: String? = null
+  @JvmField var tokenFungibility: String? = null
 
   init {
     bundle = secret?.let {
@@ -121,11 +129,11 @@ class Wallet(
      * Get formatted token units from the raw data
      */
     @JvmStatic
-    fun getTokenUnits(unitsData: List<List<String>>): List<UnitData> {
-      val result = mutableListOf<UnitData>()
+    fun getTokenUnits(unitsData: List<List<String>>): List<TokenUnit> {
+      val result = mutableListOf<TokenUnit>()
 
       unitsData.forEach {
-        result.add(UnitData(it[0], it[1], it))
+        result.add(TokenUnit(it[0], it[1], it))
       }
 
       return result.toList()
@@ -218,7 +226,7 @@ class Wallet(
    * Split token units
    */
   fun splitUnits(
-    units: List<UnitData>,
+    units: List<TokenUnit>,
     remainderWallet: Wallet,
     recipientWallet: Wallet? = null
   ) {
@@ -229,8 +237,8 @@ class Wallet(
     }
 
     // Init recipient & remainder token units
-    val recipientTokenUnits = arrayListOf<UnitData>()
-    val remainderTokenUnits = arrayListOf<UnitData>()
+    val recipientTokenUnits = arrayListOf<TokenUnit>()
+    val remainderTokenUnits = arrayListOf<TokenUnit>()
 
     tokenUnits.forEach {
 
@@ -320,27 +328,8 @@ class Wallet(
    * Encrypts a message for this wallet instance
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptMyMessage(
-    message: List<*>,
-    vararg publicKeys: String
-  ): Map<String, String> {
-    val encrypt = mutableMapOf<String, String>()
-
-    publicKeys.forEach {
-      encrypt[Crypto.hashShare(it, characters ?: "GMP")] = Crypto.encryptMessage(
-        message, it, characters ?: "GMP"
-      )
-    }
-
-    return encrypt.toMap()
-  }
-
-  /**
-   * Encrypts a message for this wallet instance
-   */
-  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptMyMessage(
-    message: Map<*, *>,
+  fun <T: Collection<*>>encryptMyMessage(
+    message: T,
     vararg publicKeys: String
   ): Map<String, String> {
     val encrypt = mutableMapOf<String, String>()
