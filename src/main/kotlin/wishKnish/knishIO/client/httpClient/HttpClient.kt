@@ -77,6 +77,9 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
 
   suspend fun query(request: QueryInterface): String {
     val response: HttpResponse  = client.post(uri.normalize().toASCIIString()) {
+      headers {
+        append("X-Auth-Token", authToken)
+      }
       contentType(ContentType.Application.Json)
       body = request
     }
@@ -94,11 +97,15 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
     authToken = data.token
   }
 
+  fun setUri(uri: URI) {
+    this.uri = uri
+    client = creatClient()
+  }
+
   private fun creatClient(): HttpClient {
 
     return HttpClient(CIO) {
       engine {
-        headersOf("X-Auth-Token", authToken)
         endpoint {
           connectAttempts = 5
         }

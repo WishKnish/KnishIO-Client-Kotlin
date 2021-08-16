@@ -82,13 +82,14 @@ class KnishIOClient @JvmOverloads constructor(
     return client.uri.toASCIIString()
   }
 
-  fun client(): HttpClient {
+  suspend fun client(): HttpClient {
     if (!authProcess) {
       val randomUri = getRandomUri()
+      client.setUri(randomUri)
       val authDataObj = clients[randomUri.toASCIIString()]
       authDataObj?.let {
         client.setAuthData(it)
-      }
+      } ?: requestAuthToken(secret = secret(), cellSlug = cellSlug(), encrypt = client.encrypt)
     }
 
     return client
@@ -122,7 +123,7 @@ class KnishIOClient @JvmOverloads constructor(
     return remainderWallet
   }
 
-  fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
+  suspend fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
     return queryClass.primaryConstructor?.call(client()) as? IQuery  ?: throw CodeException("invalid Query")
   }
 
@@ -168,13 +169,13 @@ class KnishIOClient @JvmOverloads constructor(
         response.wallet()
       )
 
-      client.setAuthData(authObj)
-      clients[uri()] = authObj
-      authProcess = false
-
       if (hasEncryption() != response.encrypt()) {
         if(response.encrypt()) enableEncryption() else disableEncryption()
       }
+
+      client.setAuthData(authObj)
+      clients[uri()] = authObj
+      authProcess = false
     }
     else {
       throw UnauthenticatedException(response.reason() ?: "Authorization token missing or invalid.")
