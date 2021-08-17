@@ -20,13 +20,13 @@ class ResponseBalance(
   }
 
   override fun payload(): Wallet? {
-    val walletData = data()
 
-    return when {
-      walletData == null -> null
-      walletData.bundleHash == null -> null
-      walletData.tokenSlug == null -> null
-      else -> ResponseWalletList.toClientWallet(walletData)
+    return data()?.let {
+      when {
+        it.bundleHash == null -> null
+        it.tokenSlug == null -> null
+        else -> ResponseWalletList.toClientWallet(it)
+      }
     }
   }
 }

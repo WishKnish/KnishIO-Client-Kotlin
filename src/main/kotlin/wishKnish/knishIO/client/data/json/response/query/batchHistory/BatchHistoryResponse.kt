@@ -5,9 +5,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import wishKnish.knishIO.client.data.json.errors.Errors
 import wishKnish.knishIO.client.data.json.response.IResponse
 
 @Serializable data class BatchHistoryResponse(@JvmField var data: Data? = null): IResponse {
+  override val errors: List<Errors> = listOf()
+  override val message: String? = null
+  override val exception: Boolean? = null
+
   companion object {
     private val jsonFormat: Json
       get() = Json {

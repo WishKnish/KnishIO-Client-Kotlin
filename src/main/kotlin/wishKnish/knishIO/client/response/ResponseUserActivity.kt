@@ -9,15 +9,15 @@ class ResponseUserActivity(
   query: QueryUserActivity,
   json: String,
 ): Response(query, json, "data.UserActivity") {
-  override fun data(): UserActivityMetaType {
-    return super.data() as UserActivityMetaType
+  override fun data(): UserActivityMetaType? {
+    return super.data() as? UserActivityMetaType
   }
 
   override fun mapping(response: String): UserActivityResponse {
     return UserActivityResponse.jsonToObject(response)
   }
 
-  override fun payload(): UserActivityMetaType {
+  override fun payload(): UserActivityMetaType? {
     return data()
   }
 }

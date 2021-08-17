@@ -58,7 +58,6 @@ import io.ktor.http.*
 import io.ktor.network.tls.*
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.json.serializer.*
-import kotlinx.coroutines.withContext
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.Clients
 import wishKnish.knishIO.client.data.json.query.QueryInterface
@@ -105,6 +104,7 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
   private fun creatClient(): HttpClient {
 
     return HttpClient(CIO) {
+      expectSuccess = false
       engine {
         endpoint {
           connectAttempts = 5

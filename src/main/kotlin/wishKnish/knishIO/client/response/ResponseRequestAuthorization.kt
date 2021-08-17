@@ -23,7 +23,7 @@ class ResponseRequestAuthorization(
   override fun initialization() {
     val data = data()
 
-    payload = data.payload?.let {
+    payload = data?.payload?.let {
       AccessToken.jsonToObject(it)
     }
   }

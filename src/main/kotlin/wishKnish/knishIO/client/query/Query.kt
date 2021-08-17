@@ -53,6 +53,8 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.IVariable
 import wishKnish.knishIO.client.response.IResponse
+import wishKnish.knishIO.client.response.Response
+import wishKnish.knishIO.client.response.ResponseBalance
 
 
 abstract class Query(httpClient: HttpClient): IQuery {

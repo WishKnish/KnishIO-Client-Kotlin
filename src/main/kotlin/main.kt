@@ -12,12 +12,18 @@ suspend fun main(args: Array<String>) {
 
   val authToken = client.requestAuthToken(seed = secret)
   println("requestAuthToken")
-  println(authToken.token())
+  when{
+    authToken.success() -> println(authToken.token())
+    else -> println(authToken.status())
+  }
   println()
 
   val balance = client.queryBalance("BYTECOIN", Crypto.generateBundleHash(secret))
   println("queryBalance")
-  println(balance.payload()!!.bundle)
+  when {
+    balance.success() -> println(balance.payload()!!.bundle)
+    else -> println(balance.status())
+  }
   println()
 
   val metaType = client.queryMeta("BBReviewReply")
@@ -30,19 +36,28 @@ suspend fun main(args: Array<String>) {
   println(metaInstance)
   println()
 
-  val batch = client.queryBatch("fe6ae28c25c2361935e44235ca32a366940efc56a4e46b17032ecd1c4da6da50")
+  val batch = client.queryBatch("eac2f09ca1da9675214c1b63959469900e5ed62e17798dff3968880c4e3f9ec4")
   println("queryBatch")
-  println(batch.data())
+  when {
+    batch.success() -> println(batch.data())
+    else -> println(batch.payload())
+  }
   println()
 
   val batchHistory = client.queryBatchHistory("fe6ae28c25c2361935e44235ca32a366940efc56a4e46b17032ecd1c4da6da50")
   println("queryBatchHistory")
-  println(batchHistory.data())
+  when {
+    batchHistory.success() -> println(batchHistory.data())
+    else -> println(batchHistory.status())
+  }
   println()
 
   val userActivity = client.queryUserActivity("f64bbb155dc1650b71a41fd176db933f2ff77ea62d28dc0613817b49493c7a55")
   println("queryUserActivity")
-  println(userActivity.data())
+  when {
+    userActivity.success() -> println(userActivity.data())
+    else -> println(userActivity.status())
+  }
   println()
 
   val wallets = client.queryWallets(Crypto.generateBundleHash(secret))
@@ -52,13 +67,19 @@ suspend fun main(args: Array<String>) {
 
   val createWallet = client.createWallet("BYTECOIN")
   println("createWallet")
-  println(createWallet.data())
+  when {
+    createWallet.success() -> println(createWallet.data())
+    else -> println(createWallet.status())
+  }
   println()
 
 
   val createMeta = client.createMeta("initMetaType", "initMetaID", mutableListOf(MetaData("name", "New init meta")))
   println("createMeta")
-  println(createMeta.data())
+  when {
+    createMeta.success() -> println(createMeta.data())
+    else -> println(createMeta.status())
+  }
   println()
 
   val tokenSlug = "NEWTOKEN1"
@@ -71,12 +92,18 @@ suspend fun main(args: Array<String>) {
   )
   val createToken = client.createToken(tokenSlug, 1000000, meta)
   println("createToken")
-  println(createToken.data())
+  when {
+    createToken.success() -> println(createToken.data())
+    else -> println(createToken.status())
+  }
   println()
 
 
   val transferToken = client.transferToken(Wallet(secret2, tokenSlug), tokenSlug, 10)
   println("transferToken")
-  println(transferToken.data())
+  when {
+    transferToken.success() -> println(transferToken.data())
+    else -> println(transferToken.status())
+  }
   println()
 }

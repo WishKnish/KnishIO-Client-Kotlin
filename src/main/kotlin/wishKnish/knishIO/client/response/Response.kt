@@ -25,13 +25,17 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
       return response
     }
 
-    var data:Any? = response
+    if (response.errors.isEmpty()) {
+      var data:Any? = response
 
-    for (key in dataKey.split(".")) {
-      data = getResponseData(data, key)
+      for (key in dataKey.split(".")) {
+        data = getResponseData(data, key)
+      }
+
+      return data
     }
 
-    return data
+    return null
   }
 
   @Throws(InvalidResponseException::class)
@@ -59,6 +63,10 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
   }
 
   override fun status(): Any? {
+    if (response.errors.isNotEmpty()) {
+      return response.errors[0].message
+    }
+
     return null
   }
 
@@ -66,10 +74,14 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
   }
 
   override fun payload(): Any? {
+    if (response.errors.isNotEmpty()) {
+      return response.errors[0].debugMessage ?: status()
+    }
+
     return null
   }
 
   override fun success(): Boolean {
-    return true
+    return response.errors.isEmpty()
   }
 }
