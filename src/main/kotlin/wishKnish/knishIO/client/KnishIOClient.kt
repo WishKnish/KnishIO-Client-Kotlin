@@ -1,4 +1,5 @@
 @file:JvmName("KnishIOClient")
+
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.encodeToString
@@ -127,6 +128,7 @@ class KnishIOClient @JvmOverloads constructor(
     return queryClass.primaryConstructor?.call(client()) as? IQuery  ?: throw CodeException("invalid Query")
   }
 
+  @JvmOverloads
   suspend fun requestAuthToken(
     secret: String? = null,
     seed: String? = null,
@@ -184,6 +186,7 @@ class KnishIOClient @JvmOverloads constructor(
     return response
   }
 
+  @JvmOverloads
   suspend fun <T : KClass<*>> createMoleculeMutation(
     mutationClass: T,
     molecule: Molecule? = null
@@ -200,6 +203,7 @@ class KnishIOClient @JvmOverloads constructor(
     return mutation
   }
 
+  @JvmOverloads
   suspend fun createMolecule(
     secret: String? = null,
     sourceWallet: Wallet? = null,
@@ -246,11 +250,13 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(ContinuIdVariable(bundle)) as ResponseContinuId
   }
 
+  @JvmOverloads
   suspend fun queryBalance(token: String, bundle: String? = null): ResponseBalance {
     val query = createQuery(QueryBalance::class) as QueryBalance
     return query.execute(BalanceVariable(token = token, bundleHash = bundle)) as ResponseBalance
   }
 
+  @JvmOverloads
   suspend fun queryMeta(
     metaType: String? = null,
     metaIds: List<String> = listOf(),
@@ -281,6 +287,7 @@ class KnishIOClient @JvmOverloads constructor(
     return response.payload()
   }
 
+  @JvmOverloads
   suspend fun queryMetaInstance(
     metaType: String,
     metaId: String? = null,
@@ -324,6 +331,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(BatchHistoryVariable(batchId)) as ResponseBatchHistory
   }
 
+  @JvmOverloads
   suspend fun queryActiveSession(
     bundleHash: String? = null,
     metaType: String? = null,
@@ -333,6 +341,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(ActiveSessionVariable(bundleHash, metaType, metaId)) as ResponseActiveSession
   }
 
+  @JvmOverloads
   suspend fun queryUserActivity(
     bundleHash: String? = null,
     metaType: String? = null,
@@ -363,6 +372,7 @@ class KnishIOClient @JvmOverloads constructor(
     ) as ResponseUserActivity
   }
 
+  @JvmOverloads
   suspend fun queryWallets(
     bundle: String? = null,
     token: String? = null,
@@ -377,6 +387,7 @@ class KnishIOClient @JvmOverloads constructor(
     return response.getWallets()
   }
 
+  @JvmOverloads
   suspend fun queryShadowWallets(
     token: String = "KNISH",
     bundle: String? = null
@@ -389,6 +400,7 @@ class KnishIOClient @JvmOverloads constructor(
     return response.payload()
   }
 
+  @JvmOverloads
   suspend fun queryBundleRaw(
     bundle: String? = null,
     key: String? = null,
@@ -407,6 +419,7 @@ class KnishIOClient @JvmOverloads constructor(
     ) as ResponseWalletBundle
   }
 
+  @JvmOverloads
   suspend fun queryBundle(
     bundle: String? = null,
     key: String? = null,
@@ -425,6 +438,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
+  @JvmOverloads
   suspend fun createToken(
     token: String,
     amount: Number? = null,
@@ -475,6 +489,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
+  @JvmOverloads
   suspend fun createMeta(
     metaType: String,
     metaId: String,
@@ -502,6 +517,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
+  @JvmOverloads
   suspend fun requestTokens(
     token: String,
     to: Wallet? = null,
@@ -595,6 +611,7 @@ class KnishIOClient @JvmOverloads constructor(
     }
   }
 
+  @JvmOverloads
   suspend fun claimShadowWallet(
     token: String,
     batchId: String? = null,
@@ -607,6 +624,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
+  @JvmOverloads
   suspend fun transferToken(
     recipient: Wallet,
     token: String,
@@ -651,6 +669,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
+  @JvmOverloads
   suspend fun transferToken(
     recipient: String,
     token: String,
@@ -668,6 +687,7 @@ class KnishIOClient @JvmOverloads constructor(
     return transferToken(recipientWallet, token, amount, units, batchId, sourceWallet)
   }
 
+  @JvmOverloads
   suspend fun burnTokens(
     token: String,
     amount: Number = 0,

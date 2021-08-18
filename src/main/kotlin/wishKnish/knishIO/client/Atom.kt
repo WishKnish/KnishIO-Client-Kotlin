@@ -61,7 +61,7 @@ import kotlin.jvm.Throws
 /**
  * Atom class used to form micro-transactions within a Molecule
  */
-@Serializable data class Atom(
+@Serializable data class Atom @JvmOverloads constructor(
   @JvmField var position: String,
   @JvmField var walletAddress: String,
   @JvmField var isotope: Char,
