@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.BatchInstance
 
 
-@Serializable data class Data(@JvmField var Batch: List<BatchInstance>? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var Batch: List<BatchInstance>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -18,6 +18,7 @@ import wishKnish.knishIO.client.data.graphql.types.BatchInstance
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(Batch: List<BatchInstance>? = null): Data {
       return Data(Batch)
     }

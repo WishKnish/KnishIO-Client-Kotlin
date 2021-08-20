@@ -191,6 +191,7 @@ import kotlin.jvm.Throws
      * Used to generate the molecularHash field for Molecules.
      */
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class)
     fun hashAtoms(
       atoms: List<Atom>,

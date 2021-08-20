@@ -12,4 +12,4 @@ import wishKnish.knishIO.client.libraries.Strings
   @JvmField var meta: List<MetaData> = mutableListOf(),
   @JvmField var snapshotMolecule: String? = null,
   @JvmField val createdAt: String = Strings.currentTimeMillis()
-) {}
+)

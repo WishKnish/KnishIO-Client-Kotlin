@@ -10,6 +10,7 @@ class Crypto {
   companion object {
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class)
     fun hashShare(
       key: String,
@@ -19,6 +20,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class, NumberFormatException::class)
     fun generateEncPublicKey(
       privateKey: String,
@@ -28,6 +30,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class)
     fun generateEncPrivateKey(
       key: String,
@@ -37,6 +40,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
     fun <T: Collection<*>>encryptMessage(
       message: T,
@@ -47,6 +51,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
     fun encryptMessage(
       message: String,
@@ -57,6 +62,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(
       IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
     )
@@ -75,6 +81,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun generateSecret(
       seed: String? = null,
@@ -87,6 +94,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun generateBatchId(
       molecularHash: String? = null,
@@ -100,6 +108,7 @@ class Crypto {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun generateWalletPosition(saltLength: Int = 64): String {
       return Strings.randomString(saltLength)

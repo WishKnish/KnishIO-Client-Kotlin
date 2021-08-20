@@ -64,7 +64,7 @@ abstract class Query(httpClient: HttpClient): IQuery {
   @JvmField var request: QueryInterface? = null
   @JvmField var response: IResponse? = null
 
-  fun createResponseRaw( response: String ) = createResponse(response)
+  fun createResponseRaw(response: String) = createResponse(response)
 
   fun createQuery(variable: IVariable): QueryInterface {
     variables = variable
@@ -80,7 +80,7 @@ abstract class Query(httpClient: HttpClient): IQuery {
     return query as QueryInterface
   }
 
-  open suspend fun execute(variables: IVariable): IResponse {
+  open fun execute(variables: IVariable): IResponse {
     request = createQuery(variables)
 
     val resp = client.query(request!!)

@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Wallet
 
-@Serializable data class Data(@JvmField var Balance: Wallet? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var Balance: Wallet? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -17,6 +17,7 @@ import wishKnish.knishIO.client.data.graphql.types.Wallet
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(Balance: Wallet? = null): Data {
       return Data(Balance)
     }

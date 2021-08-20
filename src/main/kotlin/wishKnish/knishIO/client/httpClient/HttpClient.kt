@@ -58,6 +58,9 @@ import io.ktor.http.*
 import io.ktor.network.tls.*
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.json.serializer.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.future.future
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.Clients
 import wishKnish.knishIO.client.data.json.query.QueryInterface
@@ -101,21 +104,26 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
     }
   }
 
-  suspend fun query(request: QueryInterface): String {
-    val response: HttpResponse  = client.use {
-      it.post(uri.normalize().toASCIIString()) {
-        headers {
-          append("X-Auth-Token", authToken)
+  @OptIn(DelicateCoroutinesApi::class)
+  fun query(request: QueryInterface): String {
+    val completable = GlobalScope.future() {
+      val response: HttpResponse  = client.use {
+        it.post(uri.normalize().toASCIIString()) {
+          headers {
+            append("X-Auth-Token", authToken)
+          }
+          contentType(ContentType.Application.Json)
+          body = request
         }
-        contentType(ContentType.Application.Json)
-        body = request
       }
+
+      response.readText()
     }
 
-    return response.readText()
+    return completable.get()
   }
 
-  suspend fun mutate(request: QueryInterface): String {
+  fun mutate(request: QueryInterface): String {
     return query(request)
   }
 

@@ -14,7 +14,7 @@ abstract class Mutation(httpClient: HttpClient): Query(httpClient) {
     return Mutation(variables)
   }
 
-  override suspend fun execute(variables: IVariable): IResponse {
+  override fun execute(variables: IVariable): IResponse {
     request = createQuery(variables)
 
     val resp = client.mutate(request!!)

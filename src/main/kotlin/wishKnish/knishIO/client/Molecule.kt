@@ -130,6 +130,7 @@ import kotlin.reflect.full.memberProperties
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(
       MolecularHashMissingException::class,
       AtomsMissingException::class,
@@ -172,6 +173,7 @@ import kotlin.reflect.full.memberProperties
     return toJson()
   }
 
+  @JvmOverloads
   @Throws(
     MolecularHashMissingException::class,
     AtomsMissingException::class,
@@ -226,6 +228,7 @@ import kotlin.reflect.full.memberProperties
   /**
    * Final meta array
    */
+  @JvmOverloads
   fun finalMetas(
     metas: MutableList<MetaData> = mutableListOf(),
     wallet: Wallet? = null
@@ -242,6 +245,7 @@ import kotlin.reflect.full.memberProperties
     }.toList()
   }
 
+  @JvmOverloads
   fun contextMetas(
     metas: MutableList<MetaData> = mutableListOf(),
     context: String? = null
@@ -281,6 +285,7 @@ import kotlin.reflect.full.memberProperties
   /**
    * Replenishes non-finite token supplies
    */
+  @JvmOverloads
   @Throws(MetaMissingException::class)
   fun replenishTokens(
     amount: Number,
@@ -319,6 +324,7 @@ import kotlin.reflect.full.memberProperties
   /**
    * Burns some amount of tokens from a wallet
    */
+  @JvmOverloads
   @Throws(NegativeAmountException::class)
   fun burnToken(
     amount: Number,
@@ -456,6 +462,7 @@ import kotlin.reflect.full.memberProperties
   /**
    * Initialize a C-type molecule to issue a new type of token
    */
+  @JvmOverloads
   fun initTokenCreation(
     recipientWallet: Wallet,
     amount: Number,
@@ -619,6 +626,7 @@ import kotlin.reflect.full.memberProperties
   /**
    * Arranges atoms to request tokens from the node itself
    */
+  @JvmOverloads
   fun initTokenRequest(
     token: String,
     amount: Number,
@@ -671,6 +679,7 @@ import kotlin.reflect.full.memberProperties
    * Creates a one-time signature for a molecule and breaks it up across multiple atoms within that
    * molecule. Resulting 4096 byte (2048 character) string is the one-time signature, which is then compressed.
    */
+  @JvmOverloads
   @Throws(AtomsMissingException::class, IllegalArgumentException::class)
   fun sign(
     anonymous: Boolean = false,
@@ -721,6 +730,7 @@ import kotlin.reflect.full.memberProperties
     return lastPosition
   }
 
+  @JvmOverloads
   fun signatureFragments(
     key: String,
     encode: Boolean = true

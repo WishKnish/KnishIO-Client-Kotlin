@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Session
 
 
-@Serializable data class Data(@JvmField var ActiveUser: Session? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var ActiveUser: Session? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -18,6 +18,7 @@ import wishKnish.knishIO.client.data.graphql.types.Session
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(data: Session? = null): Data {
       return Data(data)
     }

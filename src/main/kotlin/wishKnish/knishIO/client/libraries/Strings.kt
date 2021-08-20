@@ -30,6 +30,7 @@ class Strings {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun randomString(
       length: Int,
@@ -39,6 +40,7 @@ class Strings {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(IllegalArgumentException::class)
     fun charsetBaseConvert(
       src: String,

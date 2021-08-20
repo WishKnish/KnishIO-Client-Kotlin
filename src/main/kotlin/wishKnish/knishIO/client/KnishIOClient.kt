@@ -83,7 +83,7 @@ class KnishIOClient @JvmOverloads constructor(
     return client.uri.toASCIIString()
   }
 
-  suspend fun client(): HttpClient {
+  fun client(): HttpClient {
     if (!authProcess) {
       val randomUri = getRandomUri()
       client.setUri(randomUri)
@@ -124,12 +124,12 @@ class KnishIOClient @JvmOverloads constructor(
     return remainderWallet
   }
 
-  suspend fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
+  fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
     return queryClass.primaryConstructor?.call(client()) as? IQuery  ?: throw CodeException("invalid Query")
   }
 
   @JvmOverloads
-  suspend fun requestAuthToken(
+  fun requestAuthToken(
     secret: String? = null,
     seed: String? = null,
     cellSlug: String? = null,
@@ -187,7 +187,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun <T : KClass<*>> createMoleculeMutation(
+  fun <T : KClass<*>> createMoleculeMutation(
     mutationClass: T,
     molecule: Molecule? = null
   ): MutationProposeMolecule {
@@ -204,7 +204,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun createMolecule(
+  fun createMolecule(
     secret: String? = null,
     sourceWallet: Wallet? = null,
     remainderWallet: Wallet? = null
@@ -241,23 +241,23 @@ class KnishIOClient @JvmOverloads constructor(
     )
   }
 
-  suspend fun sourceWallet(): Wallet {
+  fun sourceWallet(): Wallet {
     return queryContinuId(bundle()).payload() ?: Wallet(secret())
   }
 
-  suspend fun queryContinuId(bundle: String): ResponseContinuId {
+  fun queryContinuId(bundle: String): ResponseContinuId {
     val query = createQuery(QueryContinuId::class) as QueryContinuId
     return query.execute(ContinuIdVariable(bundle)) as ResponseContinuId
   }
 
   @JvmOverloads
-  suspend fun queryBalance(token: String, bundle: String? = null): ResponseBalance {
+  fun queryBalance(token: String, bundle: String? = null): ResponseBalance {
     val query = createQuery(QueryBalance::class) as QueryBalance
     return query.execute(BalanceVariable(token = token, bundleHash = bundle)) as ResponseBalance
   }
 
   @JvmOverloads
-  suspend fun queryMeta(
+  fun queryMeta(
     metaType: String? = null,
     metaIds: List<String> = listOf(),
     keys: List<String> = listOf(),
@@ -288,7 +288,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryMetaInstance(
+  fun queryMetaInstance(
     metaType: String,
     metaId: String? = null,
     key: String? = null,
@@ -321,18 +321,18 @@ class KnishIOClient @JvmOverloads constructor(
     return response.data()
   }
 
-  suspend fun queryBatch(batchId: String): ResponseBatch {
+  fun queryBatch(batchId: String): ResponseBatch {
     val query = createQuery(QueryBatch::class) as QueryBatch
     return query.execute(BatchVariable(batchId)) as ResponseBatch
   }
 
-  suspend fun queryBatchHistory(batchId: String): ResponseBatchHistory {
+  fun queryBatchHistory(batchId: String): ResponseBatchHistory {
     val query = createQuery(QueryBatchHistory::class) as QueryBatchHistory
     return query.execute(BatchHistoryVariable(batchId)) as ResponseBatchHistory
   }
 
   @JvmOverloads
-  suspend fun queryActiveSession(
+  fun queryActiveSession(
     bundleHash: String? = null,
     metaType: String? = null,
     metaId: String? = null
@@ -342,7 +342,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryUserActivity(
+  fun queryUserActivity(
     bundleHash: String? = null,
     metaType: String? = null,
     metaId: String? = null,
@@ -373,7 +373,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryWallets(
+  fun queryWallets(
     bundle: String? = null,
     token: String? = null,
     unspent: Boolean? = null
@@ -388,7 +388,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryShadowWallets(
+  fun queryShadowWallets(
     token: String = "KNISH",
     bundle: String? = null
   ): List<Wallet> {
@@ -401,7 +401,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryBundleRaw(
+  fun queryBundleRaw(
     bundle: String? = null,
     key: String? = null,
     value: String? = null,
@@ -420,7 +420,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun queryBundle(
+  fun queryBundle(
     bundle: String? = null,
     key: String? = null,
     value: String? = null,
@@ -429,7 +429,7 @@ class KnishIOClient @JvmOverloads constructor(
     return queryBundleRaw(bundle, key, value, latest).payload()
   }
 
-  suspend fun createWallet(token: String): ResponseProposeMolecule {
+  fun createWallet(token: String): ResponseProposeMolecule {
     val newWallet = Wallet(secret(), token)
     val query = createMoleculeMutation(MutationCreateWallet::class) as MutationCreateWallet
 
@@ -439,7 +439,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun createToken(
+  fun createToken(
     token: String,
     amount: Number? = null,
     meta: MutableList<MetaData> = mutableListOf(),
@@ -490,7 +490,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun createMeta(
+  fun createMeta(
     metaType: String,
     metaId: String,
     meta: MutableList<MetaData> = mutableListOf()
@@ -505,7 +505,7 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
   }
 
-  suspend fun createIdentifier(
+  fun createIdentifier(
     type: String,
     contact: String,
     code: String
@@ -518,7 +518,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun requestTokens(
+  fun requestTokens(
     token: String,
     to: Wallet? = null,
     amount: Number? = null,
@@ -544,7 +544,8 @@ class KnishIOClient @JvmOverloads constructor(
     return requestTokensQuery(token, amount, metaType, metaId, units, meta, batchId)
   }
 
-  suspend fun requestTokens(
+
+  fun requestTokens(
     token: String,
     to: String? = null,
     amount: Number? = null,
@@ -559,7 +560,7 @@ class KnishIOClient @JvmOverloads constructor(
     return requestTokensQuery(token, amount, metaType, metaId, units, meta, batchId)
   }
 
-  private suspend fun requestTokensQuery(
+  private fun requestTokensQuery(
     token: String,
     amount: Number? = null,
     metaType: String? = null,
@@ -612,7 +613,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun claimShadowWallet(
+  fun claimShadowWallet(
     token: String,
     batchId: String? = null,
     molecule: Molecule? = null
@@ -625,7 +626,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun transferToken(
+  fun transferToken(
     recipient: Wallet,
     token: String,
     amount: Number,
@@ -670,7 +671,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun transferToken(
+  fun transferToken(
     recipient: String,
     token: String,
     amount: Number,
@@ -688,7 +689,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  suspend fun burnTokens(
+  fun burnTokens(
     token: String,
     amount: Number = 0,
     units: MutableList<TokenUnit> = mutableListOf(),

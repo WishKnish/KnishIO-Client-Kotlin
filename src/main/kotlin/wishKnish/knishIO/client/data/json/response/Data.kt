@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-@Serializable data class Data(@JvmField var data: String? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var data: String? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(data: String? = null): Data {
       return Data(data)
     }

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.UserActivityMetaType
 
 
-@Serializable data class Data(@JvmField var UserActivity: UserActivityMetaType? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var UserActivity: UserActivityMetaType? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -18,6 +18,7 @@ import wishKnish.knishIO.client.data.graphql.types.UserActivityMetaType
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(data: UserActivityMetaType? = null): Data {
       return Data(data)
     }

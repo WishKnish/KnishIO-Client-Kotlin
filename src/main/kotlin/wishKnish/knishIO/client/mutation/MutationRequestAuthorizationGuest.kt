@@ -17,8 +17,8 @@ class MutationRequestAuthorizationGuest(httpClient: HttpClient): Mutation(httpCl
     return AccessTokenMutation(variables as AccessTokenMutationVariable)
   }
 
-  fun setAuthorizationWallet ( wallet: Wallet ) {
-    this.wallet = wallet;
+  fun setAuthorizationWallet(wallet: Wallet) {
+    this.wallet = wallet
   }
 
   override fun createResponse(json: String): ResponseRequestAuthorizationGuest {

@@ -15,12 +15,14 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class
+      MolecularHashMissingException::class,
+      AtomsMissingException::class,
+      NoSuchElementException::class
     )
     fun continuId(molecule: Molecule): Boolean {
       missing(molecule)
 
-      val firstAtom = molecule.atoms.first();
+      val firstAtom = molecule.atoms.first()
 
       if (firstAtom.token == "USER" && molecule.atoms.none { it.isotope == 'I' }) {
         throw AtomsMissingException("Check::continuId() - Molecule is missing required ContinuID Atom!")
@@ -135,7 +137,7 @@ class CheckMolecule {
     fun isotopeI(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'I' }.forEach {
-        if (it.token.isNullOrEmpty() || it.token != "USER") {
+        if (it.token.isEmpty() || it.token != "USER") {
           throw WrongTokenTypeException("Check::isotopeI() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
         if (it.index == 0) {
@@ -155,7 +157,7 @@ class CheckMolecule {
     fun isotopeU(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'U' }.forEach {
-        if (it.token.isNullOrEmpty() || it.token != "AUTH") {
+        if (it.token.isEmpty() || it.token != "AUTH") {
           throw WrongTokenTypeException("Check::isotopeU() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
         if (it.index != 0) {
@@ -179,7 +181,7 @@ class CheckMolecule {
         if (it.meta.isEmpty()) {
           throw MetaMissingException()
         }
-        if (it.token.isNullOrEmpty() || it.token != "USER") {
+        if (it.token.isEmpty() || it.token != "USER") {
           throw WrongTokenTypeException("Check::isotopeM() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
       }
@@ -197,7 +199,7 @@ class CheckMolecule {
     fun isotopeC(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'C' }.forEach {
-        if (it.token.isNullOrEmpty() || it.token != "USER") {
+        if (it.token.isEmpty() || it.token != "USER") {
           throw WrongTokenTypeException("Check::isotopeC() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
         if (it.index != 0) {
@@ -235,7 +237,7 @@ class CheckMolecule {
           }
         }
 
-        if (it.token.isNullOrEmpty() || it.token != "USER") {
+        if (it.token.isEmpty() || it.token != "USER") {
           throw WrongTokenTypeException("Check::isotopeT() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
 
@@ -287,6 +289,7 @@ class CheckMolecule {
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(
       MolecularHashMissingException::class,
       AtomsMissingException::class,

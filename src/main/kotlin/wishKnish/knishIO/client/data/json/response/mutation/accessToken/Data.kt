@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.AccessToken
 
-@Serializable data class Data(@JvmField var AccessToken: AccessToken? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var AccessToken: AccessToken? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -17,6 +17,7 @@ import wishKnish.knishIO.client.data.graphql.types.AccessToken
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(AccessToken: AccessToken? = null): Data {
       return Data(AccessToken)
     }

@@ -9,6 +9,8 @@ class MutationClaimShadowWallet @JvmOverloads constructor(
   httpClient: HttpClient,
   override val molecule: Molecule? = null
 ): MutationProposeMolecule(httpClient, molecule) {
+
+  @JvmOverloads
   fun fillMolecule(
     token: String,
     batchId: String? = null

@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Molecule
 
-@Serializable data class Data(@JvmField var ProposeMolecule: Molecule? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var ProposeMolecule: Molecule? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -17,6 +17,7 @@ import wishKnish.knishIO.client.data.graphql.types.Molecule
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(ProposeMolecule: Molecule? = null): Data {
       return Data(ProposeMolecule)
     }

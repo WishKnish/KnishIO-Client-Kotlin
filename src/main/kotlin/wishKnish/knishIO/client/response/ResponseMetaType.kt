@@ -14,7 +14,7 @@ class ResponseMetaType(
   query: QueryMetaType,
   json: String,
 ): Response(query, json, "data.MetaType") {
-  data class Response(
+  data class Response @JvmOverloads constructor(
     val instances: List<MetaInstance>? = null,
     val instanceCount: List<KeyValueInt>? = null,
     val paginatorInfo: Paginator? = null

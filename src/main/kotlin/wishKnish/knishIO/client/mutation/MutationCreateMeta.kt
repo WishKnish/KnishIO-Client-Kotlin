@@ -9,6 +9,8 @@ class MutationCreateMeta @JvmOverloads constructor(
   httpClient: HttpClient,
   override val molecule: Molecule? = null
 ): MutationProposeMolecule(httpClient, molecule) {
+
+  @JvmOverloads
   fun fillMolecule(
     metaType: String,
     metaId: String,

@@ -12,6 +12,8 @@ class ResponseWalletList(
   json: String,
 ): Response(query, json, "data.Wallet") {
   companion object {
+
+    @JvmOverloads
     fun toClientWallet(data: GraphqlWallet, secret: String? = null): Wallet {
       val wallet: Wallet
 
@@ -46,6 +48,7 @@ class ResponseWalletList(
     }
   }
 
+  @JvmOverloads
   fun getWallets(secret: String? = null): List<Wallet> {
     val list = data()
     val wallets = mutableListOf<Wallet>()

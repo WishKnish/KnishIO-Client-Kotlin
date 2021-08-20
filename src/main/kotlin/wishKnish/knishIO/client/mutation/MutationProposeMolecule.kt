@@ -30,7 +30,7 @@ open class MutationProposeMolecule @JvmOverloads constructor(httpClient: HttpCli
     return MoleculeMutation(variables as MoleculeMutationVariable)
   }
 
-  suspend fun execute(variables: MoleculeMutationVariable): IResponse {
+  fun execute(variables: MoleculeMutationVariable): IResponse {
     request = createQuery(variables)
 
     val resp = client.mutate(request!!)

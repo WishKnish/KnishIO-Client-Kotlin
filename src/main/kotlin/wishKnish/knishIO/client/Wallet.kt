@@ -97,6 +97,7 @@ class Wallet @JvmOverloads constructor(
   companion object {
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun create(
       secretOrBundle: String? = null,
@@ -172,6 +173,7 @@ class Wallet @JvmOverloads constructor(
     }
 
     @JvmStatic
+    @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun generateWalletPosition(saltLength: Int = 64): String {
       return Strings.randomString(saltLength)
@@ -225,6 +227,7 @@ class Wallet @JvmOverloads constructor(
   /**
    * Split token units
    */
+  @JvmOverloads
   fun splitUnits(
     units: List<TokenUnit>,
     remainderWallet: Wallet,
@@ -272,6 +275,7 @@ class Wallet @JvmOverloads constructor(
   /**
    * Sets up a batch ID - either using the sender's, or a new one
    */
+  @JvmOverloads
   fun initBatchId(
     sourceWallet: Wallet,
     remainder: Boolean = false
@@ -371,6 +375,7 @@ class Wallet @JvmOverloads constructor(
   /**
    * Attempts to decrypt the given string
    */
+  @JvmOverloads
   @Throws(
     IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
   )

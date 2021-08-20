@@ -20,6 +20,7 @@ import kotlinx.serialization.json.Json
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(
       key: String,
       value: String? = null

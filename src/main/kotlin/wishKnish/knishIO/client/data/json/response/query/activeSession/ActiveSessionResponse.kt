@@ -9,7 +9,7 @@ import wishKnish.knishIO.client.data.json.errors.Errors
 import wishKnish.knishIO.client.data.json.response.IResponse
 
 
-@Serializable data class ActiveSessionResponse(@JvmField var data: Data? = null): IResponse {
+@Serializable data class ActiveSessionResponse @JvmOverloads constructor(@JvmField var data: Data? = null): IResponse {
   override val errors: List<Errors> = listOf()
   override val message: String? = null
   override val exception: Boolean? = null
@@ -23,6 +23,7 @@ import wishKnish.knishIO.client.data.json.response.IResponse
       }
 
     @JvmStatic
+    @JvmOverloads
     fun create(data: Data? = null): ActiveSessionResponse {
       return ActiveSessionResponse(data)
     }
