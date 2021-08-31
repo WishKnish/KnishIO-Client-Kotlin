@@ -669,7 +669,7 @@ import kotlin.reflect.full.memberProperties
         isotope = 'U',
         token = sourceWallet.token,
         batchId = sourceWallet.batchId,
-        meta = meta,
+        meta = finalMetas(metas = meta),
         index = generateIndex()
       )
     )

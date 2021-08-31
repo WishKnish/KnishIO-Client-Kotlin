@@ -7,10 +7,21 @@ import com.iwebpp.crypto.TweetNaclFast
 import kotlinx.serialization.SerializationException
 import java.security.GeneralSecurityException
 import com.google.gson.Gson
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlin.jvm.Throws
+import kotlin.text.toByteArray
 
 
 class Soda(private val base: String = "GMP") {
+  companion object {
+    private val jsonFormat: Json
+      get() = Json {
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+      }
+  }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
   fun <T: Collection<*>>encrypt(
@@ -26,7 +37,7 @@ class Soda(private val base: String = "GMP") {
     message: String,
     publicKey: String
   ): String {
-    return encode(message.toByteArray().seal(decode(publicKey)))
+    return encode(jsonFormat.encodeToString(message).toByteArray().seal(decode(publicKey)))
   }
 
   @Throws(NumberFormatException::class, IllegalArgumentException::class, SerializationException::class)
@@ -40,8 +51,13 @@ class Soda(private val base: String = "GMP") {
     if (data.isEmpty()) {
       return null
     }
+    val preform = data.toString(Charsets.UTF_8)
 
-    return Json.parseToJsonElement(data.joinToString("") { "${it.toInt().toChar()}" }).decode()
+    return try {
+      jsonFormat.parseToJsonElement(preform)
+    } catch (e: SerializationException) {
+      preform
+    }
   }
 
   @Throws(IllegalArgumentException::class)

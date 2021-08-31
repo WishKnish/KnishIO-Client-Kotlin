@@ -9,7 +9,7 @@ const val secret2 = "509d8d7eb52af57c17c01c6882b1599b2d4c9eed5fe99e33300c6c54a2b
 
 fun main(args: Array<String>) {
 
-  val client = KnishIOClient(listOf(URI("https://lumen.loc/graphql")))
+  val client = KnishIOClient(listOf(URI("https://lumen.loc/graphql")), encrypt = true)
 
   val authToken = client.requestAuthToken(seed = secret)
   println("requestAuthToken")

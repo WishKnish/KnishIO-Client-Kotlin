@@ -38,6 +38,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.5.1")
   implementation("org.slf4j:slf4j-jdk14:1.7.31")
   implementation("com.google.code.gson:gson:2.8.7")
+  implementation("com.graphql-java:graphql-java:17.0")
   testImplementation(kotlin("test"))
 }
 

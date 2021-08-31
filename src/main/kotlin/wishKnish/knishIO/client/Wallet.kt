@@ -50,8 +50,8 @@ License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.bouncycastle.util.encoders.Base64
 import wishKnish.knishIO.client.libraries.*
 import wishKnish.knishIO.client.data.graphql.types.TokenUnit
 import wishKnish.knishIO.client.data.graphql.types.Molecule
@@ -295,6 +295,7 @@ class Wallet @JvmOverloads constructor(
         secret = secret, token = token, position = position as String
       )
       address = generatePublicKey(key = key as String)
+      getMyEncPublicKey()
     }
   }
 
@@ -369,7 +370,7 @@ class Wallet @JvmOverloads constructor(
         message, it, characters ?: "GMP"
       )
     }
-    return Base64.toBase64String(encrypt.toJsonElement().toString().toByteArray())
+    return encrypt.toJsonElement().toString()
   }
 
   /**
@@ -383,17 +384,24 @@ class Wallet @JvmOverloads constructor(
     data: String,
     fallbackValue: String? = null
   ): Any? {
+    val json = Json {
+      isLenient = true
+      coerceInputValues = true
+      encodeDefaults = true
+    }
+
     return try {
-
-      val message = Json.parseToJsonElement(Base64.decode(data).joinToString("") { "${it.toInt().toChar()}" }).decode()
-      @Suppress("UNCHECKED_CAST") val decrypt = (message as? Map<String, String>)?.let { decryptMyMessage(it) }
-      decrypt ?: fallbackValue
-
-    } catch (e: Exception) {
-
+      try {
+        val message = json.decodeFromString<Map<String, String>>(data)
+        decryptMyMessage(message) ?: fallbackValue
+      }
+      catch (e: SerializationException) {
+        decryptMyMessage(data) ?: fallbackValue
+      }
+    }
+    catch (e: Exception) {
       // Probably not actually encrypted
       fallbackValue
-
     }
   }
 
@@ -419,9 +427,7 @@ class Wallet @JvmOverloads constructor(
   fun decryptMyMessage(message: Map<String, String>): Any? {
     val publicKey = getMyEncPublicKey() ?: ""
     val privateKey = getMyEncPrivateKey() ?: ""
-    val encrypt = message[Crypto.hashShare(publicKey)] ?: ""
-
+    val encrypt = message[Crypto.hashShare(publicKey, characters ?: "GMP")] ?: ""
     return Crypto.decryptMessage(encrypt, privateKey, publicKey, characters ?: "GMP")
   }
-
 }

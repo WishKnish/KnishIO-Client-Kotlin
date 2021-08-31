@@ -49,25 +49,39 @@ License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 
 package wishKnish.knishIO.client.httpClient
 
+import graphql.language.Document
+import graphql.language.Field
+import graphql.language.OperationDefinition
+import graphql.parser.Parser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.*
+import io.ktor.client.features.json.*
+import io.ktor.client.features.json.serializer.*
+import io.ktor.client.features.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.client.features.logging.*
+import io.ktor.content.*
 import io.ktor.http.*
 import io.ktor.network.tls.*
-import io.ktor.client.features.json.JsonFeature
-import io.ktor.client.features.json.serializer.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.future.future
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.JsonObject
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.Clients
+import wishKnish.knishIO.client.data.QueryData
+import wishKnish.knishIO.client.data.json.query.CipherHash
+import wishKnish.knishIO.client.data.json.response.query.cipherHash.CipherHash as RCipherHash
 import wishKnish.knishIO.client.data.json.query.QueryInterface
+import wishKnish.knishIO.client.data.json.variables.CipherHashVariable
+import wishKnish.knishIO.client.exception.CodeException
 import wishKnish.knishIO.client.libraries.TrustAllX509TrustManager
 import java.net.URI
-import kotlinx.serialization.json.Json as KotlinJson
 import java.security.SecureRandom
+import kotlin.jvm.Throws
+import kotlinx.serialization.json.Json as KotlinJson
 
 
 class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var encrypt: Boolean = false) {
@@ -104,10 +118,25 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
     }
   }
 
+  @Throws(CodeException::class)
+  fun wallet(): Wallet {
+    return wallet ?: throw CodeException("Authorized wallet missing.")
+  }
+
+  @Throws(CodeException::class)
+  fun pubkey(): String {
+    return pubkey ?: throw CodeException("Server public key missing.")
+  }
+
   @OptIn(DelicateCoroutinesApi::class)
   fun query(request: QueryInterface): String {
     val completable = GlobalScope.future() {
       val response: HttpResponse  = client.use {
+        if (encrypt) {
+          encrypt(it)
+          decode(it)
+        }
+
         it.post(uri.normalize().toASCIIString()) {
           headers {
             append("X-Auth-Token", authToken)
@@ -135,5 +164,73 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
 
   fun setUri(uri: URI) {
     this.uri = uri
+  }
+
+  private fun operationType(query: String): String? {
+    return operationDefinition(query)?.operation?.name?.lowercase()
+  }
+
+  private fun operationDefinition(query: String): OperationDefinition? {
+    require(query.isNotEmpty())
+    val graphql = Parser.parse(query) as Document
+    return graphql.getFirstDefinitionOfType(OperationDefinition::class.java)?.get()
+  }
+
+  private fun operationName(query: String): String? {
+    return (operationDefinition(query)?.selectionSet?.selections?.get(0) as? Field)?.name
+  }
+
+  private fun encrypt(client: HttpClient) {
+    client.sendPipeline.intercept(HttpSendPipeline.State) {
+      val body = context.body as TextContent
+      val queryData = QueryData.jsonToObject(body.text)
+      val requestName = operationName(queryData.query)
+      val requestType = operationType(queryData.query)
+      val isMoleculeMutation = requestName == "ProposeMolecule" && requestType == "mutation"
+      val condition = listOf(
+        requestType == "query" && listOf("__schema", "ContinuId").contains(requestName),
+        requestType == "mutation" && requestName == "AccessToken",
+        isMoleculeMutation && queryData.molecule?.atoms?.get(0)?.isotope == 'U'
+      )
+
+      if (condition.any { it }) {
+        return@intercept
+      }
+
+      val cipherHash = CipherHash(CipherHashVariable(wallet().encryptString(body.text, pubkey())))
+      context.body = TextContent(cipherHash.toJson(), body.contentType, body.status)
+
+      proceedWith(context.body)
+    }
+  }
+
+  private fun decode(client: HttpClient) {
+    client.responsePipeline.intercept(HttpResponsePipeline.Receive) { (type, content) ->
+      if (content !is ByteReadChannel) return@intercept
+
+      val byteArray = ByteArray(content.availableForRead)
+      content.readAvailable(byteArray)
+      var result = ByteReadChannel(byteArray)
+
+      RCipherHash.jsonToObject(byteArray.toString(Charsets.UTF_8)).data?.CipherHash?.hash?.let {
+        val message = KotlinJson {
+          isLenient = true
+          coerceInputValues = true
+          encodeDefaults = true
+        }.decodeFromString<Map<String, String>>(it)
+
+        wallet().decryptMyMessage(message)?.let { decrypt ->
+          val preform = when (decrypt) {
+            is JsonObject -> decrypt.toString()
+            else -> decrypt
+          }
+          result = ByteReadChannel((preform as String).toByteArray())
+        }
+      }
+
+      val response = HttpResponseContainer(type, result)
+
+      proceedWith(response)
+    }
   }
 }

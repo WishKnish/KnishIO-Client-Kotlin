@@ -37,15 +37,15 @@ internal fun ByteArray.seal(pubKey: ByteArray): ByteArray {
   val ephPubKey = ephKeyPair.publicKey
   val nonce = ephPubKey.sealNonce(pubKey)
   val box = TweetNaclFast.Box(pubKey, ephKeyPair.secretKey)
-  val cipherText = box.box(this, nonce) ?: byteArrayOf()
+  val boxed = box.box(this, nonce) ?: byteArrayOf()
 
-  if (cipherText.isEmpty()) {
+  if (boxed.isEmpty()) {
     throw GeneralSecurityException("encryption error")
   }
 
-  val sealedBox = ByteArray(cipherText.size + PUBLICKEYBYTES)
+  val sealedBox = ByteArray(boxed.size + PUBLICKEYBYTES)
   (0 until PUBLICKEYBYTES).forEach { sealedBox[it] = ephPubKey[it] }
-  cipherText.indices.forEach { sealedBox[it + PUBLICKEYBYTES] = cipherText[it] }
+  boxed.indices.forEach { sealedBox[it + PUBLICKEYBYTES] = boxed[it] }
 
   return sealedBox
 }
@@ -53,14 +53,13 @@ internal fun ByteArray.seal(pubKey: ByteArray): ByteArray {
 
 @kotlin.jvm.Throws(IllegalArgumentException::class)
 private fun ByteArray.sealNonce(pubKey: ByteArray): ByteArray {
-  val blake2b = Blake2bDigest(NONCEBYTES)
+  val blake2b = Blake2bDigest(null, NONCEBYTES, null, null)
   val nonce = ByteArray(NONCEBYTES)
-
-  forEach { blake2b.update(it) }
-  pubKey.forEach { blake2b.update(it) }
+  blake2b.update(this, 0, this.size)
+  blake2b.update(pubKey, 0, pubKey.size)
   blake2b.doFinal(nonce, 0)
 
-  if (nonce.isEmpty() || nonce.size != NONCEBYTES) {
+  if (nonce.isEmpty()) {
     throw IllegalArgumentException("hashing failed")
   }
 

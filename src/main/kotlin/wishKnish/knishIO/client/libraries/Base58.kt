@@ -194,4 +194,4 @@ internal fun String.toStringEncodeToBase58(characters: String = "GMP"): String =
 @Throws(IllegalArgumentException::class)
 internal fun String.toStringDecodeBase58(characters: String = "GMP"): String = decodeBase58(
   characters
-).joinToString("") { "${it.toInt().toChar()}" }
+).toString(Charsets.UTF_8)
