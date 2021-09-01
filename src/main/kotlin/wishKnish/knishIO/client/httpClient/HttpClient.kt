@@ -55,6 +55,7 @@ import graphql.language.OperationDefinition
 import graphql.parser.Parser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.*
+import io.ktor.client.features.*
 import io.ktor.client.features.json.*
 import io.ktor.client.features.json.serializer.*
 import io.ktor.client.features.logging.*
@@ -94,6 +95,7 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
     engine {
       endpoint {
         connectAttempts = 5
+        requestTimeout = 30000
       }
       https {
         // Certificate Authentication Stub
@@ -102,6 +104,9 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
         trustManager = TrustAllX509TrustManager()
         random = SecureRandom()
       }
+    }
+    install(UserAgent) {
+      agent = "KnishIO/0.1"
     }
     install(JsonFeature) {
       serializer = KotlinxSerializer(
