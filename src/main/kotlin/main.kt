@@ -9,80 +9,83 @@ const val secret2 = "509d8d7eb52af57c17c01c6882b1599b2d4c9eed5fe99e33300c6c54a2b
 
 fun main(args: Array<String>) {
 
-  val client = KnishIOClient(listOf(URI("https://lumen.loc/graphql")), encrypt = true)
+  val client = KnishIOClient(listOf(URI("https://frontrow.knish.io/graphql")), encrypt = true)
 
-  val authToken = client.requestAuthToken(seed = secret)
   println("requestAuthToken")
+  val authToken = client.requestAuthToken(seed = secret)
   when{
     authToken.success() -> println(authToken.token())
     else -> println(authToken.status())
   }
   println()
 
-  val balance = client.queryBalance("BYTECOIN", Crypto.generateBundleHash(secret))
   println("queryBalance")
+  val balance = client.queryBalance("BYTECOIN", Crypto.generateBundleHash(secret))
   when {
-    balance.success() -> println(balance.payload()!!.bundle)
+    balance.success() -> {
+      val wallet = balance.payload()
+      println(wallet?.bundle ?: "null")
+    }
     else -> println(balance.status())
   }
   println()
 
-  val metaType = client.queryMeta("BBReviewReply")
   println("queryMeta")
+  val metaType = client.queryMeta("BBReviewReply")
   println(metaType)
   println()
 
-  val metaInstance = client.queryMetaInstance("BBReviewReply")
   println("queryMetaInstance")
+  val metaInstance = client.queryMetaInstance("BBReviewReply")
   println(metaInstance)
   println()
 
-  val batch = client.queryBatch("eac2f09ca1da9675214c1b63959469900e5ed62e17798dff3968880c4e3f9ec4")
   println("queryBatch")
+  val batch = client.queryBatch("eac2f09ca1da9675214c1b63959469900e5ed62e17798dff3968880c4e3f9ec4")
   when {
     batch.success() -> println(batch.data())
     else -> println(batch.payload())
   }
   println()
 
-  val batchHistory = client.queryBatchHistory("fe6ae28c25c2361935e44235ca32a366940efc56a4e46b17032ecd1c4da6da50")
   println("queryBatchHistory")
+  val batchHistory = client.queryBatchHistory("fe6ae28c25c2361935e44235ca32a366940efc56a4e46b17032ecd1c4da6da50")
   when {
     batchHistory.success() -> println(batchHistory.data())
     else -> println(batchHistory.status())
   }
   println()
 
-  val userActivity = client.queryUserActivity("f64bbb155dc1650b71a41fd176db933f2ff77ea62d28dc0613817b49493c7a55")
   println("queryUserActivity")
+  val userActivity = client.queryUserActivity("f64bbb155dc1650b71a41fd176db933f2ff77ea62d28dc0613817b49493c7a55")
   when {
     userActivity.success() -> println(userActivity.data())
     else -> println(userActivity.status())
   }
   println()
 
-  val wallets = client.queryWallets(Crypto.generateBundleHash(secret))
   println("queryWallets")
+  val wallets = client.queryWallets(Crypto.generateBundleHash(secret))
   println(wallets)
   println()
 
-  val createWallet = client.createWallet("BYTECOIN")
   println("createWallet")
+  val createWallet = client.createWallet("BYTECOIN")
   when {
     createWallet.success() -> println(createWallet.data())
     else -> println(createWallet.status())
   }
   println()
 
-
-  val createMeta = client.createMeta("initMetaType", "initMetaID", mutableListOf(MetaData("name", "New init meta")))
   println("createMeta")
+  val createMeta = client.createMeta("initMetaType", "initMetaID", mutableListOf(MetaData("name", "New init meta")))
   when {
     createMeta.success() -> println(createMeta.data())
     else -> println(createMeta.status())
   }
   println()
 
+  println("createToken")
   val tokenSlug = "NEWTOKEN1"
   // Token metadata
   val meta = mutableListOf(
@@ -92,16 +95,14 @@ fun main(args: Array<String>) {
     MetaData("decimals", "0")
   )
   val createToken = client.createToken(tokenSlug, 1000000, meta)
-  println("createToken")
   when {
     createToken.success() -> println(createToken.data())
     else -> println(createToken.status())
   }
   println()
 
-
-  val transferToken = client.transferToken(Wallet(secret2, tokenSlug), tokenSlug, 10)
   println("transferToken")
+  val transferToken = client.transferToken(Wallet(secret2, tokenSlug), tokenSlug, 10)
   when {
     transferToken.success() -> println(transferToken.data())
     else -> println(transferToken.status())

@@ -18,6 +18,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.full.primaryConstructor
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.exception.*
+import kotlin.jvm.Throws
 
 class KnishIOClient @JvmOverloads constructor(
   @JvmField val uris: List<URI>,
@@ -105,6 +106,7 @@ class KnishIOClient @JvmOverloads constructor(
     bundle = Crypto.generateBundleHash(value)
   }
 
+  @Throws(UnauthenticatedException::class)
   fun secret(): String {
     if (secret.isEmpty()) {
       throw UnauthenticatedException("KnishIOClient::secret() - Unable to find a stored secret!")
@@ -112,6 +114,7 @@ class KnishIOClient @JvmOverloads constructor(
     return secret
   }
 
+  @Throws(UnauthenticatedException::class)
   fun bundle(): String {
     if (bundle.isEmpty()) {
       throw UnauthenticatedException("KnishIOClient::bundle() - Unable to find a stored bundle!")
