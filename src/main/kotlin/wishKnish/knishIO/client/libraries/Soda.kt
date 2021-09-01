@@ -81,11 +81,11 @@ class Soda(private val base: String = "GMP") {
 
   @Throws(NumberFormatException::class, IllegalArgumentException::class)
   fun decode(data: String): ByteArray {
-    return data.decodeBase58(this.base)
+    return Base58(this.base).decode(data)
   }
 
   @Throws(IllegalArgumentException::class)
   fun encode(data: ByteArray): String {
-    return data.encodeToBase58String(this.base)
+    return Base58(this.base).encode(data)
   }
 }
