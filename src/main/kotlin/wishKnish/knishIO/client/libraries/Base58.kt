@@ -6,6 +6,7 @@ class Base58(characters: String = "GMP") {
   var ALPHABET = ALFAVIT.valueOf("GMP").value
   private val ENCODED_ZERO = ALPHABET[0]
   private val INDEXES = IntArray(128)
+
   private enum class ALFAVIT(val value: CharArray) {
     IPFS("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toCharArray()),
     RIPPLE("rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz".toCharArray()),
@@ -15,7 +16,7 @@ class Base58(characters: String = "GMP") {
   }
 
   init {
-    if (!enumContains<ALFAVIT>(characters)) {
+    if (! enumContains<ALFAVIT>(characters)) {
       throw IllegalArgumentException("there is no such ALPHABET [$characters]")
     }
 

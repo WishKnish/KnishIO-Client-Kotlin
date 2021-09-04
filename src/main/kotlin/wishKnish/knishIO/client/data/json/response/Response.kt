@@ -1,4 +1,5 @@
 @file:JvmName("Response")
+
 package wishKnish.knishIO.client.data.json.response
 
 import kotlinx.serialization.Serializable
@@ -7,7 +8,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.json.errors.Errors
 
-@Serializable data class Response @JvmOverloads constructor(@JvmField var data: Data? = null): IResponse {
+@Serializable data class Response @JvmOverloads constructor(@JvmField var data: Data? = null) : IResponse {
   override val errors: List<Errors> = listOf()
   override val message: String? = null
   override val exception: Boolean? = null

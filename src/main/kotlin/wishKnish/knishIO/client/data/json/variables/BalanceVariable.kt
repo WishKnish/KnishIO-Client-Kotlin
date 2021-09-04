@@ -1,4 +1,5 @@
 @file:JvmName("BalanceVariable")
+
 package wishKnish.knishIO.client.data.json.variables
 
 import kotlinx.serialization.Serializable
@@ -12,4 +13,4 @@ import kotlinx.serialization.Serializable
   @JvmField val tokens: List<String> = listOf(),
   @JvmField val position: String? = null,
   @JvmField val positions: List<String> = listOf()
-): IVariable
+) : IVariable

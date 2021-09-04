@@ -1,4 +1,5 @@
 @file:JvmName("AccessTokenMutationVariable")
+
 package wishKnish.knishIO.client.data.json.variables
 
 import kotlinx.serialization.Serializable
@@ -7,4 +8,4 @@ import kotlinx.serialization.Serializable
   @JvmField val cellSlug: String? = null,
   @JvmField val pubkey: String? = null,
   @JvmField val encrypt: Boolean? = null
-): IVariable
+) : IVariable

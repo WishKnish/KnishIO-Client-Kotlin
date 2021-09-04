@@ -15,9 +15,7 @@ class CheckMolecule {
 
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class,
-      AtomsMissingException::class,
-      NoSuchElementException::class
+      MolecularHashMissingException::class, AtomsMissingException::class, NoSuchElementException::class
     )
     fun continuId(molecule: Molecule): Boolean {
       missing(molecule)
@@ -40,7 +38,7 @@ class CheckMolecule {
       missing(molecule)
 
       val signingAtom = molecule.atoms.first()
-      if (signingAtom.isotope == 'V' && !signingAtom.batchId.isNullOrEmpty()) {
+      if (signingAtom.isotope == 'V' && ! signingAtom.batchId.isNullOrEmpty()) {
         val atoms = molecule.atoms.filter { it.isotope == 'V' }
         val remainderAtom = atoms.last()
 

@@ -85,7 +85,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   fun client(): HttpClient {
-    if (!authProcess) {
+    if (! authProcess) {
       val randomUri = getRandomUri()
       client.setUri(randomUri)
       val authDataObj = clients[randomUri.toASCIIString()]
@@ -97,7 +97,7 @@ class KnishIOClient @JvmOverloads constructor(
     return client
   }
 
-  fun hasSecret() : Boolean {
+  fun hasSecret(): Boolean {
     return secret.isNotEmpty()
   }
 
@@ -128,7 +128,7 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
-    return queryClass.primaryConstructor?.call(client()) as? IQuery  ?: throw CodeException("invalid Query")
+    return queryClass.primaryConstructor?.call(client()) as? IQuery ?: throw CodeException("invalid Query")
   }
 
   @JvmOverloads
@@ -158,31 +158,33 @@ class KnishIOClient @JvmOverloads constructor(
       val authorizationWallet = Wallet(Crypto.generateSecret(), "AUTH")
       query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
       query.setAuthorizationWallet(authorizationWallet)
-      response = query.execute(AccessTokenMutationVariable(this.cellSlug, authorizationWallet.pubkey, enc)) as ResponseRequestAuthorizationGuest
-    }
-    else{
+      response = query.execute(
+        AccessTokenMutationVariable(
+          this.cellSlug,
+          authorizationWallet.pubkey,
+          enc
+        )
+      ) as ResponseRequestAuthorizationGuest
+    } else {
       val molecule = createMolecule(secret(), Wallet(secret(), "AUTH"))
       query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
       query.fillMolecule(listOf(MetaData("encrypt", if (enc) "true" else "false")))
-      response = query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseRequestAuthorization
+      response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
     }
 
     if (response.success()) {
       val authObj = Clients(
-        response.token(),
-        response.pubKey(),
-        response.wallet()
+        response.token(), response.pubKey(), response.wallet()
       )
 
       if (hasEncryption() != response.encrypt()) {
-        if(response.encrypt()) enableEncryption() else disableEncryption()
+        if (response.encrypt()) enableEncryption() else disableEncryption()
       }
 
       client.setAuthData(authObj)
       clients[uri()] = authObj
       authProcess = false
-    }
-    else {
+    } else {
       throw UnauthenticatedException(response.reason() ?: "Authorization token missing or invalid.")
     }
 
@@ -195,7 +197,8 @@ class KnishIOClient @JvmOverloads constructor(
     molecule: Molecule? = null
   ): MutationProposeMolecule {
     val _molecule = molecule ?: createMolecule()
-    val mutation = mutationClass.primaryConstructor?.call(client(), _molecule) ?: throw CodeException("invalid Mutation")
+    val mutation =
+      mutationClass.primaryConstructor?.call(client(), _molecule) ?: throw CodeException("invalid Mutation")
 
     if (mutation !is MutationProposeMolecule) {
       throw CodeException("${mutationClass.simpleName}::createMoleculeMutation() - This method only accepts MutationProposeMolecule!")
@@ -215,13 +218,7 @@ class KnishIOClient @JvmOverloads constructor(
     val _secret = secret ?: secret()
     var _sourceWallet = sourceWallet
 
-    if (
-      sourceWallet == null &&
-      remainderWallet()?.token != "AUTH" &&
-      lastMoleculeQuery != null &&
-      lastMoleculeQuery !!.response != null &&
-      lastMoleculeQuery !!.response!! .success()
-    ) {
+    if (sourceWallet == null && remainderWallet()?.token != "AUTH" && lastMoleculeQuery != null && lastMoleculeQuery !!.response != null && lastMoleculeQuery !!.response !!.success()) {
       _sourceWallet = remainderWallet()
     }
 
@@ -230,17 +227,11 @@ class KnishIOClient @JvmOverloads constructor(
     }
 
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      _secret,
-      _sourceWallet.token,
-      _sourceWallet.batchId,
-      _sourceWallet.characters
+      _secret, _sourceWallet.token, _sourceWallet.batchId, _sourceWallet.characters
     )
 
     return Molecule(
-      _secret,
-      _sourceWallet,
-      remainderWallet(),
-      cellSlug
+      _secret, _sourceWallet, remainderWallet(), cellSlug
     )
   }
 
@@ -254,7 +245,10 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   @JvmOverloads
-  fun queryBalance(token: String, bundle: String? = null): ResponseBalance {
+  fun queryBalance(
+    token: String,
+    bundle: String? = null
+  ): ResponseBalance {
     val query = createQuery(QueryBalance::class) as QueryBalance
     return query.execute(BalanceVariable(token = token, bundleHash = bundle)) as ResponseBalance
   }
@@ -361,16 +355,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     return query.execute(
       UserActivityVariable(
-        bundleHash,
-        metaType,
-        metaId,
-        ipAddress,
-        browser,
-        osCpu,
-        resolution,
-        timeZone,
-        countBy,
-        interval
+        bundleHash, metaType, metaId, ipAddress, browser, osCpu, resolution, timeZone, countBy, interval
       )
     ) as ResponseUserActivity
   }
@@ -383,7 +368,7 @@ class KnishIOClient @JvmOverloads constructor(
   ): List<Wallet> {
     val walletQuery = createQuery(QueryWalletList::class) as QueryWalletList
 
-    val response  = walletQuery.execute(
+    val response = walletQuery.execute(
       WalletListVariable(bundleHash = bundle, token = token, unspent = unspent)
     ) as ResponseWalletList
 
@@ -414,10 +399,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     return query.execute(
       WalletBundleVariable(
-        bundleHash = bundle ?: bundle(),
-        key = key,
-        value = value,
-        latest = latest
+        bundleHash = bundle ?: bundle(), key = key, value = value, latest = latest
       )
     ) as ResponseWalletBundle
   }
@@ -438,7 +420,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(newWallet)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   @JvmOverloads
@@ -474,12 +456,12 @@ class KnishIOClient @JvmOverloads constructor(
         }
 
         _amount = units.size
-        meta.firstOrNull { it.key == "splittable" }?.let{
-         it.value = "1"
+        meta.firstOrNull { it.key == "splittable" }?.let {
+          it.value = "1"
         } ?: meta.add(MetaData("splittable", "1"))
 
         meta.firstOrNull { it.key == "tokenUnits" }?.let {
-          it.value =  jsonFormat.encodeToString(units)
+          it.value = jsonFormat.encodeToString(units)
         } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
       }
     }
@@ -489,7 +471,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(recipientWallet, _amount, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   @JvmOverloads
@@ -499,13 +481,12 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf()
   ): ResponseProposeMolecule {
     val query = createMoleculeMutation(
-      MutationCreateMeta::class,
-      createMolecule(secret(), sourceWallet())
+      MutationCreateMeta::class, createMolecule(secret(), sourceWallet())
     ) as MutationCreateMeta
 
     query.fillMolecule(metaType, metaId, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   fun createIdentifier(
@@ -517,7 +498,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(type, contact, code)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   @JvmOverloads
@@ -536,11 +517,11 @@ class KnishIOClient @JvmOverloads constructor(
     // Are we specifying a specific recipient?
     to?.let {
       meta.firstOrNull { it.key == "position" }?.let {
-        it.value =  to.position
+        it.value = to.position
       } ?: meta.add(MetaData("position", to.position))
 
       meta.firstOrNull { it.key == "bundle" }?.let {
-        it.value =  to.bundle
+        it.value = to.bundle
       } ?: meta.add(MetaData("position", to.bundle))
     }
 
@@ -577,14 +558,14 @@ class KnishIOClient @JvmOverloads constructor(
     // Calculate amount & set meta key
     if (units.isNotEmpty()) {
       // Can't move stackable units AND provide amount
-      if ( _amount.toDouble() > 0 ) {
+      if (_amount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
       // Calculating amount based on Unit IDs
       _amount = units.size
       meta.firstOrNull { it.key == "tokenUnits" }?.let {
-        it.value =  jsonFormat.encodeToString(units)
+        it.value = jsonFormat.encodeToString(units)
       } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
     }
 
@@ -592,11 +573,14 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(token, _amount, metaType, metaId, meta, batchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
-  private fun <T>getSpecificationRequestTokens(sender: T, token: String): Map<String, String?> {
-    return when(sender) {
+  private fun <T> getSpecificationRequestTokens(
+    sender: T,
+    token: String
+  ): Map<String, String?> {
+    return when (sender) {
       // If recipient is a Wallet, we need to help the node triangulate
       // the transfer by providing position and bundle hash
       is Wallet -> mapOf("metaType" to "wallet", "metaId" to sender.address)
@@ -604,8 +588,7 @@ class KnishIOClient @JvmOverloads constructor(
       is String -> run {
         if (Wallet.isBundleHash(sender)) {
           mapOf("metaType" to "walletBundle", "metaId" to sender)
-        }
-        else{
+        } else {
           val wallet = Wallet.create(sender, token)
           mapOf("metaType" to "wallet", "metaId" to wallet.address)
         }
@@ -625,7 +608,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(token, batchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   @JvmOverloads
@@ -648,7 +631,7 @@ class KnishIOClient @JvmOverloads constructor(
       _amount = units.size
     }
 
-    if ( _sourceWallet == null || _sourceWallet.balance < _amount.toDouble()) {
+    if (_sourceWallet == null || _sourceWallet.balance < _amount.toDouble()) {
       throw TransferBalanceException()
     }
 
@@ -657,9 +640,7 @@ class KnishIOClient @JvmOverloads constructor(
     } ?: recipient.initBatchId(_sourceWallet)
 
     remainderWallet = Wallet.create(
-      secret(),
-      token,
-      characters = _sourceWallet.characters
+      secret(), token, characters = _sourceWallet.characters
     )
 
     remainderWallet !!.initBatchId(_sourceWallet, true)
@@ -670,7 +651,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(recipient, _amount)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   @JvmOverloads
@@ -720,7 +701,10 @@ class KnishIOClient @JvmOverloads constructor(
     molecule.sign()
     molecule.check()
 
-    return MutationProposeMolecule(client(), molecule).execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
+    return MutationProposeMolecule(
+      client(),
+      molecule
+    ).execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
   }
 
   fun cellSlug(): String? {

@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 
 import wishKnish.knishIO.client.data.json.variables.CipherHashVariable
 
-@Serializable data class CipherHash(@JvmField val variables: CipherHashVariable): QueryInterface {
+@Serializable data class CipherHash(@JvmField val variables: CipherHashVariable) : QueryInterface {
   override val query = """query ( ${"$"}Hash: String! ) { CipherHash ( Hash: ${"$"}Hash ) { hash } }""".trimIndent()
 
   fun toJson(): String {

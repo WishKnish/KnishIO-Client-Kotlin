@@ -1,4 +1,5 @@
 @file:JvmName("ResponseMetaType")
+
 package wishKnish.knishIO.client.response
 
 
@@ -13,7 +14,7 @@ import wishKnish.knishIO.client.query.QueryMetaType
 class ResponseMetaType(
   query: QueryMetaType,
   json: String,
-): Response(query, json, "data.MetaType") {
+) : Response(query, json, "data.MetaType") {
   data class Response @JvmOverloads constructor(
     val instances: List<MetaInstance>? = null,
     val instanceCount: List<KeyValueInt>? = null,

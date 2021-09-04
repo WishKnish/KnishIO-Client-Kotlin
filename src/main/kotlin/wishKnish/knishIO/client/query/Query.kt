@@ -46,6 +46,7 @@ Please visit https://github.com/WishKnish/KnishIO-Client-Kotlin for information.
 License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 */
 @file:JvmName("Query")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.exception.CodeException
@@ -57,7 +58,7 @@ import wishKnish.knishIO.client.response.Response
 import wishKnish.knishIO.client.response.ResponseBalance
 
 
-abstract class Query(httpClient: HttpClient): IQuery {
+abstract class Query(httpClient: HttpClient) : IQuery {
   @JvmField val client = httpClient
   @JvmField var variables: IVariable? = null
   @JvmField var query: QueryInterface? = null
@@ -83,11 +84,11 @@ abstract class Query(httpClient: HttpClient): IQuery {
   open fun execute(variables: IVariable): IResponse {
     request = createQuery(variables)
 
-    val resp = client.query(request!!)
+    val resp = client.query(request !!)
 
     response = createResponseRaw(resp)
 
-    return response!!
+    return response !!
   }
 
   fun uri(): String = client.uri.toASCIIString()

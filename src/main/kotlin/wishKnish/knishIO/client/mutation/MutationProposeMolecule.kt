@@ -1,4 +1,5 @@
 @file:JvmName("MutationProposeMolecule")
+
 package wishKnish.knishIO.client.mutation
 
 import wishKnish.knishIO.client.Molecule
@@ -11,7 +12,10 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.response.IResponse
 import wishKnish.knishIO.client.response.ResponseProposeMolecule
 
-open class MutationProposeMolecule @JvmOverloads constructor(httpClient: HttpClient, open val molecule: Molecule? = null): Mutation(httpClient) {
+open class MutationProposeMolecule @JvmOverloads constructor(
+  httpClient: HttpClient,
+  open val molecule: Molecule? = null
+) : Mutation(httpClient) {
   var remainderWallet: Wallet? = null
 
   fun molecule(): Molecule? {
@@ -33,10 +37,10 @@ open class MutationProposeMolecule @JvmOverloads constructor(httpClient: HttpCli
   fun execute(variables: MoleculeMutationVariable): IResponse {
     request = createQuery(variables)
 
-    val resp = client.mutate(request!!)
+    val resp = client.mutate(request !!)
 
     response = createResponseRaw(resp)
 
-    return response!!
+    return response !!
   }
 }

@@ -1,4 +1,5 @@
 @file:JvmName("WalletListVariable")
+
 package wishKnish.knishIO.client.data.json.variables
 
 import kotlinx.serialization.Serializable
@@ -18,4 +19,4 @@ import kotlinx.serialization.Serializable
   @JvmField val order: String? = null,
   @JvmField val limit: Int? = null,
   @JvmField val latest: Boolean? = null
-): IVariable
+) : IVariable

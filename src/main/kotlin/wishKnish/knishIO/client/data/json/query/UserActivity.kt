@@ -1,10 +1,11 @@
 @file:JvmName("UserActivity")
+
 package wishKnish.knishIO.client.data.json.query
 
 import kotlinx.serialization.Serializable
 import wishKnish.knishIO.client.data.json.variables.UserActivityVariable
 
-@Serializable data class UserActivity(@JvmField val variables: UserActivityVariable): QueryInterface {
+@Serializable data class UserActivity(@JvmField val variables: UserActivityVariable) : QueryInterface {
   override val query = """
     query UserActivity (
       ${'$'}bundleHash:String,

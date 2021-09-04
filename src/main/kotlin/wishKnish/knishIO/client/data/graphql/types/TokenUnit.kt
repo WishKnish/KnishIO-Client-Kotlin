@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
   @JvmField val id: String,
   @JvmField val name: String,
   @JvmField val metas: List<String>
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

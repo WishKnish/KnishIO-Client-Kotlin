@@ -24,7 +24,7 @@ class Soda(private val base: String = "GMP") {
   }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun <T: Collection<*>>encrypt(
+  fun <T : Collection<*>> encrypt(
     message: T,
     publicKey: String
   ): String {

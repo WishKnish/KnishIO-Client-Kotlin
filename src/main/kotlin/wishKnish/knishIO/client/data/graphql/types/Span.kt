@@ -1,7 +1,8 @@
 @file:JvmName("Span")
+
 package wishKnish.knishIO.client.data.graphql.types
 
-enum class Span (val value: String) {
+enum class Span(val value: String) {
   SECOND("SECOND"),
   MINUTE("MINUTE"),
   HOUR("HOUR"),

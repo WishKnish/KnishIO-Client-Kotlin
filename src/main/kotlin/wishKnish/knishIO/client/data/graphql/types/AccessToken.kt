@@ -1,4 +1,5 @@
 @file:JvmName("AccessToken")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.Json
   @JvmField val key: String,
   @JvmField val encrypt: Boolean? = null,
   @JvmField val expiresAt: Int
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

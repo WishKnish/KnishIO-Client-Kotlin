@@ -1,4 +1,5 @@
 @file:JvmName("MetaTypeVariable")
+
 package wishKnish.knishIO.client.data.json.variables
 
 import kotlinx.serialization.Serializable
@@ -18,4 +19,4 @@ import wishKnish.knishIO.client.data.graphql.types.QueryArgs
   @JvmField val cellSlugs: List<String> = listOf(),
   @JvmField var latest: Boolean? = null,
   @JvmField val count: String? = null
-): IVariable
+) : IVariable

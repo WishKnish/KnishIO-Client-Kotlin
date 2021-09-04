@@ -89,43 +89,45 @@ import kotlin.jvm.Throws
 import kotlinx.serialization.json.Json as KotlinJson
 
 
-class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var encrypt: Boolean = false) {
+class HttpClient @JvmOverloads constructor(
+  @JvmField var uri: URI,
+  @JvmField var encrypt: Boolean = false
+) {
 
   @JvmField var authToken = ""
   @JvmField var pubkey: String? = null
   @JvmField var wallet: Wallet? = null
-  val client: HttpClient get() = HttpClient(CIO) {
-    expectSuccess = false
-    engine {
-      endpoint {
-        connectAttempts = 5
-        requestTimeout = 30000
+  val client: HttpClient
+    get() = HttpClient(CIO) {
+      expectSuccess = false
+      engine {
+        endpoint {
+          connectAttempts = 5
+          requestTimeout = 30000
+        }
+        https {
+          // Certificate Authentication Stub
+          serverName = uri.host
+          cipherSuites = CIOCipherSuites.SupportedSuites
+          trustManager = TrustAllX509TrustManager()
+          random = SecureRandom()
+        }
       }
-      https {
-        // Certificate Authentication Stub
-        serverName = uri.host
-        cipherSuites = CIOCipherSuites.SupportedSuites
-        trustManager = TrustAllX509TrustManager()
-        random = SecureRandom()
+      install(UserAgent) {
+        agent = "KnishIO/0.1"
       }
-    }
-    install(UserAgent) {
-      agent = "KnishIO/0.1"
-    }
-    install(JsonFeature) {
-      serializer = KotlinxSerializer(
-        KotlinJson {
+      install(JsonFeature) {
+        serializer = KotlinxSerializer(KotlinJson {
           encodeDefaults = true
           ignoreUnknownKeys = true
           coerceInputValues = true
-        }
-      )
+        })
+      }
+      install(Logging) {
+        logger = Logger.DEFAULT
+        level = LogLevel.NONE
+      }
     }
-    install(Logging) {
-      logger = Logger.DEFAULT
-      level = LogLevel.NONE
-    }
-  }
 
   @Throws(CodeException::class)
   fun wallet(): Wallet {
@@ -146,7 +148,7 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
   )
   fun query(request: QueryInterface): String {
     val completable = GlobalScope.future() {
-      val response: HttpResponse  = client.use {
+      val response: HttpResponse = client.use {
         if (encrypt) {
           encrypt(it)
           decode(it)
@@ -205,9 +207,7 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
   }
 
   @Throws(
-    InvalidSyntaxException::class,
-    IllegalArgumentException::class,
-    GeneralSecurityException::class
+    InvalidSyntaxException::class, IllegalArgumentException::class, GeneralSecurityException::class
   )
   private fun encrypt(client: HttpClient) {
     client.sendPipeline.intercept(HttpSendPipeline.State) {
@@ -234,9 +234,7 @@ class HttpClient @JvmOverloads constructor(@JvmField var uri: URI, @JvmField var
   }
 
   @Throws(
-    IllegalArgumentException::class,
-    GeneralSecurityException::class,
-    SerializationException::class
+    IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
   )
   private fun decode(client: HttpClient) {
     client.responsePipeline.intercept(HttpResponsePipeline.Receive) { (type, content) ->

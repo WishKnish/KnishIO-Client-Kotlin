@@ -1,4 +1,5 @@
 @file:JvmName("Data")
+
 package wishKnish.knishIO.client.data.json.response.mutation.accessToken
 
 import kotlinx.serialization.Serializable

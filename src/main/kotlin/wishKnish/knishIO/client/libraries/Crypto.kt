@@ -42,7 +42,7 @@ class Crypto {
     @JvmStatic
     @JvmOverloads
     @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-    fun <T: Collection<*>>encryptMessage(
+    fun <T : Collection<*>> encryptMessage(
       message: T,
       recipientPublicKey: String,
       characters: String = "GMP"

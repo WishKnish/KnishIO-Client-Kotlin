@@ -1,4 +1,5 @@
 @file:JvmName("CountByUserActivity")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 enum class CountByUserActivity(val value: String) {
