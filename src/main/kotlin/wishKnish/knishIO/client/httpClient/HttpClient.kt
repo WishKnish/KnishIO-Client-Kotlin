@@ -147,7 +147,7 @@ class HttpClient @JvmOverloads constructor(
     SerializationException::class
   )
   fun query(request: QueryInterface): String {
-    val completable = GlobalScope.future() {
+    val completable = GlobalScope.future {
       val response: HttpResponse = client.use {
         if (encrypt) {
           encrypt(it)
