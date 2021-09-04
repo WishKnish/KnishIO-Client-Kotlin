@@ -196,9 +196,9 @@ class KnishIOClient @JvmOverloads constructor(
     mutationClass: T,
     molecule: Molecule? = null
   ): MutationProposeMolecule {
-    val _molecule = molecule ?: createMolecule()
+    val newOrExistingMolecule = molecule ?: createMolecule()
     val mutation =
-      mutationClass.primaryConstructor?.call(client(), _molecule) ?: throw CodeException("invalid Mutation")
+      mutationClass.primaryConstructor?.call(client(), newOrExistingMolecule) ?: throw CodeException("invalid Mutation")
 
     if (mutation !is MutationProposeMolecule) {
       throw CodeException("${mutationClass.simpleName}::createMoleculeMutation() - This method only accepts MutationProposeMolecule!")
@@ -215,23 +215,23 @@ class KnishIOClient @JvmOverloads constructor(
     sourceWallet: Wallet? = null,
     remainderWallet: Wallet? = null
   ): Molecule {
-    val _secret = secret ?: secret()
-    var _sourceWallet = sourceWallet
+    val currentSecret = secret ?: secret()
+    var signingWallet = sourceWallet
 
     if (sourceWallet == null && remainderWallet()?.token != "AUTH" && lastMoleculeQuery != null && lastMoleculeQuery !!.response != null && lastMoleculeQuery !!.response !!.success()) {
-      _sourceWallet = remainderWallet()
+      signingWallet = remainderWallet()
     }
 
-    if (_sourceWallet == null) {
-      _sourceWallet = sourceWallet()
+    if (signingWallet == null) {
+      signingWallet = sourceWallet()
     }
 
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      _secret, _sourceWallet.token, _sourceWallet.batchId, _sourceWallet.characters
+      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters
     )
 
     return Molecule(
-      _secret, _sourceWallet, remainderWallet(), cellSlug
+      currentSecret, signingWallet, remainderWallet(), cellSlug
     )
   }
 
@@ -431,14 +431,14 @@ class KnishIOClient @JvmOverloads constructor(
     batchId: String? = null,
     units: MutableList<TokenUnit> = mutableListOf()
   ): ResponseProposeMolecule {
-    val _batchId = batchId ?: Crypto.generateBatchId()
-    var _amount = amount ?: 0
+    val newOrExistingBatchId = batchId ?: Crypto.generateBatchId()
+    var tokenAmount = amount ?: 0
 
     meta.firstOrNull { it.key == "fungibility" }?.let { _ ->
 
       meta.firstOrNull { it.key == "batchId" }?.let {
-        it.value = _batchId
-      } ?: meta.add(MetaData("batchId", _batchId))
+        it.value = newOrExistingBatchId
+      } ?: meta.add(MetaData("batchId", newOrExistingBatchId))
 
 
       if (units.isNotEmpty()) {
@@ -455,7 +455,7 @@ class KnishIOClient @JvmOverloads constructor(
           }
         }
 
-        _amount = units.size
+        tokenAmount = units.size
         meta.firstOrNull { it.key == "splittable" }?.let {
           it.value = "1"
         } ?: meta.add(MetaData("splittable", "1"))
@@ -466,10 +466,10 @@ class KnishIOClient @JvmOverloads constructor(
       }
     }
 
-    val recipientWallet = Wallet(secret(), token, _batchId)
+    val recipientWallet = Wallet(secret(), token, newOrExistingBatchId)
     val query = createMoleculeMutation(MutationCreateToken::class) as MutationCreateToken
 
-    query.fillMolecule(recipientWallet, _amount, meta)
+    query.fillMolecule(recipientWallet, tokenAmount, meta)
 
     return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
@@ -553,17 +553,17 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf(),
     batchId: String? = null
   ): ResponseProposeMolecule {
-    var _amount = amount ?: 0
+    var requestedAmount = amount ?: 0
 
     // Calculate amount & set meta key
     if (units.isNotEmpty()) {
       // Can't move stackable units AND provide amount
-      if (_amount.toDouble() > 0) {
+      if (requestedAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
       // Calculating amount based on Unit IDs
-      _amount = units.size
+      requestedAmount = units.size
       meta.firstOrNull { it.key == "tokenUnits" }?.let {
         it.value = jsonFormat.encodeToString(units)
       } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
@@ -571,7 +571,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     val query = createMoleculeMutation(MutationRequestTokens::class) as MutationRequestTokens
 
-    query.fillMolecule(token, _amount, metaType, metaId, meta, batchId)
+    query.fillMolecule(token, requestedAmount, metaType, metaId, meta, batchId)
 
     return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
@@ -620,36 +620,36 @@ class KnishIOClient @JvmOverloads constructor(
     batchId: String? = null,
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    val _sourceWallet = sourceWallet ?: queryBalance(token).payload()
-    var _amount = amount
+    val signingWallet = sourceWallet ?: queryBalance(token).payload()
+    var transferAmount = amount
 
     if (units.isNotEmpty()) {
-      if (_amount.toDouble() > 0) {
+      if (transferAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
-      _amount = units.size
+      transferAmount = units.size
     }
 
-    if (_sourceWallet == null || _sourceWallet.balance < _amount.toDouble()) {
+    if (signingWallet == null || signingWallet.balance < transferAmount.toDouble()) {
       throw TransferBalanceException()
     }
 
     batchId?.let {
       recipient.batchId = batchId
-    } ?: recipient.initBatchId(_sourceWallet)
+    } ?: recipient.initBatchId(signingWallet)
 
     remainderWallet = Wallet.create(
-      secret(), token, characters = _sourceWallet.characters
+      secret(), token, characters = signingWallet.characters
     )
 
-    remainderWallet !!.initBatchId(_sourceWallet, true)
-    _sourceWallet.splitUnits(units, remainderWallet !!, recipient)
+    remainderWallet !!.initBatchId(signingWallet, true)
+    signingWallet.splitUnits(units, remainderWallet !!, recipient)
 
-    val molecule = createMolecule(sourceWallet = _sourceWallet, remainderWallet = remainderWallet)
+    val molecule = createMolecule(sourceWallet = signingWallet, remainderWallet = remainderWallet)
     val query = createMoleculeMutation(MutationTransferTokens::class, molecule) as MutationTransferTokens
 
-    query.fillMolecule(recipient, _amount)
+    query.fillMolecule(recipient, transferAmount)
 
     return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
@@ -679,25 +679,25 @@ class KnishIOClient @JvmOverloads constructor(
     units: MutableList<TokenUnit> = mutableListOf(),
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    val _sourceWallet = sourceWallet ?: queryBalance(token).payload()
+    val signingWallet = sourceWallet ?: queryBalance(token).payload()
     val remainderWallet = Wallet.create(secret(), token, characters = sourceWallet !!.characters)
-    var _amount = amount
+    var burnAmount = amount
 
-    remainderWallet.initBatchId(_sourceWallet !!, true)
+    remainderWallet.initBatchId(signingWallet !!, true)
 
     if (units.isNotEmpty()) {
-      if (_amount.toDouble() > 0) {
+      if (burnAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
-      _amount = units.size
+      burnAmount = units.size
 
       sourceWallet.splitUnits(units, remainderWallet)
     }
 
     val molecule = createMolecule(null, sourceWallet, remainderWallet)
 
-    molecule.burnToken(_amount)
+    molecule.burnToken(burnAmount)
     molecule.sign()
     molecule.check()
 

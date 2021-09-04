@@ -3,11 +3,11 @@ package wishKnish.knishIO.client.libraries
 import java.util.*
 
 class Base58(characters: String = "GMP") {
-  var ALPHABET = ALFAVIT.valueOf("GMP").value
-  private val ENCODED_ZERO = ALPHABET[0]
-  private val INDEXES = IntArray(128)
+  var alphabet = Alphabet.valueOf("GMP").value
+  private val encodedZero = alphabet[0]
+  private val indexes = IntArray(128)
 
-  private enum class ALFAVIT(val value: CharArray) {
+  private enum class Alphabet(val value: CharArray) {
     IPFS("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toCharArray()),
     RIPPLE("rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz".toCharArray()),
     FLICKR("123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray()),
@@ -16,15 +16,15 @@ class Base58(characters: String = "GMP") {
   }
 
   init {
-    if (! enumContains<ALFAVIT>(characters)) {
+    if (! enumContains<Alphabet>(characters)) {
       throw IllegalArgumentException("there is no such ALPHABET [$characters]")
     }
 
-    ALPHABET = ALFAVIT.valueOf(characters).value
+    alphabet = Alphabet.valueOf(characters).value
 
-    Arrays.fill(INDEXES, - 1)
-    for (i in ALPHABET.indices) {
-      INDEXES[ALPHABET[i].code] = i
+    Arrays.fill(indexes, - 1)
+    for (i in alphabet.indices) {
+      indexes[alphabet[i].code] = i
     }
   }
 
@@ -54,17 +54,17 @@ class Base58(characters: String = "GMP") {
     var outputStart = encoded.size
     var inputStart = zeros
     while (inputStart < incoming.size) {
-      encoded[-- outputStart] = ALPHABET[divmod(incoming, inputStart, 256, 58).toInt()]
+      encoded[-- outputStart] = alphabet[divmod(incoming, inputStart, 256, 58).toInt()]
       if (incoming[inputStart] == 0.toByte()) {
         ++ inputStart // optimization - skip leading zeros
       }
     }
     // Preserve exactly as many leading encoded zeros in output as there were leading zeros in input.
-    while (outputStart < encoded.size && encoded[outputStart] == ENCODED_ZERO) {
+    while (outputStart < encoded.size && encoded[outputStart] == encodedZero) {
       ++ outputStart
     }
     while (-- zeros >= 0) {
-      encoded[-- outputStart] = ENCODED_ZERO
+      encoded[-- outputStart] = encodedZero
     }
     // Return encoded string (including encoded leading zeros).
     return String(encoded, outputStart, encoded.size - outputStart)
@@ -86,7 +86,7 @@ class Base58(characters: String = "GMP") {
     val input58 = ByteArray(input.length)
     for (i in input.indices) {
       val c = input[i]
-      val digit = if (c.code < 128) INDEXES[c.code] else - 1
+      val digit = if (c.code < 128) indexes[c.code] else - 1
       if (digit < 0) {
         throw NumberFormatException("Illegal character $c at position $i")
       }
