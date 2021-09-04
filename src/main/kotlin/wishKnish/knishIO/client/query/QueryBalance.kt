@@ -3,7 +3,6 @@
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.Balance
-import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.BalanceVariable
 import wishKnish.knishIO.client.data.json.variables.IVariable
 import wishKnish.knishIO.client.httpClient.HttpClient

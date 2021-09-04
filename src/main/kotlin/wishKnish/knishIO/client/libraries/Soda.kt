@@ -7,7 +7,6 @@ import com.iwebpp.crypto.TweetNaclFast
 import kotlinx.serialization.SerializationException
 import java.security.GeneralSecurityException
 import com.google.gson.Gson
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlin.jvm.Throws
 import kotlin.text.toByteArray

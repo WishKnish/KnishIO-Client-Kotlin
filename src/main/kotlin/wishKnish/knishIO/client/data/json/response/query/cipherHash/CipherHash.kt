@@ -3,7 +3,6 @@
 package wishKnish.knishIO.client.data.json.response.query.cipherHash
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
