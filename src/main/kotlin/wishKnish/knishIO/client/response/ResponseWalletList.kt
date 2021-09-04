@@ -1,4 +1,5 @@
 @file:JvmName("ResponseWalletList")
+
 package wishKnish.knishIO.client.response
 
 import wishKnish.knishIO.client.data.graphql.types.Wallet as GraphqlWallet
@@ -10,21 +11,24 @@ import wishKnish.knishIO.client.query.QueryWalletList
 class ResponseWalletList(
   query: QueryWalletList,
   json: String,
-): Response(query, json, "data.Wallet") {
+) : Response(query, json, "data.Wallet") {
   companion object {
 
     @JvmOverloads
-    fun toClientWallet(data: GraphqlWallet, secret: String? = null): Wallet {
+    fun toClientWallet(
+      data: GraphqlWallet,
+      secret: String? = null
+    ): Wallet {
       val wallet: Wallet
 
       if (data.position == null) {
         wallet = Wallet.create(data.bundleHash, data.tokenSlug as String, data.batchId, data.characters)
-      }
-      else {
-        wallet = Wallet(secret, data.tokenSlug as String, data.position as String?, data.batchId, data.characters).apply {
-          address = data.address
-          bundle = data.bundleHash
-        }
+      } else {
+        wallet =
+          Wallet(secret, data.tokenSlug as String, data.position as String?, data.batchId, data.characters).apply {
+            address = data.address
+            bundle = data.bundleHash
+          }
       }
 
       data.token?.let {
@@ -39,7 +43,7 @@ class ResponseWalletList(
       wallet.apply {
         tokenUnits = data.tokenUnits.toMutableList()
         molecules = data.molecules
-        balance = data.amount!!.toDouble()
+        balance = data.amount !!.toDouble()
         pubkey = data.pubkey
         createdAt = data.createdAt
       }

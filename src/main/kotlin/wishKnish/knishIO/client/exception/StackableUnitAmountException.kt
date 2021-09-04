@@ -1,7 +1,8 @@
 @file:JvmName("StackableUnitAmountException")
+
 package wishKnish.knishIO.client.exception
 
-class StackableUnitAmountException: BaseException {
+class StackableUnitAmountException : BaseException {
   constructor(message: String = "Stackable tokens with unit IDs cannot have decimal places!") : super(message)
   constructor(
     message: String = "Stackable tokens with unit IDs cannot have decimal places!",

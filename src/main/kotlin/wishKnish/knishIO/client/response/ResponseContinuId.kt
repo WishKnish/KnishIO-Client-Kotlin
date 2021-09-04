@@ -1,4 +1,5 @@
 @file:JvmName("ResponseContinuId")
+
 package wishKnish.knishIO.client.response
 
 import wishKnish.knishIO.client.Wallet
@@ -9,7 +10,7 @@ import wishKnish.knishIO.client.data.graphql.types.Wallet as GraphqlWallet
 class ResponseContinuId(
   query: QueryContinuId,
   json: String,
-): Response(query, json, "data.ContinuId") {
+) : Response(query, json, "data.ContinuId") {
 
   override fun mapping(response: String): ContinuIdResponse {
     return ContinuIdResponse.jsonToObject(response)
@@ -28,7 +29,7 @@ class ResponseContinuId(
         batchId = it.batchId
         characters = it.characters
         pubkey = it.pubkey
-        balance = it.amount!!.toDouble()
+        balance = it.amount !!.toDouble()
       }
     }
   }

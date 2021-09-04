@@ -1,4 +1,5 @@
 @file:JvmName("QueryBatchHistory")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.BatchHistory
@@ -9,7 +10,7 @@ import wishKnish.knishIO.client.response.IResponse
 import wishKnish.knishIO.client.response.ResponseBatchHistory
 
 
-class QueryBatchHistory(client: HttpClient): Query(client) {
+class QueryBatchHistory(client: HttpClient) : Query(client) {
   override fun createResponse(json: String): IResponse {
     return ResponseBatchHistory(this, json)
   }

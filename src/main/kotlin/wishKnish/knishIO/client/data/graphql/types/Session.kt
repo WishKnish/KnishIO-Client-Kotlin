@@ -1,4 +1,5 @@
 @file:JvmName("Session")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.Json
   @JvmField val jsonData: String? = null,
   @JvmField val createdAt: String? = null,
   @JvmField val updatedAt: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

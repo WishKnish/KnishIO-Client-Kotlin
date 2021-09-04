@@ -1,4 +1,5 @@
 @file:JvmName("QueryArgs")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.Json
   @JvmField val offset: Int? = null,
   @JvmField val orderBy: String? = null,
   @JvmField val order: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

@@ -1,4 +1,5 @@
 @file:JvmName("MutationRequestAuthorizationGuest")
+
 package wishKnish.knishIO.client.mutation
 
 import wishKnish.knishIO.client.Wallet
@@ -10,7 +11,7 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.response.ResponseRequestAuthorizationGuest
 
 
-class MutationRequestAuthorizationGuest(httpClient: HttpClient): Mutation(httpClient) {
+class MutationRequestAuthorizationGuest(httpClient: HttpClient) : Mutation(httpClient) {
   var wallet: Wallet? = null
 
   override fun getQuery(variables: IVariable): QueryInterface {

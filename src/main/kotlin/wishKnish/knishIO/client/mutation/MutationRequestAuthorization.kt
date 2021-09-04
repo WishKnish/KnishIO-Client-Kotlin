@@ -1,4 +1,5 @@
 @file:JvmName("MutationRequestAuthorization")
+
 package wishKnish.knishIO.client.mutation
 
 import wishKnish.knishIO.client.Molecule
@@ -9,7 +10,7 @@ import wishKnish.knishIO.client.response.ResponseRequestAuthorization
 class MutationRequestAuthorization @JvmOverloads constructor(
   httpClient: HttpClient,
   override val molecule: Molecule? = null
-): MutationProposeMolecule(httpClient, molecule) {
+) : MutationProposeMolecule(httpClient, molecule) {
   fun fillMolecule(meta: List<MetaData>) {
     molecule()?.run {
       initAuthorization(meta.toMutableList())

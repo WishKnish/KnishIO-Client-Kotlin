@@ -1,4 +1,5 @@
 @file:JvmName("Molecule")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -26,7 +27,7 @@ import kotlinx.serialization.json.Json
   @JvmField val reason: String? = null,
   @JvmField val reasonPayload: String? = null,
   @JvmField val payload: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

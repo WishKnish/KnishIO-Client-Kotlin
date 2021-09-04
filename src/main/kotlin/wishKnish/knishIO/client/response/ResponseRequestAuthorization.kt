@@ -1,4 +1,5 @@
 @file:JvmName("ResponseRequestAuthorization")
+
 package wishKnish.knishIO.client.response
 
 import wishKnish.knishIO.client.Wallet
@@ -9,11 +10,11 @@ import wishKnish.knishIO.client.mutation.MutationRequestAuthorization
 class ResponseRequestAuthorization(
   query: MutationRequestAuthorization,
   json: String,
-): ResponseProposeMolecule(query, json), IResponseRequestAuthorization {
+) : ResponseProposeMolecule(query, json), IResponseRequestAuthorization {
   var payload: AccessToken? = null
 
   init {
-      initialization()
+    initialization()
   }
 
   override fun wallet(): Wallet {

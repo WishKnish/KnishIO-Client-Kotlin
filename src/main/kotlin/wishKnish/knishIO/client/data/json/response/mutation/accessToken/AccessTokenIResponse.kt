@@ -1,4 +1,5 @@
 @file:JvmName("AccessTokenResponse")
+
 package wishKnish.knishIO.client.data.json.response.mutation.accessToken
 
 import kotlinx.serialization.Serializable
@@ -9,7 +10,7 @@ import wishKnish.knishIO.client.data.json.errors.Errors
 import wishKnish.knishIO.client.data.json.response.IResponse
 
 
-@Serializable data class AccessTokenResponse @JvmOverloads constructor(@JvmField var data: Data? = null): IResponse {
+@Serializable data class AccessTokenResponse @JvmOverloads constructor(@JvmField var data: Data? = null) : IResponse {
   override val errors: List<Errors> = listOf()
   override val message: String? = null
   override val exception: Boolean? = null

@@ -1,4 +1,5 @@
 @file:JvmName("DataHash")
+
 package wishKnish.knishIO.client.data.json.response.query.cipherHash
 
 import kotlinx.serialization.Serializable
@@ -6,7 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable data class DataHash @JvmOverloads constructor( @JvmField val hash: String? = null) {
+@Serializable data class DataHash @JvmOverloads constructor(@JvmField val hash: String? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

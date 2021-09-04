@@ -1,4 +1,5 @@
 @file:JvmName("KeyValueInt")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -9,7 +10,7 @@ import kotlinx.serialization.json.Json
 @Serializable data class KeyValueInt @JvmOverloads constructor(
   @JvmField val key: String? = null,
   @JvmField val value: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

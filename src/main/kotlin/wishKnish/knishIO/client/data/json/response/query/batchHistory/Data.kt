@@ -1,4 +1,5 @@
 @file:JvmName("Data")
+
 package wishKnish.knishIO.client.data.json.response.query.batchHistory
 
 import kotlinx.serialization.Serializable

@@ -1,4 +1,5 @@
 @file:JvmName("Paginator")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -9,7 +10,7 @@ import kotlinx.serialization.json.Json
 @Serializable data class Paginator @JvmOverloads constructor(
   @JvmField val total: Int? = null,
   @JvmField val offset: Int? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

@@ -1,4 +1,5 @@
 @file:JvmName("ResponseProposeMolecule")
+
 package wishKnish.knishIO.client.response
 
 
@@ -11,7 +12,7 @@ import wishKnish.knishIO.client.data.graphql.types.Molecule as ProposeMolecule
 open class ResponseProposeMolecule(
   query: MutationProposeMolecule,
   json: String,
-): Response(query, json, "data.ProposeMolecule") {
+) : Response(query, json, "data.ProposeMolecule") {
   var clientMolecule: Molecule? = null
 
   init {
@@ -37,7 +38,7 @@ open class ResponseProposeMolecule(
       Molecule().apply {
         molecularHash = it.molecularHash
         status = it.status
-        createdAt = it.createdAt!!
+        createdAt = it.createdAt !!
       }
     }
   }

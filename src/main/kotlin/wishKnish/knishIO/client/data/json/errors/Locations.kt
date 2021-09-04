@@ -1,4 +1,5 @@
 @file:JvmName("Locations")
+
 package wishKnish.knishIO.client.data.json.errors
 
 import kotlinx.serialization.Serializable

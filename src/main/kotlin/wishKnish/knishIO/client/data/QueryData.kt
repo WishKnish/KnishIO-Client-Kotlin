@@ -13,6 +13,7 @@ import wishKnish.knishIO.client.data.serializers.QueryDataSerializer
   @JvmField val variables: String? = null,
 ) {
   @Transient var molecule: Molecule? = null
+
   companion object {
     private val jsonFormat: Json
       get() = Json {

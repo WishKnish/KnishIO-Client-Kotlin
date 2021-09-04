@@ -1,4 +1,5 @@
 @file:JvmName("BatchInstance")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -23,7 +24,7 @@ import kotlinx.serialization.json.Json
 
   @JvmField val metas: List<Meta> = listOf(),
   @JvmField val throughMetas: List<Meta> = listOf()
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

@@ -1,4 +1,5 @@
 @file:JvmName("ResponseRequestAuthorizationGuest")
+
 package wishKnish.knishIO.client.response
 
 import wishKnish.knishIO.client.Wallet
@@ -11,7 +12,7 @@ import kotlin.jvm.Throws
 class ResponseRequestAuthorizationGuest(
   query: MutationRequestAuthorizationGuest,
   json: String,
-): Response(query, json, "data.AccessToken"), IResponseRequestAuthorization {
+) : Response(query, json, "data.AccessToken"), IResponseRequestAuthorization {
 
   override fun reason(): String {
     return "Invalid response from server"

@@ -1,4 +1,5 @@
 @file:JvmName("MetaType")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.Json
   @JvmField val instanceCount: List<KeyValueInt>? = null,
   @JvmField val metas: List<Meta>? = null,
   @JvmField val paginatorInfo: Paginator? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

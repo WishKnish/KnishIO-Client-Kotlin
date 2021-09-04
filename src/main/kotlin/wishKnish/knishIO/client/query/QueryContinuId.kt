@@ -1,4 +1,5 @@
 @file:JvmName("QueryContinuId")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.ContinuId
@@ -9,7 +10,7 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.response.ResponseContinuId
 
 
-class QueryContinuId(client: HttpClient): Query(client) {
+class QueryContinuId(client: HttpClient) : Query(client) {
   override fun getQuery(variables: IVariable): QueryInterface {
     return ContinuId(variables as ContinuIdVariable)
   }

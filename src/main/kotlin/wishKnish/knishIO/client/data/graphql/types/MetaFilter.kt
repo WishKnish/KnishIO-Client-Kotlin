@@ -1,4 +1,5 @@
 @file:JvmName("MetaFilter")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.Json
   @JvmField val value: String,
   @JvmField val comparison: String? = null,
   @JvmField val criterion: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

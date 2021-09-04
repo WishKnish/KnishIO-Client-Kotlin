@@ -1,4 +1,5 @@
 @file:JvmName("MetaInstance")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.Json
   @JvmField val metas: List<Meta>? = null,
   @JvmField val atoms: List<Atom>? = null,
   @JvmField val molecules: List<Molecule>? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

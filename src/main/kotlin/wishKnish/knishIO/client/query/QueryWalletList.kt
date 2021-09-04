@@ -1,4 +1,5 @@
 @file:JvmName("QueryWalletList")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.WalletList
@@ -7,7 +8,7 @@ import wishKnish.knishIO.client.data.json.variables.WalletListVariable
 import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.response.ResponseWalletList
 
-class QueryWalletList(client: HttpClient): Query(client) {
+class QueryWalletList(client: HttpClient) : Query(client) {
   override fun createResponse(json: String): ResponseWalletList {
     return ResponseWalletList(this, json)
   }

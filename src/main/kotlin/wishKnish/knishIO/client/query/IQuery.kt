@@ -1,4 +1,5 @@
 @file:JvmName("IQuery")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.QueryInterface

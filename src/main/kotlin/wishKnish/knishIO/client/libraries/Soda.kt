@@ -7,7 +7,6 @@ import com.iwebpp.crypto.TweetNaclFast
 import kotlinx.serialization.SerializationException
 import java.security.GeneralSecurityException
 import com.google.gson.Gson
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlin.jvm.Throws
 import kotlin.text.toByteArray
@@ -24,7 +23,7 @@ class Soda(private val base: String = "GMP") {
   }
 
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun <T: Collection<*>>encrypt(
+  fun <T : Collection<*>> encrypt(
     message: T,
     publicKey: String
   ): String {

@@ -1,4 +1,5 @@
 @file:JvmName("MutationRequestTokens")
+
 package wishKnish.knishIO.client.mutation
 
 import wishKnish.knishIO.client.Molecule
@@ -8,7 +9,7 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 class MutationRequestTokens @JvmOverloads constructor(
   httpClient: HttpClient,
   override val molecule: Molecule? = null
-): MutationProposeMolecule(httpClient, molecule) {
+) : MutationProposeMolecule(httpClient, molecule) {
 
   @JvmOverloads
   fun fillMolecule(

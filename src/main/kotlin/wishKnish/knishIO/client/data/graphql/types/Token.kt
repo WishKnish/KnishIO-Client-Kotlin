@@ -1,4 +1,5 @@
 @file:JvmName("Token")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -18,7 +19,7 @@ import kotlinx.serialization.json.Json
   @JvmField val atoms: List<Atom> = listOf(),
   @JvmField val wallets: List<Wallet> = listOf(),
   @JvmField val createdAt: String? = null
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

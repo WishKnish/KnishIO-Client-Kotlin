@@ -1,4 +1,5 @@
 @file:JvmName("UserActivityVariable")
+
 package wishKnish.knishIO.client.data.json.variables
 
 import kotlinx.serialization.Serializable
@@ -16,4 +17,4 @@ import wishKnish.knishIO.client.data.graphql.types.Span
   @JvmField val timeZone: String? = null,
   @JvmField val countBy: List<CountByUserActivity>? = null,
   @JvmField val interval: Span = Span.HOUR
-): IVariable
+) : IVariable

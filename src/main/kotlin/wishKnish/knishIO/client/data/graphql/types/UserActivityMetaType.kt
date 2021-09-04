@@ -1,4 +1,5 @@
 @file:JvmName("UserActivityMetaType")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.Json
   @JvmField val metaId: String? = null,
   @JvmField val instances: List<Session> = listOf(),
   @JvmField val instanceCount: List<InstanceCountType> = listOf()
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

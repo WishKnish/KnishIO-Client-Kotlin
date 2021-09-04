@@ -1,4 +1,5 @@
 @file:JvmName("InstanceCountType")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.Json
   @JvmField val id: String? = null,
   @JvmField val count: Int? = null,
   @JvmField val instances: List<InstanceCountType> = listOf()
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

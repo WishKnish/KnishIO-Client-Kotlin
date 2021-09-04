@@ -1,4 +1,5 @@
 @file:JvmName("QueryUserActivity")
+
 package wishKnish.knishIO.client.query
 
 import wishKnish.knishIO.client.data.json.query.UserActivity
@@ -8,7 +9,7 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.response.ResponseUserActivity
 
 
-class QueryUserActivity(client: HttpClient): Query(client) {
+class QueryUserActivity(client: HttpClient) : Query(client) {
   override fun createResponse(json: String): ResponseUserActivity {
     return ResponseUserActivity(this, json)
   }

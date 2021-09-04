@@ -78,7 +78,7 @@ class Wallet @JvmOverloads constructor(
   @JvmField var pubkey: String? = null
   @JvmField var tokenUnits = mutableListOf<TokenUnit>()
   @JvmField var bundle: String? = null
-  @JvmField var molecules:List<Molecule> = listOf()
+  @JvmField var molecules: List<Molecule> = listOf()
 
   @JvmField var createdAt: String? = null
   @JvmField var tokenName: String? = null
@@ -333,7 +333,7 @@ class Wallet @JvmOverloads constructor(
    * Encrypts a message for this wallet instance
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun <T: Collection<*>>encryptMyMessage(
+  fun <T : Collection<*>> encryptMyMessage(
     message: T,
     vararg publicKeys: String
   ): Map<String, String> {
@@ -394,12 +394,10 @@ class Wallet @JvmOverloads constructor(
       try {
         val message = json.decodeFromString<Map<String, String>>(data)
         decryptMyMessage(message) ?: fallbackValue
-      }
-      catch (e: SerializationException) {
+      } catch (e: SerializationException) {
         decryptMyMessage(data) ?: fallbackValue
       }
-    }
-    catch (e: Exception) {
+    } catch (e: Exception) {
       // Probably not actually encrypted
       fallbackValue
     }

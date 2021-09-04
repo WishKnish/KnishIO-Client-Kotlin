@@ -1,3 +1,50 @@
+/*
+                               (
+                              (/(
+                              (//(
+                              (///(
+                             (/////(
+                             (//////(                          )
+                            (////////(                        (/)
+                            (////////(                       (///)
+                           (//////////(                      (////)
+                           (//////////(                     (//////)
+                          (////////////(                    (///////)
+                         (/////////////(                   (/////////)
+                        (//////////////(                  (///////////)
+                        (///////////////(                (/////////////)
+                       (////////////////(               (//////////////)
+                      (((((((((((((((((((              (((((((((((((((
+                     (((((((((((((((((((              ((((((((((((((
+                     (((((((((((((((((((            ((((((((((((((
+                    ((((((((((((((((((((           (((((((((((((
+                    ((((((((((((((((((((          ((((((((((((
+                    (((((((((((((((((((         ((((((((((((
+                    (((((((((((((((((((        ((((((((((
+                    ((((((((((((((((((/      (((((((((
+                    ((((((((((((((((((     ((((((((
+                    (((((((((((((((((    (((((((
+                   ((((((((((((((((((  (((((
+                   #################  ##
+                   ################  #
+                  ################# ##
+                 %################  ###
+                 ###############(   ####
+                ###############      ####
+               ###############       ######
+              %#############(        (#######
+             %#############           #########
+            ############(              ##########
+           ###########                  #############
+          #########                      ##############
+        %######
+
+        Powered by Knish.IO: Connecting a Decentralized World
+
+Please visit https://github.com/WishKnish/KnishIO-Client-Kotlin for information.
+
+License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
+*/
 @file:JvmName("KnishIOClient")
 
 package wishKnish.knishIO.client
@@ -20,6 +67,10 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.exception.*
 import kotlin.jvm.Throws
 
+/**
+ * Base client class providing a powerful but user-friendly wrapper
+ * around complex Knish.IO ledger transactions.
+ */
 class KnishIOClient @JvmOverloads constructor(
   @JvmField val uris: List<URI>,
   @JvmField val serverSdkVersion: Int = 3,
@@ -54,41 +105,69 @@ class KnishIOClient @JvmOverloads constructor(
     }
   }
 
+  /**
+   *  Enables end-to-end encryption protocol.
+   */
   fun enableEncryption() {
     client.encrypt = true
   }
 
+  /**
+   *  Disables end-to-end encryption protocol.
+   */
   fun disableEncryption() {
     client.encrypt = false
   }
 
+  /**
+   * Returns whether or not the end-to-end encryption protocol is enabled
+   */
   fun hasEncryption(): Boolean {
     return client.encrypt
   }
 
+  /**
+   * Get random uri from specified uris
+   */
   fun getRandomUri(): URI {
     return uris.random()
   }
 
+  /**
+   * Reset common properties
+   */
   fun reset() {
     secret = ""
     bundle = ""
     remainderWallet = null
   }
 
+  /**
+   * Deinitializes the Knish.IO client session so that a new session can replace it
+   */
   fun deinitialize() {
     reset()
   }
 
+  /**
+   * Retrieves the endpoint URI for this session
+   */
   fun uri(): String {
     return client.uri.toASCIIString()
   }
 
+  /**
+   * Returns the HTTP client class session
+   */
   fun client(): HttpClient {
-    if (!authProcess) {
+    if (! authProcess) {
       val randomUri = getRandomUri()
       client.setUri(randomUri)
+
+      // Try to get stored auth token object
       val authDataObj = clients[randomUri.toASCIIString()]
+
+      // Not authorized - try to do it
       authDataObj?.let {
         client.setAuthData(it)
       } ?: requestAuthToken(secret = secret(), cellSlug = cellSlug(), encrypt = client.encrypt)
@@ -97,15 +176,24 @@ class KnishIOClient @JvmOverloads constructor(
     return client
   }
 
-  fun hasSecret() : Boolean {
+  /**
+   * Returns whether or not a secret is being stored for this session
+   */
+  fun hasSecret(): Boolean {
     return secret.isNotEmpty()
   }
 
+  /**
+   * Set the client's secret
+   */
   fun secret(value: String) {
     secret = value
     bundle = Crypto.generateBundleHash(value)
   }
 
+  /**
+   * Retrieves the stored secret for this session
+   */
   @Throws(UnauthenticatedException::class)
   fun secret(): String {
     if (secret.isEmpty()) {
@@ -114,6 +202,9 @@ class KnishIOClient @JvmOverloads constructor(
     return secret
   }
 
+  /**
+   * Returns the bundle hash for this session
+   */
   @Throws(UnauthenticatedException::class)
   fun bundle(): String {
     if (bundle.isEmpty()) {
@@ -123,14 +214,23 @@ class KnishIOClient @JvmOverloads constructor(
     return bundle
   }
 
+  /**
+   * Retrieves this session's remainder wallet
+   */
   fun remainderWallet(): Wallet? {
     return remainderWallet
   }
 
+  /**
+   * Builds a new instance of the provided Query class
+   */
   fun <T : KClass<*>> createQuery(queryClass: T): IQuery {
-    return queryClass.primaryConstructor?.call(client()) as? IQuery  ?: throw CodeException("invalid Query")
+    return queryClass.primaryConstructor?.call(client()) as? IQuery ?: throw CodeException("invalid Query")
   }
 
+  /**
+   * Requests an authorization token from the node endpoint
+   */
   @JvmOverloads
   fun requestAuthToken(
     secret: String? = null,
@@ -144,9 +244,11 @@ class KnishIOClient @JvmOverloads constructor(
     val response: IResponseRequestAuthorization
     val query: Query
 
+    // Do we have a seed we need to hash?
     seed?.let {
       secret(Crypto.generateSecret(it))
     } ?: secret?.let {
+      // Do we have a secret pre-hashed?
       secret(it)
     }
 
@@ -158,44 +260,53 @@ class KnishIOClient @JvmOverloads constructor(
       val authorizationWallet = Wallet(Crypto.generateSecret(), "AUTH")
       query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
       query.setAuthorizationWallet(authorizationWallet)
-      response = query.execute(AccessTokenMutationVariable(this.cellSlug, authorizationWallet.pubkey, enc)) as ResponseRequestAuthorizationGuest
-    }
-    else{
+      response = query.execute(
+        AccessTokenMutationVariable(
+          this.cellSlug,
+          authorizationWallet.pubkey,
+          enc
+        )
+      ) as ResponseRequestAuthorizationGuest
+    } else {
       val molecule = createMolecule(secret(), Wallet(secret(), "AUTH"))
       query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
       query.fillMolecule(listOf(MetaData("encrypt", if (enc) "true" else "false")))
-      response = query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseRequestAuthorization
+      response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
     }
 
     if (response.success()) {
       val authObj = Clients(
-        response.token(),
-        response.pubKey(),
-        response.wallet()
+        response.token(), response.pubKey(), response.wallet()
       )
 
       if (hasEncryption() != response.encrypt()) {
-        if(response.encrypt()) enableEncryption() else disableEncryption()
+        if (response.encrypt()) enableEncryption() else disableEncryption()
       }
 
       client.setAuthData(authObj)
       clients[uri()] = authObj
       authProcess = false
-    }
-    else {
+    } else {
       throw UnauthenticatedException(response.reason() ?: "Authorization token missing or invalid.")
     }
 
     return response
   }
 
+  /**
+   * Uses the supplied Mutation class to build a new tailored Molecule
+   */
   @JvmOverloads
   fun <T : KClass<*>> createMoleculeMutation(
     mutationClass: T,
     molecule: Molecule? = null
   ): MutationProposeMolecule {
-    val _molecule = molecule ?: createMolecule()
-    val mutation = mutationClass.primaryConstructor?.call(client(), _molecule) ?: throw CodeException("invalid Mutation")
+
+    // If you don't supply the molecule, we'll generate one for you
+    val newOrExistingMolecule = molecule ?: createMolecule()
+
+    val mutation =
+      mutationClass.primaryConstructor?.call(client(), newOrExistingMolecule) ?: throw CodeException("invalid Mutation")
 
     if (mutation !is MutationProposeMolecule) {
       throw CodeException("${mutationClass.simpleName}::createMoleculeMutation() - This method only accepts MutationProposeMolecule!")
@@ -206,59 +317,69 @@ class KnishIOClient @JvmOverloads constructor(
     return mutation
   }
 
+  /**
+   * Instantiates a new Molecule and prepares this client session to operate on it
+   */
   @JvmOverloads
   fun createMolecule(
     secret: String? = null,
     sourceWallet: Wallet? = null,
     remainderWallet: Wallet? = null
   ): Molecule {
-    val _secret = secret ?: secret()
-    var _sourceWallet = sourceWallet
+    val currentSecret = secret ?: secret()
+    var signingWallet = sourceWallet
 
-    if (
-      sourceWallet == null &&
-      remainderWallet()?.token != "AUTH" &&
-      lastMoleculeQuery != null &&
-      lastMoleculeQuery !!.response != null &&
-      lastMoleculeQuery !!.response!! .success()
-    ) {
-      _sourceWallet = remainderWallet()
+    // Sets the source wallet as the last remainder wallet (to maintain ContinuID)
+    if (sourceWallet == null && remainderWallet()?.token != "AUTH" && lastMoleculeQuery != null && lastMoleculeQuery !!.response != null && lastMoleculeQuery !!.response !!.success()) {
+      signingWallet = remainderWallet()
     }
 
-    if (_sourceWallet == null) {
-      _sourceWallet = sourceWallet()
+    // Unable to use last remainder wallet; Figure out what wallet to use:
+    if (signingWallet == null) {
+      signingWallet = sourceWallet()
     }
 
+    // Set the remainder wallet for the next transaction
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      _secret,
-      _sourceWallet.token,
-      _sourceWallet.batchId,
-      _sourceWallet.characters
+      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters
     )
 
     return Molecule(
-      _secret,
-      _sourceWallet,
-      remainderWallet(),
-      cellSlug
+      currentSecret, signingWallet, remainderWallet(), cellSlug
     )
   }
 
+  /**
+   * Retrieves this session's wallet used for signing the next Molecule
+   */
   fun sourceWallet(): Wallet {
     return queryContinuId(bundle()).payload() ?: Wallet(secret())
   }
 
+  /**
+   * Queries the ledger for the next ContinuId wallet
+   */
   fun queryContinuId(bundle: String): ResponseContinuId {
     val query = createQuery(QueryContinuId::class) as QueryContinuId
     return query.execute(ContinuIdVariable(bundle)) as ResponseContinuId
   }
 
+  /**
+   * Retrieves the balance wallet for a specified Knish.IO identity and token slug
+   */
   @JvmOverloads
-  fun queryBalance(token: String, bundle: String? = null): ResponseBalance {
+  fun queryBalance(
+    token: String,
+    bundle: String? = null
+  ): ResponseBalance {
+    // Execute query with either the provided bundle hash or the active client's bundle
     val query = createQuery(QueryBalance::class) as QueryBalance
     return query.execute(BalanceVariable(token = token, bundleHash = bundle)) as ResponseBalance
   }
 
+  /**
+   * Retrieves metadata for the given metaType and provided parameters
+   */
   @JvmOverloads
   fun queryMeta(
     metaType: String? = null,
@@ -290,6 +411,10 @@ class KnishIOClient @JvmOverloads constructor(
     return response.payload()
   }
 
+
+  /**
+   * Retrieves metadata for the given metaType and provided parameters
+   */
   @JvmOverloads
   fun queryMetaInstance(
     metaType: String,
@@ -324,16 +449,25 @@ class KnishIOClient @JvmOverloads constructor(
     return response.data()
   }
 
+  /**
+   * Query batch to get cascading meta instances by batchID
+   */
   fun queryBatch(batchId: String): ResponseBatch {
     val query = createQuery(QueryBatch::class) as QueryBatch
     return query.execute(BatchVariable(batchId)) as ResponseBatch
   }
 
+  /**
+   * Query batch history to get cascading meta instances by batchID
+   */
   fun queryBatchHistory(batchId: String): ResponseBatchHistory {
     val query = createQuery(QueryBatchHistory::class) as QueryBatchHistory
     return query.execute(BatchHistoryVariable(batchId)) as ResponseBatchHistory
   }
 
+  /**
+   * Queries the ledger to retrieve a list of active sessions for the given MetaType
+   */
   @JvmOverloads
   fun queryActiveSession(
     bundleHash: String? = null,
@@ -361,20 +495,14 @@ class KnishIOClient @JvmOverloads constructor(
 
     return query.execute(
       UserActivityVariable(
-        bundleHash,
-        metaType,
-        metaId,
-        ipAddress,
-        browser,
-        osCpu,
-        resolution,
-        timeZone,
-        countBy,
-        interval
+        bundleHash, metaType, metaId, ipAddress, browser, osCpu, resolution, timeZone, countBy, interval
       )
     ) as ResponseUserActivity
   }
 
+  /**
+   * Retrieves a list of your active wallets (unspent)
+   */
   @JvmOverloads
   fun queryWallets(
     bundle: String? = null,
@@ -383,13 +511,16 @@ class KnishIOClient @JvmOverloads constructor(
   ): List<Wallet> {
     val walletQuery = createQuery(QueryWalletList::class) as QueryWalletList
 
-    val response  = walletQuery.execute(
+    val response = walletQuery.execute(
       WalletListVariable(bundleHash = bundle, token = token, unspent = unspent)
     ) as ResponseWalletList
 
     return response.getWallets()
   }
 
+  /**
+   * Retrieves a list of your shadow wallets (balance, but no keys)
+   */
   @JvmOverloads
   fun queryShadowWallets(
     token: String = "KNISH",
@@ -414,14 +545,14 @@ class KnishIOClient @JvmOverloads constructor(
 
     return query.execute(
       WalletBundleVariable(
-        bundleHash = bundle ?: bundle(),
-        key = key,
-        value = value,
-        latest = latest
+        bundleHash = bundle ?: bundle(), key = key, value = value, latest = latest
       )
     ) as ResponseWalletBundle
   }
 
+  /**
+   * Retrieves your wallet bundle's metadata from the ledger
+   */
   @JvmOverloads
   fun queryBundle(
     bundle: String? = null,
@@ -432,15 +563,21 @@ class KnishIOClient @JvmOverloads constructor(
     return queryBundleRaw(bundle, key, value, latest).payload()
   }
 
+  /**
+   * Builds and executes a molecule to issue a new Wallet on the ledger
+   */
   fun createWallet(token: String): ResponseProposeMolecule {
     val newWallet = Wallet(secret(), token)
     val query = createMoleculeMutation(MutationCreateWallet::class) as MutationCreateWallet
 
     query.fillMolecule(newWallet)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Builds and executes a molecule to issue a new token on the ledger
+   */
   @JvmOverloads
   fun createToken(
     token: String,
@@ -449,49 +586,58 @@ class KnishIOClient @JvmOverloads constructor(
     batchId: String? = null,
     units: MutableList<TokenUnit> = mutableListOf()
   ): ResponseProposeMolecule {
-    val _batchId = batchId ?: Crypto.generateBatchId()
-    var _amount = amount ?: 0
+    val newOrExistingBatchId = batchId ?: Crypto.generateBatchId()
+    var tokenAmount = amount ?: 0
 
+    // Stackable tokens need a new batch for every transfer
     meta.firstOrNull { it.key == "fungibility" }?.let { _ ->
 
+      // No batch ID specified? Create a random one
       meta.firstOrNull { it.key == "batchId" }?.let {
-        it.value = _batchId
-      } ?: meta.add(MetaData("batchId", _batchId))
+        it.value = newOrExistingBatchId
+      } ?: meta.add(MetaData("batchId", newOrExistingBatchId))
 
-
+      // Adding unit IDs to the token
       if (units.isNotEmpty()) {
 
+        // Stackable tokens with Unit IDs must not use decimals
         meta.firstOrNull { it.key == "decimals" }?.let {
           if (it.value !!.toDouble() > 0) {
             throw StackableUnitDecimalsException()
           }
         }
 
+        // Can't create stackable units AND provide amount
         amount?.let {
           if (it.toDouble() > 0) {
             throw StackableUnitAmountException()
           }
         }
 
-        _amount = units.size
-        meta.firstOrNull { it.key == "splittable" }?.let{
-         it.value = "1"
+        // Calculating amount based on Unit IDs
+        tokenAmount = units.size
+        meta.firstOrNull { it.key == "splittable" }?.let {
+          it.value = "1"
         } ?: meta.add(MetaData("splittable", "1"))
 
         meta.firstOrNull { it.key == "tokenUnits" }?.let {
-          it.value =  jsonFormat.encodeToString(units)
+          it.value = jsonFormat.encodeToString(units)
         } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
       }
     }
 
-    val recipientWallet = Wallet(secret(), token, _batchId)
+    // Creating the wallet that will receive the new tokens
+    val recipientWallet = Wallet(secret(), token, newOrExistingBatchId)
     val query = createMoleculeMutation(MutationCreateToken::class) as MutationCreateToken
 
-    query.fillMolecule(recipientWallet, _amount, meta)
+    query.fillMolecule(recipientWallet, tokenAmount, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Builds and executes a molecule to convey new metadata to the ledger
+   */
   @JvmOverloads
   fun createMeta(
     metaType: String,
@@ -499,15 +645,17 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf()
   ): ResponseProposeMolecule {
     val query = createMoleculeMutation(
-      MutationCreateMeta::class,
-      createMolecule(secret(), sourceWallet())
+      MutationCreateMeta::class, createMolecule(secret(), sourceWallet())
     ) as MutationCreateMeta
 
     query.fillMolecule(metaType, metaId, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Builds and executes a molecule to create a new identifier on the ledger
+   */
   fun createIdentifier(
     type: String,
     contact: String,
@@ -517,9 +665,12 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(type, contact, code)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Builds and executes a Molecule that requests token payment from the node
+   */
   @JvmOverloads
   fun requestTokens(
     token: String,
@@ -536,18 +687,20 @@ class KnishIOClient @JvmOverloads constructor(
     // Are we specifying a specific recipient?
     to?.let {
       meta.firstOrNull { it.key == "position" }?.let {
-        it.value =  to.position
+        it.value = to.position
       } ?: meta.add(MetaData("position", to.position))
 
       meta.firstOrNull { it.key == "bundle" }?.let {
-        it.value =  to.bundle
+        it.value = to.bundle
       } ?: meta.add(MetaData("position", to.bundle))
     }
 
     return requestTokensQuery(token, amount, metaType, metaId, units, meta, batchId)
   }
 
-
+  /**
+   * Builds and executes a Molecule that requests token payment from the node
+   */
   fun requestTokens(
     token: String,
     to: String? = null,
@@ -572,31 +725,35 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf(),
     batchId: String? = null
   ): ResponseProposeMolecule {
-    var _amount = amount ?: 0
+    var requestedAmount = amount ?: 0
 
     // Calculate amount & set meta key
     if (units.isNotEmpty()) {
+
       // Can't move stackable units AND provide amount
-      if ( _amount.toDouble() > 0 ) {
+      if (requestedAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
       // Calculating amount based on Unit IDs
-      _amount = units.size
+      requestedAmount = units.size
       meta.firstOrNull { it.key == "tokenUnits" }?.let {
-        it.value =  jsonFormat.encodeToString(units)
+        it.value = jsonFormat.encodeToString(units)
       } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
     }
 
     val query = createMoleculeMutation(MutationRequestTokens::class) as MutationRequestTokens
 
-    query.fillMolecule(token, _amount, metaType, metaId, meta, batchId)
+    query.fillMolecule(token, requestedAmount, metaType, metaId, meta, batchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
-  private fun <T>getSpecificationRequestTokens(sender: T, token: String): Map<String, String?> {
-    return when(sender) {
+  private fun <T> getSpecificationRequestTokens(
+    sender: T,
+    token: String
+  ): Map<String, String?> {
+    return when (sender) {
       // If recipient is a Wallet, we need to help the node triangulate
       // the transfer by providing position and bundle hash
       is Wallet -> mapOf("metaType" to "wallet", "metaId" to sender.address)
@@ -604,8 +761,7 @@ class KnishIOClient @JvmOverloads constructor(
       is String -> run {
         if (Wallet.isBundleHash(sender)) {
           mapOf("metaType" to "walletBundle", "metaId" to sender)
-        }
-        else{
+        } else {
           val wallet = Wallet.create(sender, token)
           mapOf("metaType" to "wallet", "metaId" to wallet.address)
         }
@@ -615,6 +771,9 @@ class KnishIOClient @JvmOverloads constructor(
     }
   }
 
+  /**
+   * Creates and executes a Molecule that assigns keys to an unclaimed shadow wallet
+   */
   @JvmOverloads
   fun claimShadowWallet(
     token: String,
@@ -625,9 +784,12 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(token, batchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Creates and executes a Molecule that moves tokens from one user to another
+   */
   @JvmOverloads
   fun transferToken(
     recipient: Wallet,
@@ -637,42 +799,52 @@ class KnishIOClient @JvmOverloads constructor(
     batchId: String? = null,
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    val _sourceWallet = sourceWallet ?: queryBalance(token).payload()
-    var _amount = amount
+    val signingWallet = sourceWallet ?: queryBalance(token).payload()
+    var transferAmount = amount
 
+    // Calculate amount & set meta key
     if (units.isNotEmpty()) {
-      if (_amount.toDouble() > 0) {
+
+      // Can't move stackable units AND provide amount
+      if (transferAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
-      _amount = units.size
+      transferAmount = units.size
     }
 
-    if ( _sourceWallet == null || _sourceWallet.balance < _amount.toDouble()) {
+    // Do you have enough tokens?
+    if (signingWallet == null || signingWallet.balance < transferAmount.toDouble()) {
       throw TransferBalanceException()
     }
 
+    // Compute the batch ID for the recipient
+    // (typically used by stackable tokens)
     batchId?.let {
       recipient.batchId = batchId
-    } ?: recipient.initBatchId(_sourceWallet)
+    } ?: recipient.initBatchId(signingWallet)
 
     remainderWallet = Wallet.create(
-      secret(),
-      token,
-      characters = _sourceWallet.characters
+      secret(), token, characters = signingWallet.characters
     )
 
-    remainderWallet !!.initBatchId(_sourceWallet, true)
-    _sourceWallet.splitUnits(units, remainderWallet !!, recipient)
+    remainderWallet !!.initBatchId(signingWallet, true)
 
-    val molecule = createMolecule(sourceWallet = _sourceWallet, remainderWallet = remainderWallet)
+    // Token units splitting
+    signingWallet.splitUnits(units, remainderWallet !!, recipient)
+
+    // Build the molecule itself
+    val molecule = createMolecule(sourceWallet = signingWallet, remainderWallet = remainderWallet)
     val query = createMoleculeMutation(MutationTransferTokens::class, molecule) as MutationTransferTokens
 
-    query.fillMolecule(recipient, _amount)
+    query.fillMolecule(recipient, transferAmount)
 
-    return query.execute(MoleculeMutationVariable(query.molecule()!!)) as ResponseProposeMolecule
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
+  /**
+   * Creates and executes a Molecule that moves tokens from one user to another
+   */
   @JvmOverloads
   fun transferToken(
     recipient: String,
@@ -691,6 +863,9 @@ class KnishIOClient @JvmOverloads constructor(
     return transferToken(recipientWallet, token, amount, units, batchId, sourceWallet)
   }
 
+  /**
+   * Builds and executes a molecule to destroy the specified Token units
+   */
   @JvmOverloads
   fun burnTokens(
     token: String,
@@ -698,31 +873,43 @@ class KnishIOClient @JvmOverloads constructor(
     units: MutableList<TokenUnit> = mutableListOf(),
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    val _sourceWallet = sourceWallet ?: queryBalance(token).payload()
+    val signingWallet = sourceWallet ?: queryBalance(token).payload()
     val remainderWallet = Wallet.create(secret(), token, characters = sourceWallet !!.characters)
-    var _amount = amount
+    var burnAmount = amount
 
-    remainderWallet.initBatchId(_sourceWallet !!, true)
+    remainderWallet.initBatchId(signingWallet !!, true)
 
+    // Calculate amount & set meta key
     if (units.isNotEmpty()) {
-      if (_amount.toDouble() > 0) {
+
+      // Can't burn stackable units AND provide amount
+      if (burnAmount.toDouble() > 0) {
         throw StackableUnitAmountException()
       }
 
-      _amount = units.size
+      // Calculating amount based on Unit IDs
+      burnAmount = units.size
 
+      // Token units splitting
       sourceWallet.splitUnits(units, remainderWallet)
     }
 
+    // Burn tokens
     val molecule = createMolecule(null, sourceWallet, remainderWallet)
 
-    molecule.burnToken(_amount)
+    molecule.burnToken(burnAmount)
     molecule.sign()
     molecule.check()
 
-    return MutationProposeMolecule(client(), molecule).execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
+    return MutationProposeMolecule(
+      client(),
+      molecule
+    ).execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
   }
 
+  /**
+   * Returns the currently defined Cell identifier for this session
+   */
   fun cellSlug(): String? {
     return cellSlug
   }

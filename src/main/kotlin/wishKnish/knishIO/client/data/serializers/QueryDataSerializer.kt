@@ -7,7 +7,7 @@ import kotlinx.serialization.encoding.*
 import wishKnish.knishIO.client.data.QueryData
 import wishKnish.knishIO.client.Molecule
 
-class QueryDataSerializer: KSerializer<QueryData> {
+class QueryDataSerializer : KSerializer<QueryData> {
 
   override val descriptor: SerialDescriptor = buildClassSerialDescriptor("QueryData") {
     element<String>("query")
@@ -40,7 +40,10 @@ class QueryDataSerializer: KSerializer<QueryData> {
     return queryData
   }
 
-  override fun serialize(encoder: Encoder, value: QueryData) {
+  override fun serialize(
+    encoder: Encoder,
+    value: QueryData
+  ) {
     error("Serialization is not supported")
   }
 }

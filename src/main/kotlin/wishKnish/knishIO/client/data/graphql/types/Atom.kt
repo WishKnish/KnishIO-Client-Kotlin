@@ -1,4 +1,5 @@
 @file:JvmName("Atom")
+
 package wishKnish.knishIO.client.data.graphql.types
 
 import kotlinx.serialization.Serializable
@@ -6,7 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-@Serializable data class Atom @JvmOverloads constructor (
+@Serializable data class Atom @JvmOverloads constructor(
   @JvmField val molecule: Molecule,
   @JvmField val molecularHash: String,
   @JvmField val position: String? = null,
@@ -23,7 +24,7 @@ import kotlinx.serialization.json.Json
   @JvmField val metas: List<Meta> = listOf(),
   @JvmField val otsFragment: String,
   @JvmField val createdAt: String
-): IGraphql {
+) : IGraphql {
   companion object {
     private val jsonFormat: Json
       get() = Json {

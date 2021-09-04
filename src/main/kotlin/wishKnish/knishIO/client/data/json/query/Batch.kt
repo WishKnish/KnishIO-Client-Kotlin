@@ -1,10 +1,11 @@
 @file:JvmName("Batch")
+
 package wishKnish.knishIO.client.data.json.query
 
 import kotlinx.serialization.Serializable
 import wishKnish.knishIO.client.data.json.variables.BatchVariable
 
-@Serializable data class Batch(@JvmField val variables: BatchVariable): QueryInterface {
+@Serializable data class Batch(@JvmField val variables: BatchVariable) : QueryInterface {
   companion object {
     @JvmStatic
     fun getFields(): String {
@@ -66,9 +67,9 @@ import wishKnish.knishIO.client.data.json.variables.BatchVariable
   override val query = """
     query( ${'$'}batchId: String ) {
       Batch( batchId: ${'$'}batchId ) {
-        ${ getFields() },
+        ${getFields()},
         children {
-          ${ getFields() }
+          ${getFields()}
         }
       }
     }

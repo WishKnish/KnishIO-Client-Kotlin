@@ -1,4 +1,5 @@
 @file:JvmName("Response")
+
 package wishKnish.knishIO.client.response
 
 import wishKnish.knishIO.client.data.json.response.IResponse as JsonIResponse
@@ -9,7 +10,11 @@ import kotlin.jvm.Throws
 import kotlin.reflect.full.memberProperties
 
 
-abstract class Response(@JvmField val query: Query, json: String, @JvmField val dataKey: String): IResponse {
+abstract class Response(
+  @JvmField val query: Query,
+  json: String,
+  @JvmField val dataKey: String
+) : IResponse {
   @JvmField var errorKey = "exception"
   @JvmField var response: JsonIResponse
   @JvmField var originResponse = ""
@@ -26,7 +31,7 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
     }
 
     if (response.errors.isEmpty()) {
-      var data:Any? = response
+      var data: Any? = response
 
       for (key in dataKey.split(".")) {
         data = getResponseData(data, key)
@@ -39,7 +44,10 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
   }
 
   @Throws(InvalidResponseException::class)
-  protected fun getResponseData(data: Any?, key: String): Any? {
+  protected fun getResponseData(
+    data: Any?,
+    key: String
+  ): Any? {
     if (data == null) {
       throw InvalidResponseException("Response does not match the key.")
     }
@@ -48,8 +56,8 @@ abstract class Response(@JvmField val query: Query, json: String, @JvmField val 
 
     return when {
       property != null -> property.call(data)
-      data is Map<*,*> && data.containsKey(key) -> data[key]
-      data is List<*> && key.all { it in '0'..'9' }  -> data[key.toInt()]
+      data is Map<*, *> && data.containsKey(key) -> data[key]
+      data is List<*> && key.all { it in '0'..'9' } -> data[key.toInt()]
       data is Set<*> && key.all { it in '0'..'9' } -> data.toList()[key.toInt()]
       else -> throw InvalidResponseException("Response does not match the key.")
     }
