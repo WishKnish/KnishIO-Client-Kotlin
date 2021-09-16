@@ -50,7 +50,6 @@ License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.encodeToString
-import wishKnish.knishIO.client.data.Clients
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.data.graphql.types.*
 import wishKnish.knishIO.client.data.json.variables.*
@@ -59,7 +58,6 @@ import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.mutation.*
 import wishKnish.knishIO.client.query.*
 import wishKnish.knishIO.client.response.*
-import wishKnish.knishIO.client.response.IResponseRequestAuthorization
 import java.net.URI
 import kotlin.reflect.KClass
 import kotlin.reflect.full.primaryConstructor
@@ -77,10 +75,11 @@ class KnishIOClient @JvmOverloads constructor(
   @JvmField val logging: Boolean = false,
   encrypt: Boolean = false
 ) {
-  @JvmField var clients = mutableMapOf<String, Clients?>()
-  @JvmField var authProcess: Boolean = false
-  @JvmField val client = HttpClient(getRandomUri())
-  @JvmField var secret = ""
+  @JvmField var authTokenObjects = mutableMapOf<String, AuthToken?>()
+  private var authToken: AuthToken? = null
+  @JvmField var authInProcess: Boolean = false
+  private val client = HttpClient(getRandomUri())
+  private var secret = ""
   @JvmField var bundle = ""
   @JvmField var remainderWallet: Wallet? = null
   @JvmField var cellSlug: String? = null
@@ -97,12 +96,26 @@ class KnishIOClient @JvmOverloads constructor(
 
   init {
     uris.forEach {
-      clients[it.toASCIIString()] = null
+      authTokenObjects[it.toASCIIString()] = null
     }
 
     if (encrypt) {
       enableEncryption()
     }
+  }
+
+  private fun switchEncryption(encrypt: Boolean): Boolean {
+    if(hasEncryption() == encrypt) {
+      return false
+    }
+
+    if(encrypt) {
+      enableEncryption()
+    }
+    else {
+      disableEncryption()
+    }
+    return true
   }
 
   /**
@@ -160,17 +173,17 @@ class KnishIOClient @JvmOverloads constructor(
    * Returns the HTTP client class session
    */
   fun client(): HttpClient {
-    if (! authProcess) {
+    if (! authInProcess) {
       val randomUri = getRandomUri()
       client.setUri(randomUri)
 
       // Try to get stored auth token object
-      val authDataObj = clients[randomUri.toASCIIString()]
+      val authDataObj = authTokenObjects[randomUri.toASCIIString()]
 
       // Not authorized - try to do it
       authDataObj?.let {
-        client.setAuthData(it)
-      } ?: requestAuthToken(secret = secret(), cellSlug = cellSlug(), encrypt = client.encrypt)
+        client.setAuthData(it.getAuthData())
+      } ?: authorize(getSecret(), cellSlug(), client.encrypt)
     }
 
     return client
@@ -186,7 +199,7 @@ class KnishIOClient @JvmOverloads constructor(
   /**
    * Set the client's secret
    */
-  fun secret(value: String) {
+  fun setSecret(value: String) {
     secret = value
     bundle = Crypto.generateBundleHash(value)
   }
@@ -195,9 +208,9 @@ class KnishIOClient @JvmOverloads constructor(
    * Retrieves the stored secret for this session
    */
   @Throws(UnauthenticatedException::class)
-  fun secret(): String {
+  fun getSecret(): String {
     if (secret.isEmpty()) {
-      throw UnauthenticatedException("KnishIOClient::secret() - Unable to find a stored secret!")
+      throw UnauthenticatedException("KnishIOClient::getSecret() - Unable to find a stored secret!")
     }
     return secret
   }
@@ -236,61 +249,71 @@ class KnishIOClient @JvmOverloads constructor(
     secret: String? = null,
     seed: String? = null,
     cellSlug: String? = null,
-    encrypt: Boolean? = null
-  ): IResponseRequestAuthorization {
-    authProcess = true
-    val guestMode = (seed == null) && (seed == secret)
-    val enc = encrypt ?: hasEncryption()
-    val response: IResponseRequestAuthorization
-    val query: Query
+    encrypt: Boolean = false
+  ): AuthToken {
+    val _secret = secret ?: seed?.let { Crypto.generateSecret(it) }
+    val slug = cellSlug ?: cellSlug()
 
-    // Do we have a seed we need to hash?
-    seed?.let {
-      secret(Crypto.generateSecret(it))
-    } ?: secret?.let {
-      // Do we have a secret pre-hashed?
-      secret(it)
+    return authorize(_secret, slug, encrypt)
+  }
+
+  fun setAuthToken(authToken: AuthToken) {
+    authTokenObjects[uri()] = authToken
+    client().setAuthData(authToken.getAuthData())
+    this.authToken = authToken
+  }
+
+  fun getAuthToken(): AuthToken? {
+    return authToken
+  }
+
+  fun setCellSlug(cellSlug: String?) {
+    this.cellSlug = cellSlug
+  }
+
+  private fun getGuestAuthToken(cellSlug: String?, encrypt: Boolean = false): AuthToken {
+    setCellSlug(cellSlug)
+
+    val wallet = Wallet(Crypto.generateSecret(), "AUTH")
+    val query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
+    val response = query.execute(AccessTokenMutationVariable(this.cellSlug, wallet.pubkey, encrypt)) as ResponseRequestAuthorizationGuest
+
+    return AuthToken.create(response.payload()!!, wallet, encrypt)
+  }
+
+  private fun getProfileAuthToken(secret: String, encrypt: Boolean = false): AuthToken {
+    setSecret(secret)
+
+    val wallet = Wallet(secret, "AUTH")
+    val molecule = createMolecule(secret, wallet)
+    val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
+
+    query.fillMolecule(listOf(MetaData("encrypt", if (encrypt) "true" else "false")))
+
+    val response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
+
+    return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
+  }
+
+  @JvmOverloads
+  fun authorize(
+    secret: String? = null,
+    cellSlug: String? = null,
+    encrypt: Boolean = false
+  ): AuthToken {
+    authInProcess = true
+
+    val authToken = when (secret) {
+      null -> getGuestAuthToken(cellSlug, encrypt)
+      else -> getProfileAuthToken(secret, encrypt)
     }
 
-    cellSlug?.let {
-      this.cellSlug = it
-    }
+    setAuthToken(authToken)
+    switchEncryption(encrypt)
 
-    if (guestMode) {
-      val authorizationWallet = Wallet(Crypto.generateSecret(), "AUTH")
-      query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
-      query.setAuthorizationWallet(authorizationWallet)
-      response = query.execute(
-        AccessTokenMutationVariable(
-          this.cellSlug,
-          authorizationWallet.pubkey,
-          enc
-        )
-      ) as ResponseRequestAuthorizationGuest
-    } else {
-      val molecule = createMolecule(secret(), Wallet(secret(), "AUTH"))
-      query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
-      query.fillMolecule(listOf(MetaData("encrypt", if (enc) "true" else "false")))
-      response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
-    }
+    authInProcess = false
 
-    if (response.success()) {
-      val authObj = Clients(
-        response.token(), response.pubKey(), response.wallet()
-      )
-
-      if (hasEncryption() != response.encrypt()) {
-        if (response.encrypt()) enableEncryption() else disableEncryption()
-      }
-
-      client.setAuthData(authObj)
-      clients[uri()] = authObj
-      authProcess = false
-    } else {
-      throw UnauthenticatedException(response.reason() ?: "Authorization token missing or invalid.")
-    }
-
-    return response
+    return authToken
   }
 
   /**
@@ -326,7 +349,7 @@ class KnishIOClient @JvmOverloads constructor(
     sourceWallet: Wallet? = null,
     remainderWallet: Wallet? = null
   ): Molecule {
-    val currentSecret = secret ?: secret()
+    val currentSecret = secret ?: getSecret()
     var signingWallet = sourceWallet
 
     // Sets the source wallet as the last remainder wallet (to maintain ContinuID)
@@ -353,7 +376,7 @@ class KnishIOClient @JvmOverloads constructor(
    * Retrieves this session's wallet used for signing the next Molecule
    */
   fun sourceWallet(): Wallet {
-    return queryContinuId(bundle()).payload() ?: Wallet(secret())
+    return queryContinuId(bundle()).payload() ?: Wallet(getSecret())
   }
 
   /**
@@ -567,7 +590,7 @@ class KnishIOClient @JvmOverloads constructor(
    * Builds and executes a molecule to issue a new Wallet on the ledger
    */
   fun createWallet(token: String): ResponseProposeMolecule {
-    val newWallet = Wallet(secret(), token)
+    val newWallet = Wallet(getSecret(), token)
     val query = createMoleculeMutation(MutationCreateWallet::class) as MutationCreateWallet
 
     query.fillMolecule(newWallet)
@@ -627,7 +650,7 @@ class KnishIOClient @JvmOverloads constructor(
     }
 
     // Creating the wallet that will receive the new tokens
-    val recipientWallet = Wallet(secret(), token, newOrExistingBatchId)
+    val recipientWallet = Wallet(getSecret(), token, newOrExistingBatchId)
     val query = createMoleculeMutation(MutationCreateToken::class) as MutationCreateToken
 
     query.fillMolecule(recipientWallet, tokenAmount, meta)
@@ -645,7 +668,7 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf()
   ): ResponseProposeMolecule {
     val query = createMoleculeMutation(
-      MutationCreateMeta::class, createMolecule(secret(), sourceWallet())
+      MutationCreateMeta::class, createMolecule(getSecret(), sourceWallet())
     ) as MutationCreateMeta
 
     query.fillMolecule(metaType, metaId, meta)
@@ -825,7 +848,7 @@ class KnishIOClient @JvmOverloads constructor(
     } ?: recipient.initBatchId(signingWallet)
 
     remainderWallet = Wallet.create(
-      secret(), token, characters = signingWallet.characters
+      getSecret(), token, characters = signingWallet.characters
     )
 
     remainderWallet !!.initBatchId(signingWallet, true)
@@ -874,7 +897,7 @@ class KnishIOClient @JvmOverloads constructor(
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
     val signingWallet = sourceWallet ?: queryBalance(token).payload()
-    val remainderWallet = Wallet.create(secret(), token, characters = sourceWallet !!.characters)
+    val remainderWallet = Wallet.create(getSecret(), token, characters = sourceWallet !!.characters)
     var burnAmount = amount
 
     remainderWallet.initBatchId(signingWallet !!, true)

@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
   @JvmField val token: String,
   @JvmField val time: Int,
   @JvmField val key: String,
+  @JvmField val pubkey: String,
   @JvmField val encrypt: Boolean? = null,
   @JvmField val expiresAt: Int
 ) : IGraphql {

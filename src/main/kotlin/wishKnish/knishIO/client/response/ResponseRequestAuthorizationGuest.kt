@@ -2,7 +2,6 @@
 
 package wishKnish.knishIO.client.response
 
-import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.graphql.types.AccessToken
 import wishKnish.knishIO.client.data.json.response.mutation.accessToken.AccessTokenResponse
 import wishKnish.knishIO.client.exception.InvalidResponseException
@@ -43,10 +42,6 @@ class ResponseRequestAuthorizationGuest(
   @Throws(InvalidResponseException::class)
   override fun pubKey(): String {
     return payload()?.key ?: throw InvalidResponseException("ResponseAuthorizationGuest::pubKey() - 'pubKey' key is not found in the payload!")
-  }
-
-  override fun wallet(): Wallet {
-    return (query() as MutationRequestAuthorizationGuest).wallet as Wallet
   }
 
   override fun encrypt(): Boolean {

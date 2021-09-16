@@ -17,7 +17,7 @@ class ResponseRequestAuthorization(
     initialization()
   }
 
-  override fun wallet(): Wallet {
+  fun wallet(): Wallet {
     return clientMolecule() !!.sourceWallet
   }
 

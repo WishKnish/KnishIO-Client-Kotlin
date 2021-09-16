@@ -14,11 +14,9 @@ fun main(args: Array<String>) {
   val client = KnishIOClient(listOf(URI("http://knishnode.knishio/graphql")), encrypt = false)
 
   println("requestAuthToken")
-  val authToken = client.requestAuthToken(seed = secret)
-  when {
-    authToken.success() -> println(authToken.token())
-    else -> println(authToken.status())
-  }
+  val authToken = client.requestAuthToken(secret)
+  println(authToken.getToken())
+  println(authToken.getExpireInterval())
   println()
 
   println("queryBalance")

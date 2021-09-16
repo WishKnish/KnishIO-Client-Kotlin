@@ -74,7 +74,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonObject
 import wishKnish.knishIO.client.Wallet
-import wishKnish.knishIO.client.data.Clients
+import wishKnish.knishIO.client.data.ClientTokenData
 import wishKnish.knishIO.client.data.QueryData
 import wishKnish.knishIO.client.data.json.query.CipherHash
 import wishKnish.knishIO.client.data.json.response.query.cipherHash.CipherHash as RCipherHash
@@ -179,7 +179,7 @@ class HttpClient @JvmOverloads constructor(
     return query(request)
   }
 
-  fun setAuthData(data: Clients) {
+  fun setAuthData(data: ClientTokenData) {
     pubkey = data.pubkey
     wallet = data.wallet
     authToken = data.token

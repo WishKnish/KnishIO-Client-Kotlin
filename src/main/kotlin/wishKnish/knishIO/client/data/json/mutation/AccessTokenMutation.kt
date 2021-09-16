@@ -14,6 +14,7 @@ import wishKnish.knishIO.client.data.json.variables.AccessTokenMutationVariable
         token,
         time,
         key,
+        pubkey,
         expiresAt,
         encrypt
       }
