@@ -2,7 +2,7 @@
 
 package wishKnish.knishIO.client.mutation
 
-import wishKnish.knishIO.client.data.json.mutation.AccessTokenMutation
+import wishKnish.knishIO.client.data.json.query.AccessTokenMutation
 import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.AccessTokenMutationVariable
 import wishKnish.knishIO.client.data.json.variables.IVariable

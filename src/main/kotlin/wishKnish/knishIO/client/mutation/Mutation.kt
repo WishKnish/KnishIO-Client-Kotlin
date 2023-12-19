@@ -5,7 +5,7 @@ package wishKnish.knishIO.client.mutation
 import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.query.Query
-import wishKnish.knishIO.client.data.json.mutation.Mutation
+import wishKnish.knishIO.client.data.json.query.Mutation
 import wishKnish.knishIO.client.data.json.variables.IVariable
 import wishKnish.knishIO.client.response.IResponse
 

@@ -50,7 +50,6 @@ License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 package wishKnish.knishIO.client
 
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.libraries.*
 import wishKnish.knishIO.client.data.graphql.types.TokenUnit
@@ -148,7 +147,7 @@ class Wallet @JvmOverloads constructor(
     fun generatePrivateKey(
       secret: String,
       token: String,
-      position: String
+      position: String?
     ): String {
 
       // Converting secret to bigInt

@@ -56,7 +56,7 @@ import wishKnish.knishIO.client.data.json.variables.IVariable
 import wishKnish.knishIO.client.response.IResponse
 
 
-abstract class Query(httpClient: HttpClient) : IQuery {
+abstract class  Query(httpClient: HttpClient) : IQuery {
   @JvmField val client = httpClient
   @JvmField var variables: IVariable? = null
   @JvmField var query: QueryInterface? = null

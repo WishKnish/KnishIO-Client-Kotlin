@@ -1,9 +1,8 @@
 @file:JvmName("MoleculeMutation")
 
-package wishKnish.knishIO.client.data.json.mutation
+package wishKnish.knishIO.client.data.json.query
 
 import kotlinx.serialization.Serializable
-import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
 
 @Serializable data class MoleculeMutation(@JvmField val variables: MoleculeMutationVariable) : QueryInterface {

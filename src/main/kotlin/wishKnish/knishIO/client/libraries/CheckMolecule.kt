@@ -374,7 +374,7 @@ class CheckMolecule {
         if (remainder != sum) {
           throw TransferRemainderException()
         }
-      } ?: if (value != 0.0) throw TransferRemainderException() // No sourceWallet, but have a remainder?
+      } ?: if (value != 0.0) throw TransferRemainderException() else return true // No sourceWallet, but have a remainder?
 
       // Looks like we passed all the tests!
       return true
@@ -386,6 +386,8 @@ class CheckMolecule {
     )
     fun molecularHash(molecule: Molecule): Boolean {
       missing(molecule)
+      println(molecule.molecularHash)
+      println(Atom.hashAtoms(atoms = molecule.atoms))
       if (molecule.molecularHash != Atom.hashAtoms(atoms = molecule.atoms)) {
         throw MolecularHashMismatchException()
       }

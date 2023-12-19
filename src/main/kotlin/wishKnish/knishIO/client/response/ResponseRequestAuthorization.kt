@@ -42,14 +42,14 @@ class ResponseRequestAuthorization(
   }
 
   override fun time(): Int {
-    return payload?.time ?: throw InvalidResponseException("ResponseRequestAuthorization::token() - response missing time")
+    return payload?.time ?: throw InvalidResponseException("ResponseRequestAuthorization::time() - response missing time")
   }
 
   override fun encrypt(): Boolean {
-    return payload?.encrypt ?: throw InvalidResponseException("ResponseRequestAuthorization::token() - response missing encrypt")
+    return payload?.encrypt ?: throw InvalidResponseException("ResponseRequestAuthorization::encrypt() - response missing encrypt")
   }
 
   override fun pubKey(): String {
-    return payload?.key ?: throw InvalidResponseException("ResponseRequestAuthorization::token() - response missing key")
+    return payload?.key ?: throw InvalidResponseException("ResponseRequestAuthorization::pubKey() - response missing key")
   }
 }

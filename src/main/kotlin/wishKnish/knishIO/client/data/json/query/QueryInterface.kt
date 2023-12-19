@@ -2,6 +2,9 @@
 
 package wishKnish.knishIO.client.data.json.query
 
-interface QueryInterface {
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed interface QueryInterface {
   val query: String
 }

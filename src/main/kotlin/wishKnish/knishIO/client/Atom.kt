@@ -73,7 +73,8 @@ import kotlin.jvm.Throws
   @JvmField var meta: List<MetaData> = mutableListOf(),
   @JvmField var otsFragment: String? = null,
   @JvmField var index: Int = 0,
-  @JvmField val createdAt: String = Strings.currentTimeMillis()
+  @JvmField val createdAt: String = Strings.currentTimeMillis(),
+  @JvmField val version: String? = null
 ) {
 
   companion object {
@@ -96,6 +97,19 @@ import kotlin.jvm.Throws
         encodeDefaults = true
         ignoreUnknownKeys = true
       }
+
+    @JvmStatic
+    public fun create(
+      isotope: Char,
+      wallet: Wallet? = null,
+      value: String? = null,
+      metaType: String? = null,
+      metaId: String? = null,
+      meta: List<MetaData> = mutableListOf(),
+
+    ) {
+
+    }
 
     /**
      * Populates and returns a schema object according to hash priority list
@@ -122,6 +136,10 @@ import kotlin.jvm.Throws
     @JvmStatic
     fun jsonToObject(json: String): Atom {
       return jsonFormat.decodeFromString(json)
+    }
+
+    fun jsonSerialization(): String {
+      return jsonFormat.encodeToString(this)
     }
 
     /**
@@ -208,6 +226,34 @@ import kotlin.jvm.Throws
         else -> null
       }
     }
+  }
+
+  private fun getHashableValues(): List<String> {
+    val hashableValues = mutableListOf<String>()
+
+    molecularHashSchema(this).forEach { (property, value) ->
+      if (value == null && property !in arrayListOf("position", "walletAddress")) {
+        return@forEach
+      }
+
+      // Hashing individual meta keys and values
+      if (property == "meta") {
+        @Suppress("UNCHECKED_CAST") (value as List<MetaData>).forEach {
+          it.value?.run {
+            hashableValues.add(it.key)
+            hashableValues.add(this)
+          }
+        }
+
+        return@forEach
+      }
+
+      val content = value ?: ""
+
+      hashableValues.add(content.toString())
+    }
+
+    return hashableValues.toList()
   }
 
   fun toJson(): String {

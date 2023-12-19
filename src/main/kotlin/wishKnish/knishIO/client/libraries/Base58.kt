@@ -2,8 +2,8 @@ package wishKnish.knishIO.client.libraries
 
 import java.util.*
 
-class Base58(characters: String = "GMP") {
-  var alphabet = Alphabet.valueOf("GMP").value
+class Base58(private var characters: String = "BASE64") {
+  var alphabet = Alphabet.valueOf("BASE64").value
   private val encodedZero = alphabet[0]
   private val indexes = IntArray(128)
 
@@ -12,7 +12,8 @@ class Base58(characters: String = "GMP") {
     RIPPLE("rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz".toCharArray()),
     FLICKR("123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray()),
     BITCOIN("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toCharArray()),
-    GMP("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv".toCharArray())
+    GMP("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv".toCharArray()),
+    BASE64("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray())
   }
 
   init {
@@ -43,6 +44,11 @@ class Base58(characters: String = "GMP") {
     if (incoming.isEmpty()) {
       return ""
     }
+
+    if (characters.equals("BASE64", ignoreCase = true)) {
+      return Base64.getEncoder().encodeToString(input)
+    }
+
     // Count leading zeros.
     var zeros = 0
     while ((zeros < incoming.size) && (incoming[zeros] == 0.toByte())) {
@@ -82,6 +88,11 @@ class Base58(characters: String = "GMP") {
     if (input.isEmpty()) {
       return ByteArray(0)
     }
+
+    if (characters.equals("BASE64", ignoreCase = true)) {
+      return Base64.getDecoder().decode(input)
+    }
+
     // Convert the base58-encoded ASCII chars to a base58 byte sequence (base58 digits).
     val input58 = ByteArray(input.length)
     for (i in input.indices) {

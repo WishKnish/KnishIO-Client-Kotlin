@@ -3,4 +3,5 @@
 vendor/
 build/
 gradle/
+out/
 src/main/kotlin/main.kt

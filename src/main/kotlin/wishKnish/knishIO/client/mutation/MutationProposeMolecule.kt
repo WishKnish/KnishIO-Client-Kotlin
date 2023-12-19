@@ -4,7 +4,7 @@ package wishKnish.knishIO.client.mutation
 
 import wishKnish.knishIO.client.Molecule
 import wishKnish.knishIO.client.Wallet
-import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
+import wishKnish.knishIO.client.data.json.query.MoleculeMutation
 import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
 import wishKnish.knishIO.client.data.json.variables.IVariable

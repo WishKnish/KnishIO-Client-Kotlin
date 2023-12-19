@@ -155,7 +155,7 @@ import kotlin.reflect.full.memberProperties
         molecule
       ) && CheckMolecule.continuId(molecule) && CheckMolecule.isotopeM(molecule) && CheckMolecule.isotopeT(molecule) && CheckMolecule.isotopeC(
         molecule
-      ) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeR(molecule) && CheckMolecule.isotopeV(
+      ) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeV(
         molecule, sourceWallet
       )
     }
@@ -682,6 +682,7 @@ import kotlin.reflect.full.memberProperties
   @JvmOverloads
   @Throws(AtomsMissingException::class, IllegalArgumentException::class)
   fun sign(
+    inputBundle: String? = null,
     anonymous: Boolean = false,
     compressed: Boolean = true
   ): String? {
@@ -696,8 +697,8 @@ import kotlin.reflect.full.memberProperties
     }
 
     // Derive the user's bundle
-    if (! anonymous) {
-      bundle = Crypto.generateBundleHash(secret)
+    if (! anonymous && this.bundle.isNullOrEmpty()) {
+      bundle = inputBundle ?: Crypto.generateBundleHash(secret)
     }
 
     // Hash atoms to get molecular hash

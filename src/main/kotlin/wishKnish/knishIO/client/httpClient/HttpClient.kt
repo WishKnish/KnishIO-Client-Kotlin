@@ -56,10 +56,10 @@ import graphql.parser.InvalidSyntaxException
 import graphql.parser.Parser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.*
-import io.ktor.client.features.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.json.serializer.*
-import io.ktor.client.features.logging.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.content.*
@@ -71,8 +71,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonObject
+import io.ktor.serialization.kotlinx.cbor.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.*
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.ClientTokenData
 import wishKnish.knishIO.client.data.QueryData
@@ -97,7 +99,7 @@ class HttpClient @JvmOverloads constructor(
   @JvmField var authToken = ""
   @JvmField var pubkey: String? = null
   @JvmField var wallet: Wallet? = null
-  val client: HttpClient
+  @OptIn(ExperimentalSerializationApi::class) val client: HttpClient
     get() = HttpClient(CIO) {
       expectSuccess = false
       engine {
@@ -116,11 +118,14 @@ class HttpClient @JvmOverloads constructor(
       install(UserAgent) {
         agent = "KnishIO/0.1"
       }
-      install(JsonFeature) {
-        serializer = KotlinxSerializer(KotlinJson {
+      install(ContentNegotiation) {
+        json (KotlinJson {
           encodeDefaults = true
           ignoreUnknownKeys = true
           coerceInputValues = true
+        })
+        cbor(Cbor {
+          ignoreUnknownKeys = true
         })
       }
       install(Logging) {
@@ -159,11 +164,11 @@ class HttpClient @JvmOverloads constructor(
             append("X-Auth-Token", authToken)
           }
           contentType(ContentType.Application.Json)
-          body = request
+          setBody(request)
         }
       }
 
-      response.readText()
+      response.bodyAsText()
     }
 
     return completable.get()
@@ -227,7 +232,7 @@ class HttpClient @JvmOverloads constructor(
       }
 
       val cipherHash = CipherHash(CipherHashVariable(wallet().encryptString(body.text, pubkey())))
-      context.body = TextContent(cipherHash.toJson(), body.contentType, body.status)
+      context.setBody(TextContent(cipherHash.toJson(), body.contentType, body.status))
 
       proceedWith(context.body)
     }
@@ -240,16 +245,17 @@ class HttpClient @JvmOverloads constructor(
     client.responsePipeline.intercept(HttpResponsePipeline.Receive) { (type, content) ->
       if (content !is ByteReadChannel) return@intercept
 
+      val decodeJson =  KotlinJson {
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+      }
       val byteArray = ByteArray(content.availableForRead)
       content.readAvailable(byteArray)
       var result = ByteReadChannel(byteArray)
 
       RCipherHash.jsonToObject(byteArray.toString(Charsets.UTF_8)).data?.CipherHash?.hash?.let {
-        val message = KotlinJson {
-          isLenient = true
-          coerceInputValues = true
-          encodeDefaults = true
-        }.decodeFromString<Map<String, String>>(it)
+        val message = decodeJson.decodeFromString<Map<String, String>>(it)
 
         wallet().decryptMyMessage(message)?.let { decrypt ->
           val preform = when (decrypt) {
