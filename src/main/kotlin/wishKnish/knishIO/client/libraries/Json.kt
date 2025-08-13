@@ -19,16 +19,16 @@ private fun JsonObject.toMap(): Map<String, *> = keys.asSequence().associateWith
 
 
 private fun JsonArray.toList(): List<Any?> = map {
-  when (val value = it) {
+  when (it) {
     is JsonArray -> {
-      val map = (0 until value.size).associate { _ ->
+      val map = (0 until it.size).associate { _ ->
         Pair(it.toString(), it)
       }
       JsonObject(map).toMap().values.toList()
     }
-    is JsonObject -> value.toMap()
+    is JsonObject -> it.toMap()
     is JsonNull -> null
-    else -> value
+    else -> it
   }
 }
 

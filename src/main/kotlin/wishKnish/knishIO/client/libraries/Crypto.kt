@@ -14,7 +14,7 @@ class Crypto {
     @Throws(IllegalArgumentException::class)
     fun hashShare(
       key: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): String {
       return Soda(characters).shortHash(key)
     }
@@ -24,7 +24,7 @@ class Crypto {
     @Throws(IllegalArgumentException::class, NumberFormatException::class)
     fun generateEncPublicKey(
       privateKey: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): String {
       return Soda(characters).generatePublicKey(privateKey)
     }
@@ -34,7 +34,7 @@ class Crypto {
     @Throws(IllegalArgumentException::class)
     fun generateEncPrivateKey(
       key: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): String {
       return Soda(characters).generatePrivateKey(key)
     }
@@ -45,7 +45,7 @@ class Crypto {
     fun <T : Collection<*>> encryptMessage(
       message: T,
       recipientPublicKey: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): String {
       return Soda(characters).encrypt(message, recipientPublicKey)
     }
@@ -56,7 +56,7 @@ class Crypto {
     fun encryptMessage(
       message: String,
       recipientPublicKey: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): String {
       return Soda(characters).encrypt(message, recipientPublicKey)
     }
@@ -70,7 +70,7 @@ class Crypto {
       message: String,
       privateKey: String,
       publicKey: String,
-      characters: String = "GMP"
+      characters: String = "BASE64"
     ): Any? {
       return Soda(characters).decrypt(message, privateKey, publicKey)
     }
@@ -89,7 +89,7 @@ class Crypto {
     ): String {
       return when (seed) {
         null -> Strings.randomString(length)
-        else -> Shake256.hash(seed, length / 4)
+        else -> Shake256.hash(seed, length / 2)
       }
     }
 
@@ -111,7 +111,21 @@ class Crypto {
     @JvmOverloads
     @Throws(NoSuchElementException::class)
     fun generateWalletPosition(saltLength: Int = 64): String {
-      return Strings.randomString(saltLength)
+      // Use hex alphabet to match JavaScript implementation
+      return Strings.randomString(saltLength, "abcdef0123456789")
+    }
+
+    /**
+     * SHAKE256 hash function
+     * 
+     * @param input The input string to hash
+     * @param outputLength The desired output length in bits
+     * @return The hex-encoded hash
+     */
+    @JvmStatic
+    fun shake256(input: String, outputLength: Int): String {
+      // Convert bits to bytes (outputLength is in bits, Shake256.hash expects bytes)
+      return Shake256.hash(input, outputLength / 8)
     }
   }
 }

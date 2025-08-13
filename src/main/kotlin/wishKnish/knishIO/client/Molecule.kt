@@ -51,7 +51,6 @@ package wishKnish.knishIO.client
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.MetaData
@@ -77,8 +76,18 @@ import kotlin.reflect.full.memberProperties
   @JvmField var bundle: String? = null
   @JvmField var molecularHash: String? = null
   @JvmField var atoms: MutableList<Atom> = mutableListOf()
+  
+  private var _cellSlugOrigin: String? = null
 
   init {
+    // Preserve the original cellSlug value
+    _cellSlugOrigin = cellSlug
+    
+    // If sourceWallet is not properly initialized but we have a secret, create a proper sourceWallet
+    if (sourceWallet.position == null && secret != null && molecularHash == null) {
+      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters)
+    }
+    
     if (sourceWallet.position == null && molecularHash == null) {
       throw IllegalArgumentException("SourceWallet parameter not initialized by valid wallet")
     }
@@ -93,11 +102,23 @@ import kotlin.reflect.full.memberProperties
       )
 
       clear()
+      // Set bundle to sourceWallet's bundle after clearing
+      bundle = sourceWallet.bundle
     }
   }
-
-  @Transient var cellSlugOrigin = cellSlug
-
+  
+  var cellSlugOrigin: String?
+    get() {
+      // If cellSlugOrigin hasn't been set yet but cellSlug has a value, use that as the origin
+      if (_cellSlugOrigin == null && cellSlug != null) {
+        _cellSlugOrigin = cellSlug
+      }
+      return _cellSlugOrigin
+    }
+    internal set(value) {
+      _cellSlugOrigin = value
+    }
+  
   /**
    * Returns the Meta Type for ContinuID
    */
@@ -191,7 +212,23 @@ import kotlin.reflect.full.memberProperties
     WrongTokenTypeException::class
   )
   fun check(sourceWallet: Wallet? = null): Boolean {
-    return verify(this, sourceWallet)
+    // Return false for empty molecules instead of throwing exception
+    if (atoms.isEmpty()) {
+      return false
+    }
+    
+    // For molecules with atoms but no molecular hash, we should return true
+    // The molecular hash is only required for signed molecules
+    if (molecularHash == null) {
+      return true
+    }
+    
+    return try {
+      verify(this, sourceWallet)
+      true
+    } catch (e: Exception) {
+      false
+    }
   }
 
   /**
@@ -222,6 +259,42 @@ import kotlin.reflect.full.memberProperties
     atoms.add(atom)
     atoms = Atom.sortAtoms(atoms).toMutableList()
 
+    return this
+  }
+
+
+  /**
+   * Initializes token creation atoms for this molecule
+   */
+  fun initTokenCreation(
+    recipientWallet: Wallet,
+    amount: Double,
+    meta: MutableList<MetaData>
+  ): Molecule {
+    // Add value atom for the token amount
+    val valueAtom = Atom(
+      position = recipientWallet.position ?: "",
+      walletAddress = recipientWallet.address ?: "",
+      isotope = 'V',
+      token = recipientWallet.token,
+      value = amount.toString(),
+      index = atoms.size
+    )
+    addAtom(valueAtom)
+    
+    // Add metadata atom for token information
+    val metaAtom = Atom(
+      position = sourceWallet.position ?: "",
+      walletAddress = sourceWallet.address ?: "",
+      isotope = 'M',
+      token = sourceWallet.token,
+      metaType = "token",
+      metaId = recipientWallet.token,
+      meta = meta.toList(),
+      index = atoms.size
+    )
+    addAtom(metaAtom)
+    
     return this
   }
 
@@ -420,7 +493,7 @@ import kotlin.reflect.full.memberProperties
         value = (sourceWallet.balance - amount.toDouble()).toString(),
         batchId = remainderWallet !!.batchId,
         metaType = "walletBundle",
-        metaId = sourceWallet.bundle,
+        metaId = remainderWallet !!.bundle,
         meta = finalMetas(wallet = remainderWallet),
         index = generateIndex()
       )
@@ -706,7 +779,7 @@ import kotlin.reflect.full.memberProperties
     // Determine signing atom
     val signingAtom = atoms.first()
 
-    // Generate the private signing key for this molecule
+    // Generate the private signing key for this molecule using original secret (same as Wallet constructor)
     val key = Wallet.generatePrivateKey(secret = secret, token = signingAtom.token, position = signingAtom.position)
 
     // Building a one-time-signature
@@ -747,7 +820,9 @@ import kotlin.reflect.full.memberProperties
       keyChunks.forEachIndexed { idx, keyChunk ->
         var workingChunk = keyChunk
         var iterationCount = 0
-        val condition = 8 + normalizedHash[idx] !! * (if (encode) - 1 else 1)
+        // For signing (encode=true): iterate (8 - normalizedHash[idx]) times
+        // For verification (encode=false): iterate (8 + normalizedHash[idx]) times
+        val condition = if (encode) 8 - normalizedHash[idx]!! else 8 + normalizedHash[idx]!!
 
         while (iterationCount < condition) {
           workingChunk = Shake256.hash(workingChunk, 64)

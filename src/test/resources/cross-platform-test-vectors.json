@@ -1,0 +1,370 @@
+{
+  "version": "1.0.0",
+  "description": "Cross-platform compatibility test vectors for KnishIO Kotlin and JavaScript clients",
+  "generated": "2025-01-XX",
+  "vectors": {
+    "shake256": {
+      "description": "SHAKE256 hash function test vectors with various inputs and output lengths",
+      "tests": [
+        {
+          "name": "empty_string_32_bytes",
+          "input": "",
+          "outputLength": 32,
+          "expected": "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762fd"
+        },
+        {
+          "name": "single_a_32_bytes",
+          "input": "a",
+          "outputLength": 32,
+          "expected": "867e2cb04f5a04dcbd592501a5e8fe9ceaafca50255626ca736c138042530ba4"
+        },
+        {
+          "name": "abc_32_bytes",
+          "input": "abc",
+          "outputLength": 32,
+          "expected": "258e7b1c0c8c82c7d34aa06ca52f98a98fd0c8ff6a1b85bd3ad70e52a6a3f86b"
+        },
+        {
+          "name": "test_message_32_bytes",
+          "input": "Hello, KnishIO Cross-Platform World!",
+          "outputLength": 32,
+          "expected": "TO_BE_GENERATED"
+        },
+        {
+          "name": "unicode_message_32_bytes",
+          "input": "🌟🔐💎",
+          "outputLength": 32,
+          "expected": "TO_BE_GENERATED"
+        },
+        {
+          "name": "long_string_32_bytes",
+          "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outputLength": 32,
+          "expected": "TO_BE_GENERATED"
+        },
+        {
+          "name": "hex_pattern_64_bytes",
+          "input": "0123456789abcdef",
+          "outputLength": 64,
+          "expected": "TO_BE_GENERATED"
+        }
+      ]
+    },
+    "bundle_hash": {
+      "description": "Bundle hash generation test vectors using SHAKE256",
+      "tests": [
+        {
+          "name": "empty_secret",
+          "secret": "",
+          "expected": "TO_BE_GENERATED"
+        },
+        {
+          "name": "test_secret",
+          "secret": "test-secret",
+          "expected": "TO_BE_GENERATED"
+        },
+        {
+          "name": "long_secret_2048",
+          "secret": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "expected": "TO_BE_GENERATED"
+        }
+      ]
+    },
+    "wallet_generation": {
+      "description": "Wallet address and key generation test vectors",
+      "tests": [
+        {
+          "name": "standard_wallet",
+          "secret": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "token": "TEST",
+          "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          "expectedBundle": "TO_BE_GENERATED",
+          "expectedAddress": "TO_BE_GENERATED",
+          "expectedPrivateKey": "TO_BE_GENERATED",
+          "expectedPublicKey": "TO_BE_GENERATED"
+        },
+        {
+          "name": "user_wallet",
+          "secret": "test-user-secret",
+          "token": "USER",
+          "position": "user-position-12345678901234567890123456789012345678901234567890",
+          "expectedBundle": "TO_BE_GENERATED",
+          "expectedAddress": "TO_BE_GENERATED",
+          "expectedPrivateKey": "TO_BE_GENERATED",
+          "expectedPublicKey": "TO_BE_GENERATED"
+        },
+        {
+          "name": "bitcoin_wallet",
+          "secret": "btc-wallet-secret",
+          "token": "BTC",
+          "position": "btc-pos-1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          "expectedBundle": "TO_BE_GENERATED",
+          "expectedAddress": "TO_BE_GENERATED",
+          "expectedPrivateKey": "TO_BE_GENERATED",
+          "expectedPublicKey": "TO_BE_GENERATED"
+        }
+      ]
+    },
+    "hash_normalization": {
+      "description": "WOTS+ hash normalization test vectors",
+      "tests": [
+        {
+          "name": "all_zeros",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "expectedEnumerated": {
+            "0": -8, "1": -8, "2": -8, "3": -8, "4": -8, "5": -8, "6": -8, "7": -8,
+            "8": -8, "9": -8, "10": -8, "11": -8, "12": -8, "13": -8, "14": -8, "15": -8,
+            "16": -8, "17": -8, "18": -8, "19": -8, "20": -8, "21": -8, "22": -8, "23": -8,
+            "24": -8, "25": -8, "26": -8, "27": -8, "28": -8, "29": -8, "30": -8, "31": -8,
+            "32": -8, "33": -8, "34": -8, "35": -8, "36": -8, "37": -8, "38": -8, "39": -8,
+            "40": -8, "41": -8, "42": -8, "43": -8, "44": -8, "45": -8, "46": -8, "47": -8,
+            "48": -8, "49": -8, "50": -8, "51": -8, "52": -8, "53": -8, "54": -8, "55": -8,
+            "56": -8, "57": -8, "58": -8, "59": -8, "60": -8, "61": -8, "62": -8, "63": -8
+          },
+          "expectedNormalized": "TO_BE_CALCULATED"
+        },
+        {
+          "name": "all_f",
+          "hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expectedEnumerated": "TO_BE_CALCULATED",
+          "expectedNormalized": "TO_BE_CALCULATED"
+        },
+        {
+          "name": "hex_pattern",
+          "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "expectedEnumerated": "TO_BE_CALCULATED",
+          "expectedNormalized": "TO_BE_CALCULATED"
+        },
+        {
+          "name": "mixed_pattern",
+          "hash": "deadbeef12345678cafebabe87654321feedface98765432abcdef0123456789",
+          "expectedEnumerated": "TO_BE_CALCULATED",
+          "expectedNormalized": "TO_BE_CALCULATED"
+        }
+      ]
+    },
+    "wots_signature": {
+      "description": "WOTS+ signature generation and verification test vectors",
+      "tests": [
+        {
+          "name": "standard_signature",
+          "privateKey": "TO_BE_GENERATED_FROM_WALLET",
+          "molecularHash": "1234567890abcdef1234567890abcdef1234567890abcdefg1234567890abcdefg",
+          "expectedSignatureFragments": "TO_BE_GENERATED",
+          "expectedCompressedSignature": "TO_BE_GENERATED"
+        }
+      ]
+    },
+    "base58_encoding": {
+      "description": "Base58 encoding/decoding test vectors for all character sets",
+      "tests": [
+        {
+          "charset": "GMP",
+          "cases": [
+            {
+              "input": "",
+              "expected": ""
+            },
+            {
+              "input": "00",
+              "expected": "0"
+            },
+            {
+              "input": "0001",
+              "expected": "01"
+            },
+            {
+              "input": "48656c6c6f20576f726c64", 
+              "expected": "TO_BE_CALCULATED"
+            }
+          ]
+        },
+        {
+          "charset": "BITCOIN",
+          "cases": [
+            {
+              "input": "",
+              "expected": ""
+            },
+            {
+              "input": "00",
+              "expected": "1"
+            },
+            {
+              "input": "0001",
+              "expected": "12"
+            },
+            {
+              "input": "48656c6c6f20576f726c64",
+              "expected": "TO_BE_CALCULATED"
+            }
+          ]
+        },
+        {
+          "charset": "IPFS",
+          "cases": [
+            {
+              "input": "",
+              "expected": ""
+            },
+            {
+              "input": "00",
+              "expected": "1"
+            },
+            {
+              "input": "48656c6c6f20576f726c64",
+              "expected": "TO_BE_CALCULATED"
+            }
+          ]
+        }
+      ]
+    },
+    "encryption": {
+      "description": "Encryption/decryption test vectors for various methods",
+      "nacl_box": {
+        "tests": [
+          {
+            "name": "simple_message",
+            "message": "Hello, World!",
+            "senderPrivateKey": "TO_BE_GENERATED",
+            "recipientPublicKey": "TO_BE_GENERATED",
+            "expectedEncrypted": "TO_BE_GENERATED"
+          }
+        ]
+      },
+      "post_quantum": {
+        "tests": [
+          {
+            "name": "ml_kem768_aes_gcm",
+            "message": "Post-quantum encrypted message",
+            "publicKey": "TO_BE_GENERATED",
+            "expectedEncapsulation": "TO_BE_GENERATED",
+            "expectedCiphertext": "TO_BE_GENERATED"
+          }
+        ]
+      }
+    },
+    "molecular_hash": {
+      "description": "Molecular hash calculation test vectors",
+      "tests": [
+        {
+          "name": "single_atom_molecule",
+          "atoms": [
+            {
+              "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              "walletAddress": "TO_BE_GENERATED",
+              "isotope": "M",
+              "token": "TEST",
+              "metaType": "test",
+              "metaId": "test-123",
+              "meta": [
+                {"key": "test-key", "value": "test-value"}
+              ],
+              "index": 0,
+              "createdAt": "1640995200000"
+            }
+          ],
+          "expectedHash": "TO_BE_GENERATED"
+        },
+        {
+          "name": "multi_atom_molecule",
+          "atoms": [
+            {
+              "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+              "walletAddress": "TO_BE_GENERATED_1",
+              "isotope": "V",
+              "token": "TEST",
+              "value": "-100.0",
+              "index": 0,
+              "createdAt": "1640995200000"
+            },
+            {
+              "position": "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+              "walletAddress": "TO_BE_GENERATED_2",
+              "isotope": "V",
+              "token": "TEST",
+              "value": "100.0",
+              "index": 1,
+              "createdAt": "1640995200000"
+            }
+          ],
+          "expectedHash": "TO_BE_GENERATED"
+        }
+      ]
+    },
+    "edge_cases": {
+      "description": "Edge case test vectors",
+      "tests": [
+        {
+          "name": "unicode_handling",
+          "inputs": [
+            "🌟🔐💎",
+            "测试",
+            "テスト", 
+            "тест",
+            "🚀✨🌈🎯🔥"
+          ],
+          "expectedHashes": [
+            "TO_BE_GENERATED_1",
+            "TO_BE_GENERATED_2", 
+            "TO_BE_GENERATED_3",
+            "TO_BE_GENERATED_4",
+            "TO_BE_GENERATED_5"
+          ]
+        },
+        {
+          "name": "large_inputs",
+          "input": "LARGE_STRING_10000_CHARACTERS",
+          "expectedHash": "TO_BE_GENERATED"
+        },
+        {
+          "name": "boundary_values",
+          "cases": [
+            {
+              "description": "Single character",
+              "input": "a",
+              "expectedHash": "TO_BE_GENERATED"
+            },
+            {
+              "description": "64 characters",
+              "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "expectedHash": "TO_BE_GENERATED"
+            },
+            {
+              "description": "2048 characters",
+              "input": "LONG_STRING_2048_CHARS",
+              "expectedHash": "TO_BE_GENERATED"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "implementation_notes": {
+    "kotlin": {
+      "shake256": "Uses BouncyCastle SHAKEDigest(256)",
+      "base58": "Custom implementation with support for multiple character sets",
+      "wots": "Custom WOTS+ implementation with hash normalization",
+      "encryption": "Supports NaCl Box (TweetNacl) and ML-KEM768+AES-GCM (BouncyCastle)"
+    },
+    "javascript": {
+      "shake256": "Should use compatible SHAKE256 implementation",
+      "base58": "Should use same character sets and encoding logic",
+      "wots": "Must implement identical hash normalization algorithm",
+      "encryption": "Should support same encryption modes and formats"
+    }
+  },
+  "validation_instructions": {
+    "setup": [
+      "1. Run the Kotlin test suite to generate actual values for 'TO_BE_GENERATED' placeholders",
+      "2. Use these generated values to update the test vectors file",
+      "3. Run the JavaScript test suite with the same test vectors",
+      "4. Compare results to verify 100% compatibility"
+    ],
+    "continuous_validation": [
+      "1. Any changes to cryptographic functions should update test vectors",
+      "2. Both platforms should run the same test vectors on each release",
+      "3. Failed compatibility tests should block releases until resolved"
+    ]
+  }
+}

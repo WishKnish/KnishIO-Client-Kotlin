@@ -4,7 +4,7 @@ import java.util.*
 
 class Base58(characters: String = "GMP") {
   var alphabet = Alphabet.valueOf("GMP").value
-  private val encodedZero = alphabet[0]
+  private var encodedZero: Char = '0'
   private val indexes = IntArray(128)
 
   private enum class Alphabet(val value: CharArray) {
@@ -21,6 +21,7 @@ class Base58(characters: String = "GMP") {
     }
 
     alphabet = Alphabet.valueOf(characters).value
+    encodedZero = alphabet[0] // Initialize encodedZero after alphabet is set
 
     Arrays.fill(indexes, - 1)
     for (i in alphabet.indices) {

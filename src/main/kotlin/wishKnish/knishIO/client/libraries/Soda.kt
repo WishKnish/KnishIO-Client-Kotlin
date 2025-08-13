@@ -10,9 +10,10 @@ import com.google.gson.Gson
 import kotlinx.serialization.encodeToString
 import kotlin.jvm.Throws
 import kotlin.text.toByteArray
+import java.util.Base64
 
 
-class Soda(private val base: String = "GMP") {
+class Soda(private val base: String = "BASE64") {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -80,11 +81,17 @@ class Soda(private val base: String = "GMP") {
 
   @Throws(NumberFormatException::class, IllegalArgumentException::class)
   fun decode(data: String): ByteArray {
-    return Base58(this.base).decode(data)
+    return when (this.base) {
+      "BASE64" -> Base64.getDecoder().decode(data)
+      else -> Base58(this.base).decode(data)
+    }
   }
 
   @Throws(IllegalArgumentException::class)
   fun encode(data: ByteArray): String {
-    return Base58(this.base).encode(data)
+    return when (this.base) {
+      "BASE64" -> Base64.getEncoder().encodeToString(data)
+      else -> Base58(this.base).encode(data)
+    }
   }
 }

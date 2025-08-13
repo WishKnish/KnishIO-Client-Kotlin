@@ -21,7 +21,7 @@ class Shake256 {
       length: Int
     ): String {
       val shaked = SHAKEDigest(256)
-      val dataByteArray = data.toByteArray()
+      val dataByteArray = data.toByteArray(Charsets.UTF_8)
       val output = ByteArray(length)
 
       shaked.update(dataByteArray, 0, dataByteArray.size)
@@ -32,7 +32,7 @@ class Shake256 {
   }
 
   fun absorb(text: String): Shake256 {
-    val dataByteArray = text.toByteArray()
+    val dataByteArray = text.toByteArray(Charsets.UTF_8)
 
     digest.update(dataByteArray, 0, dataByteArray.size)
 

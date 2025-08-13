@@ -14,7 +14,7 @@ import wishKnish.knishIO.client.data.MetaData
   @JvmField val keys: List<String> = listOf(),
   @JvmField val value: String? = null,
   @JvmField val values: List<String> = listOf(),
-  @JvmField val keys_values: List<MetaData> = listOf(),
+  @JvmField val keysValues: List<MetaData> = listOf(),
   @JvmField val latest: Boolean? = null,
   @JvmField val limit: Int? = null,
   @JvmField val skip: Int? = null,

@@ -153,32 +153,36 @@ import kotlin.jvm.Throws
 
         molecularHashSchema(atom).forEach { (property, value) ->
 
-          // Old atoms support (without batch_id field)
-          if (value == null && property in arrayListOf("batchId", "pubkey", "characters")) {
-            return@forEach
-          }
-
-          // Hashing individual meta keys and values
-          if (property == "meta") {
-            @Suppress("UNCHECKED_CAST") (value as List<MetaData>).forEach { MetaData ->
-              MetaData.value?.run {
-                molecularSponge.absorb(MetaData.key)
-                molecularSponge.absorb(this)
-              }
+          // Skip null values for all properties except position and walletAddress
+          // This matches the JS implementation which only hashes non-null values
+          if (value == null) {
+            // For position and walletAddress, hash empty string when null
+            if (property in arrayListOf("position", "walletAddress")) {
+              molecularSponge.absorb("")
             }
             return@forEach
           }
 
-          if (property in arrayListOf("position", "walletAddress", "isotope")) {
-            val content = value ?: ""
-
-            molecularSponge.absorb(content.toString())
-
-            return@forEach
-          }
-
-          value?.run {
-            molecularSponge.absorb(toString())
+          // Handle different property types
+          when (property) {
+            "meta" -> {
+              // Hash individual meta keys and values
+              @Suppress("UNCHECKED_CAST") 
+              (value as List<MetaData>).forEach { metaData ->
+                metaData.value?.let {
+                  molecularSponge.absorb(metaData.key)
+                  molecularSponge.absorb(it)
+                }
+              }
+            }
+            "isotope" -> {
+              // Isotope is a Char, convert to String for hashing
+              molecularSponge.absorb(value.toString())
+            }
+            else -> {
+              // For all other properties, convert to string and hash
+              molecularSponge.absorb(value.toString())
+            }
           }
         }
       }

@@ -3,12 +3,11 @@
 package wishKnish.knishIO.client.data.json.response.query.balance
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Wallet
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var Balance: Wallet? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var balanceWallet: Wallet? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -19,8 +18,8 @@ import wishKnish.knishIO.client.data.graphql.types.Wallet
 
     @JvmStatic
     @JvmOverloads
-    fun create(Balance: Wallet? = null): Data {
-      return Data(Balance)
+    fun create(balanceWallet: Wallet? = null): Data {
+      return Data(balanceWallet)
     }
 
     @JvmStatic

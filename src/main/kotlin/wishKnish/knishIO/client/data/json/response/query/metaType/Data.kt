@@ -3,13 +3,12 @@
 package wishKnish.knishIO.client.data.json.response.query.metaType
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.MetaType
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var MetaType: List<MetaType>? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var metaTypes: List<MetaType>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -20,8 +19,8 @@ import wishKnish.knishIO.client.data.graphql.types.MetaType
 
     @JvmStatic
     @JvmOverloads
-    fun create(MetaType: List<MetaType>? = null): Data {
-      return Data(MetaType)
+    fun create(metaTypes: List<MetaType>? = null): Data {
+      return Data(metaTypes)
     }
 
     @JvmStatic

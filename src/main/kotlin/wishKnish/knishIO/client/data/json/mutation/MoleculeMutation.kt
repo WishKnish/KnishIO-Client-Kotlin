@@ -7,9 +7,9 @@ import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
 
 @Serializable data class MoleculeMutation(@JvmField val variables: MoleculeMutationVariable) : QueryInterface {
-  override val query = """
-        mutation(${'$'}molecule: MoleculeInput! ) {
-          ProposeMolecule( molecule: ${'$'}molecule ) {
+  override val query = $$"""
+        mutation($molecule: MoleculeInput! ) {
+          ProposeMolecule( molecule: $molecule ) {
             molecularHash,
             height,
             depth,
