@@ -351,6 +351,12 @@ class CheckMolecule {
         sum += value
 
       }
+      
+      // All atoms must sum to zero for a balanced transaction
+      if (sum != 0.0) {
+        throw TransferUnbalancedException()
+      }
+      
       // If we're provided with a sourceWallet argument, we can perform additional check
       sourceWallet?.let { wallet ->
         firstAtom.value?.let {
