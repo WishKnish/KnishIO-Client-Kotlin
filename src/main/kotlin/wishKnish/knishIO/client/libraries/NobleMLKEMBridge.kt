@@ -103,6 +103,16 @@ class NobleMLKEMBridge {
         }
         
         /**
+         * Generate seed using Noble SHAKE256 (identical to JavaScript SDK generateSecret)
+         */
+        fun generateSeed(input: String, lengthInBits: Int): String {
+            // Call JavaScript generateSecret function for deterministic compatibility
+            return nobleMLKEM.getMember("generateSecret")
+                .execute(input, lengthInBits)
+                .asString()
+        }
+        
+        /**
          * Encrypt message using ML-KEM + native AES-GCM
          */
         fun encryptMessage(publicKey: PublicKey, message: String): String {

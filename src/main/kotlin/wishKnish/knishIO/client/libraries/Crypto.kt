@@ -110,9 +110,22 @@ class Crypto {
     @JvmStatic
     @JvmOverloads
     @Throws(NoSuchElementException::class)
-    fun generateWalletPosition(saltLength: Int = 64): String {
-      // Use hex alphabet to match JavaScript implementation
-      return Strings.randomString(saltLength, "abcdef0123456789")
+    fun generateWalletPosition(
+      saltLength: Int = 64,
+      secret: String? = null,
+      index: Int = 0
+    ): String {
+      return if (secret != null) {
+        // Deterministic position generation for cross-SDK compatibility
+        val sponge = Shake256.create()
+        sponge.absorb(secret)
+        sponge.absorb("WalletPosition")
+        sponge.absorb(index.toString())
+        sponge.hexString(32) // 32 bytes = 64 hex characters
+      } else {
+        // Fallback to random for backward compatibility
+        Strings.randomString(saltLength, "abcdef0123456789")
+      }
     }
 
     /**

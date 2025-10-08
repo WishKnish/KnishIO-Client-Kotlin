@@ -1503,18 +1503,23 @@
     const NobleMLKEM = {
         // Generate key pair from seed (deterministic)
         generateKeyPairFromSeed: function(seedHex) {
-            const seed = hexToBytes(seedHex);
-            // ML-KEM expects a 64-byte seed
+            // Use the exact same conversion method as JavaScript SDK
+            const seed = new Uint8Array(64);
+            for (let i = 0; i < 64; i++) {
+                seed[i] = parseInt(seedHex.substr(i * 2, 2), 16);
+            }
+            
+            // Validate exactly like Noble library expects
             if (seed.length !== 64) {
                 throw new Error('Seed must be exactly 64 bytes, got ' + seed.length);
             }
             
-            // Generate deterministic key pair
+            // Generate deterministic key pair - exact same call as JavaScript SDK
             const keyPair = globalThis.ml_kem768.keygen(seed);
             
             return {
-                publicKey: bytesToHex(keyPair.publicKey),
-                secretKey: bytesToHex(keyPair.secretKey)
+                publicKey: Array.from(keyPair.publicKey, byte => byte.toString(16).padStart(2, '0')).join(''),
+                secretKey: Array.from(keyPair.secretKey, byte => byte.toString(16).padStart(2, '0')).join('')
             };
         },
 
@@ -1534,6 +1539,38 @@
             const secretKey = hexToBytes(secretKeyHex);
             const sharedSecret = globalThis.ml_kem768.decapsulate(cipherText, secretKey);
             return bytesToHex(sharedSecret);
+        },
+
+        // Generate seed using SHAKE256 (identical to JavaScript SDK generateSecret)
+        generateSecret: function(input, lengthInBits) {
+            // Replicate the exact JavaScript SDK generateSecret logic
+            // This ensures identical behavior across both SDKs
+            
+            // Simple string to bytes conversion for GraalVM compatibility
+            const inputBytes = new Uint8Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+                inputBytes[i] = input.charCodeAt(i);
+            }
+            
+            const outputBytes = lengthInBits / 8; // Convert bits to bytes
+            
+            // Use the bundled shake256 implementation
+            // Find the shake256 function from the bundle
+            let shake256Function = null;
+            if (typeof shake256 !== 'undefined') {
+                shake256Function = shake256;
+            } else if (typeof global !== 'undefined' && global.shake256) {
+                shake256Function = global.shake256;
+            } else {
+                // Fallback to the ML-KEM internal shake implementation
+                throw new Error('SHAKE256 implementation not found');
+            }
+            
+            const hash = shake256Function.create({ dkLen: outputBytes });
+            hash.update(inputBytes);
+            const output = hash.digest();
+            
+            return bytesToHex(output);
         }
     };
 

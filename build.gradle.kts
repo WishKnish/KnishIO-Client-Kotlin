@@ -236,3 +236,26 @@ tasks.register<JavaExec>("validateTestVectors") {
     "--add-opens=java.base/java.io=ALL-UNNAMED"      // Fix IO warnings
   )
 }
+
+// Task to run the SDK self-test
+tasks.register<JavaExec>("selftest") {
+  description = "Run the SDK self-test to validate core functionality against reference values"
+  group = "verification"
+  
+  // Only compile main sources, skip tests
+  dependsOn(tasks.compileKotlin, tasks.processResources, tasks.classes)
+  
+  // Set working directory to project root for file access
+  workingDir = projectDir
+  
+  // Run the self-test class
+  mainClass.set("SelfTestKt")
+  classpath = sourceSets["main"].runtimeClasspath
+  
+  // Clean runtime environment - eliminate external library warnings
+  jvmArgs(
+    "--enable-native-access=ALL-UNNAMED",  // Fix JANSI native access warnings
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",  // Fix NIO warnings
+    "--add-opens=java.base/java.io=ALL-UNNAMED"      // Fix IO warnings
+  )
+}

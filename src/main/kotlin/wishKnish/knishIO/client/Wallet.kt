@@ -90,6 +90,9 @@ class Wallet @JvmOverloads constructor(
     EncryptionMethod.NACL_SEALED_BOX,
     EncryptionMethod.POST_QUANTUM
   )
+  
+  // Raw ML-KEM768 private key bytes for JavaScript SDK compatibility
+  private var mlkemRawPrivkey: ByteArray? = null
 
   @JvmField var createdAt: String? = null
   @JvmField var tokenName: String? = null
@@ -104,9 +107,9 @@ class Wallet @JvmOverloads constructor(
     bundle = secret?.let {
       // Validate position or generate a new one
       position = when {
-        position == null -> Crypto.generateWalletPosition()
+        position == null -> Crypto.generateWalletPosition(secret = it, index = 0)
         position!!.matches(Regex("^[a-f0-9]{64}$")) -> position
-        else -> Crypto.generateWalletPosition() // Invalid position, generate new one
+        else -> Crypto.generateWalletPosition(secret = it, index = 0) // Invalid position, generate new one
       }
       val bundleHash = Crypto.generateBundleHash(it)
       prepareKeys(it)
@@ -135,7 +138,7 @@ class Wallet @JvmOverloads constructor(
       }
 
       val position = secret?.let {
-        Crypto.generateWalletPosition()
+        Crypto.generateWalletPosition(secret = it, index = 1) // Use index 1 for remainder wallet
       }
 
       // Wallet initialization
@@ -220,8 +223,22 @@ class Wallet @JvmOverloads constructor(
     @JvmStatic
     @JvmOverloads
     @Throws(NoSuchElementException::class)
-    fun generateWalletPosition(saltLength: Int = 64): String {
-      return Strings.randomString(saltLength)
+    fun generateWalletPosition(
+      saltLength: Int = 64,
+      secret: String? = null,
+      index: Int = 0
+    ): String {
+      return if (secret != null) {
+        // Deterministic position generation for cross-SDK compatibility
+        val sponge = Shake256.create()
+        sponge.absorb(secret)
+        sponge.absorb("WalletPosition")
+        sponge.absorb(index.toString())
+        sponge.hexString(32) // 32 bytes = 64 hex characters
+      } else {
+        // Fallback to random for backward compatibility
+        Strings.randomString(saltLength, "abcdef0123456789")
+      }
     }
 
     /**
@@ -486,18 +503,25 @@ class Wallet @JvmOverloads constructor(
   @Throws(Exception::class)
   private fun preparePostQuantumKeys(secret: String) {
     // Generate post-quantum seed using the same approach as JavaScript:
-    // SHAKE256(wallet.key) with 64-byte output (matches generateSecret(this.key, 64))
-    val pqSeedHex = key?.let { Shake256.hash(it, 64) }
+    // JavaScript: generateSecret(key, 256) → 256*2=512 bits = 64 bytes = 128 hex chars
+    // Kotlin: generateSecret(key, 128) → hash(key, 128/2=64) = 64 bytes = 128 hex chars
+    val pqSeedHex = key?.let { Crypto.generateSecret(it, 128) } // 128 hex chars = 64 bytes
     if (pqSeedHex != null) {
       // Convert hex string to byte array (same as JavaScript conversion)
       val pqSeed = org.bouncycastle.util.encoders.Hex.decode(pqSeedHex)
-      val keyPair = PostQuantumCrypto.generateMLKEMKeyPairFromSeed(pqSeed)
       
-      pqPrivateKey = keyPair.private
-      pqPublicKey = keyPair.public
+      // Generate using NobleMLKEMBridge for JavaScript compatibility
+      val mlkemKeyPair = NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed)
       
-      // Set pubkey field to raw ML-KEM768 public key (1580 chars) for quantum resistance
-      pubkey = pqPublicKey?.let { PostQuantumCrypto.rawMLKEMPublicKeyToBase64(it) }
+      // Store BouncyCastle format for existing hybrid compatibility
+      pqPrivateKey = mlkemKeyPair.private
+      pqPublicKey = mlkemKeyPair.public
+      
+      // Store raw bytes for JavaScript SDK compatibility
+      mlkemRawPrivkey = mlkemKeyPair.private.encoded
+      
+      // Set pubkey field to raw ML-KEM768 public key (Base64 like JavaScript)
+      pubkey = java.util.Base64.getEncoder().encodeToString(mlkemKeyPair.public.encoded)
     }
   }
   
@@ -595,5 +619,105 @@ class Wallet @JvmOverloads constructor(
    */
   fun setEncryptionMode(mode: EncryptionMode) {
     encryptionMode = mode
+  }
+
+  // =============================================================================
+  // DIRECT ML-KEM768 METHODS (JavaScript SDK Compatibility)
+  // =============================================================================
+
+  /**
+   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly)
+   */
+  fun encryptMessage(message: String, recipientPubkey: String): Map<String, String> {
+    // Convert message to JSON string then bytes (matching JavaScript JSON.stringify)
+    val gson = com.google.gson.Gson()
+    val messageString = gson.toJson(message) // Like JavaScript JSON.stringify(message)
+    val messageBytes = messageString.toByteArray(Charsets.UTF_8)
+    
+    // Deserialize public key from Base64 to raw bytes (like JavaScript)
+    val recipientPublicKeyBytes = java.util.Base64.getDecoder().decode(recipientPubkey)
+    
+    // Create MLKEMPublicKey from raw bytes (not X509 encoded)  
+    val recipientPublicKey = NobleMLKEMBridge.Companion.MLKEMPublicKey(recipientPublicKeyBytes)
+    val (sharedSecret, cipherText) = NobleMLKEMBridge.encapsulate(recipientPublicKey)
+    
+    // Encrypt message using shared secret (AES-GCM like JavaScript)
+    val encryptedMessage = encryptWithSharedSecret(messageBytes, sharedSecret)
+    
+    return mapOf(
+      "cipherText" to java.util.Base64.getEncoder().encodeToString(cipherText),
+      "encryptedMessage" to java.util.Base64.getEncoder().encodeToString(encryptedMessage)
+    )
+  }
+
+  /**
+   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly)
+   */
+  fun decryptMessage(encryptedData: Map<String, String>): String? {
+    return try {
+      val cipherText = encryptedData["cipherText"] ?: return null
+      val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
+      
+      // Recover shared secret using NobleMLKEMBridge (JavaScript compatibility)
+      val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
+      
+      // Use raw private key bytes (like JavaScript SDK) 
+      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
+      
+      val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
+      
+      val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
+      
+      // Decrypt message using shared secret
+      val encryptedMessageBytes = java.util.Base64.getDecoder().decode(encryptedMessage)
+      
+      val decryptedBytes = decryptWithSharedSecret(encryptedMessageBytes, sharedSecret)
+      
+      // Convert back to string and parse JSON (matching JavaScript JSON.parse)
+      val decryptedString = String(decryptedBytes, Charsets.UTF_8)
+      
+      val gson = com.google.gson.Gson()
+      gson.fromJson(decryptedString, String::class.java)
+    } catch (e: Exception) {
+      println("Wallet::decryptMessage() - Decryption failed: ${e.message}")
+      null
+    }
+  }
+
+  /**
+   * Encrypt data using AES-GCM with shared secret (JavaScript SDK compatible)
+   */
+  private fun encryptWithSharedSecret(message: ByteArray, sharedSecret: ByteArray): ByteArray {
+    // Generate random IV for AES-GCM (like JavaScript)
+    val iv = ByteArray(12)
+    java.security.SecureRandom().nextBytes(iv)
+    
+    // Use AES-GCM encryption
+    val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+    val aesKey = javax.crypto.spec.SecretKeySpec(sharedSecret, "AES")
+    val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
+    
+    cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, aesKey, gcmSpec)
+    val encryptedContent = cipher.doFinal(message)
+    
+    // Combine IV and encrypted content (like JavaScript)
+    return iv + encryptedContent
+  }
+
+  /**
+   * Decrypt data using AES-GCM with shared secret (JavaScript SDK compatible)
+   */
+  private fun decryptWithSharedSecret(encryptedMessage: ByteArray, sharedSecret: ByteArray): ByteArray {
+    // Extract IV from encrypted message (like JavaScript)
+    val iv = encryptedMessage.sliceArray(0..11)
+    val ciphertext = encryptedMessage.sliceArray(12 until encryptedMessage.size)
+    
+    // Use AES-GCM decryption
+    val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+    val aesKey = javax.crypto.spec.SecretKeySpec(sharedSecret, "AES")
+    val gcmSpec = javax.crypto.spec.GCMParameterSpec(128, iv)
+    
+    cipher.init(javax.crypto.Cipher.DECRYPT_MODE, aesKey, gcmSpec)
+    return cipher.doFinal(ciphertext)
   }
 }

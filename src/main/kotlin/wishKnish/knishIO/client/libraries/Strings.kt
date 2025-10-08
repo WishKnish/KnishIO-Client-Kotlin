@@ -28,7 +28,13 @@ class Strings {
     @JvmStatic
     @Throws(ArithmeticException::class)
     fun currentTimeMillis(): String {
-      return ZonedDateTime.of(LocalDateTime.now(), ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
+      // Support deterministic timestamps for cross-SDK validation
+      val fixedTimestamp = System.getenv("KNISHIO_FIXED_TIMESTAMP")
+      return if (!fixedTimestamp.isNullOrBlank()) {
+        fixedTimestamp
+      } else {
+        ZonedDateTime.of(LocalDateTime.now(), ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
+      }
     }
 
     @JvmStatic

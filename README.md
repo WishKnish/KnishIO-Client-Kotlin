@@ -5,28 +5,73 @@
 
 # Knish.IO Kotlin Client SDK
 
-This is an experimental Kotlin / Java implementation of the Knish.IO client SDK. Its purpose is to expose class
-libraries for building and signing Knish.IO Molecules, composing Atoms, generating Wallets, and so much more.
+[![CI/CD Pipeline](https://github.com/WishKnish/KnishIO-Client-Kotlin/actions/workflows/ci.yml/badge.svg)](https://github.com/WishKnish/KnishIO-Client-Kotlin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Maven Central](https://img.shields.io/maven-central/v/io.knish/knishio-client-kotlin.svg?label=Maven%20Central)](https://search.maven.org/artifact/io.knish/knishio-client-kotlin)
+[![codecov](https://codecov.io/gh/WishKnish/KnishIO-Client-Kotlin/branch/main/graph/badge.svg)](https://codecov.io/gh/WishKnish/KnishIO-Client-Kotlin)
+
+This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its purpose is to expose class libraries for building and signing Knish.IO Molecules, composing Atoms, generating Wallets, and much more.
 
 ## Installation
 
-The SDK can be installed via either of the following:
-
-Gradle:
-```
+### Gradle
+```kotlin
 dependencies {
-     implementation("io.knish:KnishIO-Client-Kotlin:0.0.1")
+    implementation("io.knish:knishio-client-kotlin:1.0.0-RC1")
 }
 ```
-Maven:
-```
+
+### Maven
+```xml
 <dependency>
   <groupId>io.knish</groupId>
-  <artifactId>KnishIO-Client-Kotlin</artifactId>
-  <version>0.0.1</version>
+  <artifactId>knishio-client-kotlin</artifactId>
+  <version>1.0.0-RC1</version>
 </dependency>
 ```
 
+**Requirements:**
+- JDK 8 or higher
+- Gradle 6.0 or higher (for building from source)
+- Kotlin 1.5.10 or higher
+
+<details>
+<summary>Alternative Installation Methods</summary>
+
+### GitHub Packages
+```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/WishKnish/KnishIO-Client-Kotlin")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
+            password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
+        }
+    }
+}
+```
+
+### JitPack
+[![](https://jitpack.io/v/WishKnish/KnishIO-Client-Kotlin.svg)](https://jitpack.io/#WishKnish/KnishIO-Client-Kotlin)
+```kotlin
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+dependencies {
+    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:1.0.0-RC1'
+}
+```
+</details>
+
+After installation, import the SDK in your project:
+
+```kotlin
+import wishKnish.knishIO.client.KnishIOClient
+import wishKnish.knishIO.client.Wallet
+import wishKnish.knishIO.client.Molecule
+import wishKnish.knishIO.client.data.MetaData
+import java.net.URI
+```
 
 ## Basic Usage
 
@@ -43,434 +88,562 @@ This document will explain both ways.
 ## The Easy Way: KnishIOClient Wrapper
 
 1. Include the wrapper class in your application code:
-```kotlin
+   ```kotlin
    import wishKnish.knishIO.client.KnishIOClient
-```
+   ```
 
 2. Instantiate the class with your node URI:
-```kotlin
-   val client = KnishIOClient(listOf(URI("myNodeURI")))
-```
+   ```kotlin
+   val client = KnishIOClient(
+       uris = listOf(URI("http://localhost:8000/graphql")),
+       encrypt = true  // Optional: Enable encryption
+   )
+   client.setCellSlug("my-cell-slug")
+   ```
 
-3. Set the Cell to match your app:
-```kotlin
-   client.setCellSlug( "myCellSlug" )
-```
-   (**Note:** the `knishio_cells` table on the node must contain an entry for this Cell)
+3. Request authorization token from the node:
+   ```kotlin
+   val response = client.requestAuthToken(secret)
+   
+   if (response.success()) {
+       // Authentication successful
+       val authData = response.payload()
+       println("Authenticated: ${authData?.token}")
+   } else {
+       throw Exception("Authentication failed: ${response.reason()}")
+   }
+   ```
 
+   (**Note:** The `secret` parameter can be a salted combination of username + password, a biometric hash, an existing user identifier from an external authentication process, for example)
 
-4. Request authorization token from the node:
-```kotlin
-   client.requestAuthToken(seed = "myTopSecretCode")
-```
-
-   (**Note:** the `seed` parameter can be a salted combination of username + password, a biometric hash, an existing
-   user identifier from an external authentication process, for example)
-
-
-5. Begin using `client` to trigger commands described below...
+4. Begin using `client` to trigger commands described below...
 
 ### KnishIOClient Methods
 
 - Query metadata for a **Wallet Bundle**. Omit the `bundleHash` parameter to query your own Wallet Bundle:
-```kotlin
-  val result = client.queryBundle(
-    bundle="c47e20f99df190e418f0cc5ddfa2791e9ccc4eb297cfa21bd317dc0f98313b1d"
+  ```kotlin
+  val response = client.queryBundle(
+      bundleHash = "c47e20f99df190e418f0cc5ddfa2791e9ccc4eb297cfa21bd317dc0f98313b1d"
+  )
+  
+  if (response.success()) {
+      val bundleData = response.payload()
+      println(bundleData) // Raw Metadata
+  }
+  ```
+
+- Query metadata for a **Meta Asset**:
+
+  ```kotlin
+  val result = client.queryMeta(
+      metaType = "Vehicle",
+      metaIds = listOf("vehicle-123"), // Optional: Specific IDs
+      keys = listOf("LicensePlate"), // Optional: Specific keys  
+      values = listOf("1H17P"), // Optional: Search by value
+      latest = true // Optional: Limit meta values to latest per key
   )
 
-  when {
-    result.success() -> {
-      val wallet = result.payload()
-      println(wallet?.bundle)
-    }
-    else -> println(result.status())
-  }
-```
+  println(result) // Raw Metadata
+  ```
 
-- Query metadata for a **Meta Asset**. Omit any parameters to widen the search:
+- Writing new metadata for a **Meta Asset**:
 
-```kotlin
-  val result = client.queryMeta ( 
-    metaType = 'Vehicle',
-    metaIds = listOf("Meta ID"),
-    keys = listOf("LicensePlate"),
-    values = listOf("1H17P"),
-    latest = true // Limit meta values to latest per key
-   )
-
-  // Raw Metadata
-  println(result)
-```
-
-- Writing new metadata for a **Meta Asset**.
-
-```kotlin
-  import kotlinx.serialization.json.Json
-  import kotlinx.serialization.json.encodeToJsonElement
+  ```kotlin
+  val metadata = mutableListOf(
+      MetaData("type", "fire"),
+      MetaData("weaknesses", listOf("rock", "water", "electric").toString()),
+      MetaData("immunities", listOf("ground").toString()),
+      MetaData("hp", "78"),
+      MetaData("attack", "84")
+  )
   
-  val json = Json {
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-  }
-  
-  val result = client.createMeta ( 
-    metaType = "Pokemon",
-    metaId = "Charizard",
-    meta = mutableListOf(
-    MetaData("type", "fire"),
-    MetaData(
-      "weaknesses", 
-      json.encodeToJsonElement(listOf("rock", "water", "electric")).toString()
-    ),
-    MetaData(
-      "immunities", 
-      json.encodeToJsonElement(listOf("ground")).toString()
-    ),
-    MetaData("hp", "78"),
-    MetaData("attack", "84")
-  ) 
- )
+  val response = client.createMeta(
+      metaType = "Pokemon",
+      metaId = "Charizard",
+      meta = metadata
+  )
 
-  when {
-   result.success() -> println(result.data())
-    else -> println(result.status())
+  if (response.success()) {
+      // Do things!
+      println("Metadata created successfully!")
   }
-```
+
+  println(response.payload()) // Raw response
+  ```
 
 - Query Wallets associated with a Wallet Bundle:
 
-```kotlin
-  val result = client.queryWallets (
-    bundle = "c47e20f99df190e418f0cc5ddfa2791e9ccc4eb297cfa21bd317dc0f98313b1d",
-    unspent = true // limit results to unspent wallets?
+  ```kotlin
+  val wallets = client.queryWallets(
+      bundleHash = "c47e20f99df190e418f0cc5ddfa2791e9ccc4eb297cfa21bd317dc0f98313b1d",
+      token = "FOO" // Optional: Filter by token
   )
 
-  println(result) // Raw response
-```
+  println(wallets) // Raw response
+  ```
 
-- Declaring new **Wallets**. If Tokens are sent to undeclared Wallets, **Shadow Wallets** will be used (placeholder
-  Wallets that can receive, but cannot send) to store tokens until they are claimed.
+- Declaring new **Wallets**:
 
-```kotlin
-  val result = client.createWallet ( 
-    token = 'FOO' // Token Slug for the wallet we are declaring
-  )
+  (**Note:** If Tokens are sent to undeclared Wallets, **Shadow Wallets** will be used (placeholder
+  Wallets that can receive, but cannot send) to store tokens until they are claimed.)
 
-  when {
-      result.success() -> println(result.data())
-    else -> println(result.status())
+  ```kotlin
+  val response = client.createWallet("FOO") // Token Slug for the wallet we are declaring
+
+  if (response.success()) {
+      // Do things!
+      println("Wallet created successfully!")
   }
-```
+
+  println(response.payload()) // Raw response
+  ```
 
 - Issuing new **Tokens**:
 
-```kotlin
-  val meta = mutableListOf(
-    MetaData("name", "CrazyCoin"),
-    MetaData("fungibility", "fungible"),
-    MetaData("supply", "limited"),
-    MetaData("decimals", "2")
+  ```kotlin
+  val tokenMeta = mutableListOf(
+      MetaData("name", "CrazyCoin"), // Public name for the token
+      MetaData("fungibility", "fungible"), // Fungibility style (fungible / nonfungible / stackable)
+      MetaData("supply", "limited"), // Supply style (limited / replenishable)
+      MetaData("decimals", "2") // Decimal places
   )
-  val result = client.createToken ( 
-    token = "CRZY", // Token slug (ticker symbol)
-    amount = "100000000", // Initial amount to issue
-    meta = meta
+  
+  val response = client.createToken(
+      token = "CRZY", // Token slug (ticker symbol)
+      amount = 100000000, // Initial amount to issue
+      meta = tokenMeta,
+      units = mutableListOf(), // Optional: for stackable tokens
+      batchId = null // Optional: for stackable tokens
   )
 
-  when {
-      result.success() -> println(result.data())
-    else -> println(result.status())
+  if (response.success()) {
+      // Do things!
+      println("Token created successfully!")
   }
-```
+
+  println(response.payload()) // Raw response
+  ```
 
 - Transferring **Tokens** to other users:
 
-```kotlin
-  import wishKnish.knishIO.client.Wallet
+  ```kotlin
+  val recipientWallet = Wallet(recipientSecret, "CRZY")
+  val response = client.transferToken(
+      recipient = recipientWallet, // Or bundle hash string
+      token = "CRZY", // Token slug
+      amount = 100.0,
+      units = mutableListOf(), // Optional: for stackable tokens
+      batchId = null // Optional: for stackable tokens
+  )
 
-  val result = client.transferToken ( 
-    recipient = Wallet(secret, "CRZY"), // Recipient's wallet,
-    token = "CRZY", // Token slug
-    amount = '100'
-   )
-
-  when {
-      result.success() -> println(result.data())
-    else -> println(result.status())
+  if (response.success()) {
+      // Do things!
+      println("Token transferred successfully!")
   }
-```
 
-## The Hard Way: working directly with Molecules
+  println(response.payload()) // Raw response
+  ```
 
-- Return a Molecule instance that you can manually add atoms to:
-```kotlin
-    client.createMolecule()
-```
+- Creating a new **Identifier**:
 
-- Return a customized Query instance that can be used to generate arbitrary transactions to the ledger for
-  the supplied Query class:
-```kotlin
-    client.createMoleculeMutation (
-      mutationClass = myQueryClass // More info on these below
-    )
-```
+  ```kotlin
+  val response = client.createIdentifier(
+      type = "email",
+      contact = "user@example.com", 
+      code = "verification-code-123"
+  )
 
-- Retrieves the active balance (in the form of a Wallet object:
-```kotlin
-    client.queryBalance (
-      token = myTokenSlug,
-      bundle = myBundleHash // Omit to get your own balance
-    )
-```
+  if (response.success()) {
+      // Do things!
+      println("Identifier created successfully!")
+  }
 
-- Create a new Token on the ledger and places initial balance into a new wallet created for you; `tokenMetadata` object
-  must contain properties for `name` and `fungibility` (which can presently be `'fungible'`, `'nonfungible'`,
-  or `'stackable'`):
-```kotlin
-    client.createToken (
-      token = tokenSlug, 
-      amount = initialAmount,
-      meta = tokenMetadata
-    )
-```
+  println(response.payload()) // Raw response
+  ```
 
-- Retrieve a list of Shadow Wallets (wallets that have a balance in a particular token, but no keys - as can happen when
-  you are sent tokens for which you lack a prior wallet):
-```kotlin
-    client.queryShadowWallets (
-      token = tokenSlug,
-      bundle = myBundleHash // Omit to get your own balance
-    )
-```
+- Claiming a **Shadow Wallet**:
 
-- Attempt to claim a Shadow Wallet by generating keys for it, which turns it into a usable Wallet:
-```kotlin
-    client.claimShadowWallet (
-      token = tokenSlug
-    )
-```
+  ```kotlin
+  val response = client.claimShadowWallet(
+      token = "MTK",
+      molecules = moleculeList // Optional: Batch claim
+  )
 
-- Transfer tokens to a recipient Wallet:
-```kotlin
-    client.transferToken (
-      recipient = wallet,
-      token = tokenSlug,
-      amount = transferAmount
-    )
-```
+  if (response.success()) {
+      // Do things!
+      println("Shadow wallet claimed successfully!")
+  }
 
-### Knish.IO Query Classes
+  println(response.payload()) // Raw response
+  ```
 
-The `KnishIOClient` can utilize a wide variety of built-in query classes
-via `client.createMoleculeMutation ( myMutationClass )`, in case you need something more flexible than the built-in methods.
+- Query **ContinuID** information:
 
-After calling `client.createMoleculeMutation ( myMutationClass )`, you will receive a `Mutation` class instance, which will let
-you add any necessary metadata to fulfill the GraphQL query or mutation. The metadata required will be different based
-on the type of `Mutation` class you choose, via an overloaded `fill()` method.
+  ```kotlin
+  val response = client.queryContinuId(bundleHash)
 
-Here are the most commonly used ones:
+  if (response.success()) {
+      val continuData = response.payload()
+      println("ContinuID: $continuData")
+  }
+  ```
 
-#### `QueryMetaType` (for retrieving Meta Asset information)
+- Query **Batch** operations:
 
-```kotlin
-// Build the query
-val query = client.createQuery(QueryMetaType::class)
-
-// Define variable parameters
-// (eg: which MetaType we are querying)
-val variables = MetaTypeVariable(metaType = 'SomeMetaType')
+  ```kotlin
+  // Query batch information
+  val batchResponse = client.queryBatch("batch-id-123")
   
+  // Query batch history
+  val historyResponse = client.queryBatchHistory("batch-id-123")
 
-// Execute the query
-val result = query.execute(variables = variables)
+  println(batchResponse.payload())
+  println(historyResponse.payload())
+  ```
 
-println(result.data())
-```
+- Query **User Activity**:
 
-#### `QueryWalletBundle` (for retrieving information about Wallet Bundles)
+  ```kotlin
+  val response = client.queryUserActivity(
+      bundleHash = bundleHash,
+      metaType = "UserAction", // Optional: Filter by meta type
+      metaId = "login", // Optional: Filter by meta ID
+      limit = 10 // Optional: Limit results
+  )
 
-```kotlin
-// Build the query
-val query = client.createQuery(QueryWalletBundle::class)
+  println(response.payload()) // User activity data
+  ```
 
-// Define variable parameters
-// (eg: how we want to filter Wallet Bundles)
-val variables = WalletBundleVariable(key = "publicName", value = "Eugene")
+- Request **Tokens** from faucet:
 
+  ```kotlin
+  val response = client.requestTokens(
+      token = "DEMO",
+      amount = 1000
+  )
 
-// Execute the query
-val result = query.execute(variables = variables)
+  if (response.success()) {
+      println("Tokens requested successfully!")
+  }
+  ```
 
-println(result.data())
-```
+- Getting client information:
 
-#### `QueryWalletList` (for getting a list of Wallets)
+  ```kotlin
+  // Note: Fingerprint and buffer token methods are not available in Kotlin SDK
+  // Check client configuration and bundle information
+  val bundle = client.getBundle()
+  println("Client bundle: $bundle")
+  ```
 
-```kotlin
-// Build the query
-val query = client.createQuery(QueryWalletList::class)
+## Advanced Usage: Working with Molecules
 
-// Define variable parameters
-// (eg: how we want to filter Wallet Bundles)
-val variables = WalletListVariable(token = "DYD") 
+For more granular control, you can work directly with Molecules:
 
+- Create a new Molecule:
+  ```kotlin
+  import wishKnish.knishIO.client.Molecule
+  
+  val molecule = Molecule(
+      secret = secret,
+      sourceWallet = sourceWallet,
+      cellSlug = cellSlug
+  )
+  ```
 
+- Create a custom Mutation:
+  ```kotlin
+  import wishKnish.knishIO.client.mutation.MutationProposeMolecule
+  
+  val mutation = MutationProposeMolecule(molecule)
+  ```
 
-// Execute the query
-val result = query.execute(variables = variables)
+- Sign and check a Molecule:
+  ```kotlin
+  molecule.sign()
+  if (molecule.check()) {
+      println("Molecule validation passed!")
+  } else {
+      println("Molecule validation failed!")
+  }
+  ```
 
-println(result.data())
-```
+- Execute a custom Query or Mutation:
+  ```kotlin
+  val response = client.executeQuery(mutation)
+  
+  if (response.success()) {
+      println("Molecule executed successfully!")
+  }
+  ```
 
-## The Extreme Way: DIY Everything
+## The Hard Way: DIY Everything
 
-This method involves individually building Atoms and Molecules, triggering the signature and validation processes, and
-communicating the resulting signed Molecule mutation or Query to a Knish.IO node via your favorite GraphQL client.
+This method involves individually building Atoms and Molecules, triggering the signature and validation processes, and communicating the resulting signed Molecule mutation or Query to a Knish.IO node via GraphQL.
 
 1. Include the relevant classes in your application code:
-```kotlin
-  import wishKnish.knishIO.client.Wallet
-  import wishKnish.knishIO.client.Molecule
-```
+    ```kotlin
+    import wishKnish.knishIO.client.Molecule
+    import wishKnish.knishIO.client.Wallet  
+    import wishKnish.knishIO.client.Atom
+    import wishKnish.knishIO.client.libraries.Crypto
+    ```
 
-2. Generate a 2048-symbol hexadecimal secret, either randomly, or via hashing login + password + salt, OAuth secret ID,
-   biometric ID, or any other static value
-
+2. Generate a 2048-symbol hexadecimal secret, either randomly, or via hashing login + password + salt, OAuth secret ID, biometric ID, or any other static value.
 
 3. (optional) Initialize a signing wallet with:
-```kotlin
-   val wallet = Wallet( 
-     secret = mySecret,
-     token = tokenSlug,
-     position = myCustomPosition // (optional) instantiate specific wallet instance vs. random
-   
-     // (optional) helps you override the character set used by the wallet, for inter-ledger compatibility. Currently supported options are: `GMP`, `BITCOIN`, `FLICKR`, `RIPPLE`, and `IPFS`.
-     // characters: myCharacterSet
+   ```kotlin
+   val wallet = Wallet(
+       secret = secret,
+       token = tokenSlug,
+       position = customPosition, // (optional) instantiate specific wallet instance vs. random  
+       characters = characterSet // (optional) override the character set used by the wallet
    )
-```
+   ```
 
-   **WARNING 1:** If ContinuID is enabled on the node, you will need to use a specific wallet, and therefore will first
-   need to query the node to retrieve the `position` for that wallet.
+   **WARNING 1:** If ContinuID is enabled on the node, you will need to use a specific wallet, and therefore will first need to query the node to retrieve the `position` for that wallet.
 
    **WARNING 2:** The Knish.IO protocol mandates that all C and M transactions be signed with a `USER` token wallet.
 
-
 4. Build your molecule with:
-```kotlin
-   val molecule = Molecule( 
-     secret = mySecret,
-     sourceWallet = mySourceWallet, // (optional) wallet for signing
-     remainderWaller = myRemainderWallet, // (optional) wallet to receive remainder tokens
-     cellSlug = myCellSlug // (optional) used to point a transaction to a specific branch of the ledger
+   ```kotlin
+   val molecule = Molecule(
+       secret = secret,
+       sourceWallet = sourceWallet, // (optional) wallet for signing
+       cellSlug = cellSlug // (optional) used to point a transaction to a specific branch of the ledger
    )
-```
+   ```
 
-5. Either use one of the shortcut methods provided by the `Molecule` class (which will build `Atom` instances for you),
-   or create `Atom` instances yourself.
+5. Either use one of the shortcut methods provided by the `Molecule` class (which will build `Atom` instances for you), or create `Atom` instances yourself.
 
    DIY example:
-```kotlin
+    ```kotlin
     // This example records a new Wallet on the ledger
 
     // Define metadata for our new wallet
+    val newWalletMeta = listOf(
+        MetaData("address", newWallet.address),
+        MetaData("token", newWallet.token),
+        MetaData("bundle", newWallet.bundle),
+        MetaData("position", newWallet.position),
+        MetaData("batchId", newWallet.batchId ?: "")
+    )
 
-  val newWalletMeta = mutableListOf(
-    MetaData("address", newWallet.address),
-    MetaData("token", newWallet.token),
-    MetaData("bundle", newWallet.bundle),
-    MetaData("position", newWallet.position), 
-    MetaData("batch_id", newWallet.batchId)
-  )
-   
-  // Build the C isotope atom
-  val walletCreationAtom = Atom(
-    position = sourceWallet.position,
-    walletAddress = sourceWallet.address,
-    isotope = 'C',
-    token = sourceWallet.token,
-    metaType = "wallet",
-    metaId = newWallet.address,
-    meta = newWalletMeta,
-    index = molecule.generateIndex()
-  )
-   
-  // Add the atom to our molecule
-  molecule.addAtom(walletCreationAtom)
-   
-  // Adding a ContinuID / remainder atom
-  molecule.addUserRemainderAtom(Wallet(secret))
-```
+    // Build the C isotope atom
+    val walletCreationAtom = Atom(
+        position = sourceWallet.position,
+        walletAddress = sourceWallet.address,
+        isotope = 'C',
+        token = sourceWallet.token,
+        metaType = "wallet",
+        metaId = newWallet.address,
+        meta = newWalletMeta,
+        index = molecule.generateIndex()
+    )
+
+    // Add the atom to our molecule
+    molecule.addAtom(walletCreationAtom)
+
+    // Adding a ContinuID / remainder atom
+    molecule.addContinuIdAtom()
+    ```
 
    Molecule shortcut method example:
-```kotlin
-  // This example commits metadata to some Meta Asset
+    ```kotlin
+    // This example commits metadata to some Meta Asset
 
-  // Defining our metadata
-  val metadata = mutableListOf(
-    MetaData("foo", "Foo"),
-    MetaData("bar", "Bar")
-  )
-    
-  molecule.initMeta(
-    meta = metadata,
-    metaType = "MyMetaType",
-    metaId = "MetaId123"
-  )
-```
+    // Defining our metadata
+    val metadata = listOf(
+        MetaData("foo", "Foo"),
+        MetaData("bar", "Bar")
+    )
+
+    molecule.initMeta(
+        meta = metadata,
+        metaType = "MyMetaType",
+        metaId = "MetaId123"
+    )
+    ```
 
 6. Sign the molecule with the stored user secret:
-```kotlin
+    ```kotlin
     molecule.sign()
-```
+    ```
 
 7. Make sure everything checks out by verifying the molecule:
-```kotlin
-    if (!molecule.check()) {
-       // Throw some exception?
+    ```kotlin
+    try {
+        if (molecule.check()) {
+            // If we're validating a V isotope transaction,
+            // add the source wallet as a parameter
+            println("Molecule validation passed!")
+        } else {
+            println("Molecule validation failed!")
+        }
+    } catch (e: Exception) {
+        println("Molecule check failed: ${e.message}")
+        // Handle the error
     }
-    
-    // If we're validating a V isotope transaction,
-    // add the source wallet as a parameter
-    if (!molecule.check(sourceWallet)) {
-       // Insufficient tokens?
-    }
-```
+    ```
 
 8. Broadcast the molecule to a Knish.IO node:
-```kotlin
-    // Build our query object using the KnishIOClient wrapper
-    val query = MutationProposeMolecule(client, molecule)
-   
-    // Send the query to the node and get a response
-    val response = query.execute(MoleculeMutationVariable(query.molecule()?))
-```
+    ```kotlin
+    import wishKnish.knishIO.client.mutation.MutationProposeMolecule
+    
+    // Build our mutation object using the KnishIOClient wrapper
+    val mutation = MutationProposeMolecule(molecule)
+
+    // Send the mutation to the node and get a response
+    val response = client.executeQuery(mutation)
+    ```
 
 9. Inspect the response...
-```kotlin
+    ```kotlin
     // For basic queries, we look at the data property:
-    println(response.data())
-```
-   If you are sending a mutation, you can also check if the molecule was accepted by the ledger:
-```kotlin
-  // For mutations only 
-  println(response.success())
-   
-  // We can also check the reason for rejection
-  println(response.reason())
-```
-   Some queries may also produce a payload, with additional data:
-```kotlin 
     println(response.payload())
-```
+
+    // For mutations, check if the molecule was accepted by the ledger:
+    println(if (response.success()) "Success" else "Failed")
+
+    // We can also check the reason for rejection
+    println(response.reason())
+
+    // Some queries may also produce additional data:
+    println(response.data())
+    ```
+
    Payloads are provided by responses to the following queries:
-    1. `QueryBalance` and `QueryContinuId` -> returns a `Wallet` instance
-    2. `QueryWalletList` -> returns a list of `Wallet` instances
-    3. `MutationProposeMolecule`, `MutationRequestAuthorization`, `MutationCreateIdentifier`, `MutationLinkIdentifier`
-       , `MutationClaimShadowWallet`, `MutationCreateToken`, `MutationRequestTokens`, and `MutationTransferTokens` ->
-       returns molecule metadata
+    1. `queryBalance` and `queryContinuId` -> returns a `Wallet` instance
+    2. `queryWallets` -> returns a list of `Wallet` instances
+    3. `createToken`, `transferToken`, `createWallet`, `createMeta`, and other mutations -> returns molecule metadata
+
+## Demo System
+
+This SDK includes a comprehensive examples system with practical demonstrations. Explore the examples folder to see real implementations:
+
+```bash
+# From the project root directory
+./gradlew build
+
+# Run specific examples
+./gradlew run -PmainClass=examples.BasicUsageKt
+./gradlew run -PmainClass=examples.TokenOperationsKt  
+./gradlew run -PmainClass=examples.MetadataManagementKt
+./gradlew run -PmainClass=examples.WalletManagementKt
+./gradlew run -PmainClass=examples.AdvancedMoleculesKt
+./gradlew run -PmainClass=examples.CompleteExampleKt
+
+# Or compile and run directly  
+java -cp build/libs/knishio-client-kotlin-*.jar examples.BasicUsageKt
+```
+
+The examples system provides:
+- **Basic usage** - Client initialization, authentication, and simple operations
+- **Token operations** - Creating tokens (fungible, NFTs), transfers, and balance verification  
+- **Metadata management** - Data storage, user profiles, product catalogs, complex queries
+- **Wallet management** - Advanced wallet operations, bundle management, shadow wallets
+- **Advanced molecules** - Low-level molecule construction for complex scenarios
+- **Complete workflow** - Full feature demonstration with production patterns
+
+See `examples/README.md` for complete setup instructions and detailed usage guides.
+
+## Security
+
+This SDK implements quantum-resistant cryptography for future-proof security:
+
+- All signatures use XMSS (post-quantum secure)
+- Encryption uses ML-KEM768 (NIST approved)
+- One-time keys prevent signature reuse
+- Secure random generation for all cryptographic operations
+
+For security issues, please email security@wishknish.com instead of using the issue tracker.
+
+## Features
+
+- 🚀 **Post-Blockchain Architecture**: DAG-based distributed ledger with organism-inspired transaction model
+- 🔐 **Quantum-Resistant Security**: XMSS signatures and ML-KEM768 (NIST FIPS-203) encryption
+- ⚡ **Network-Bound Scalability**: Performance improves as the network grows
+- 🔄 **Cross-Platform Compatibility**: Full compatibility with JavaScript client
+- 📦 **Comprehensive SDK**: Complete API for wallets, tokens, metadata, and transactions
+- 🧬 **Molecular Composition**: Atomic operations grouped into molecular transactions
+- 🏢 **Cellular Architecture**: Application-specific sub-ledgers with isolation
 
 ## Getting Help
 
-Knish.IO is active development, and our team is ready to assist with integration questions. The best way to seek help is
-to stop by our [Telegram Support Channel](https://t.me/wishknish). You can
-also [send us a contact request](https://knish.io/contact) via our website.
+Knish.IO is under active development, and our team is ready to assist with integration questions. The best way to seek help is to stop by our [Telegram Support Channel](https://t.me/wishknish). You can also [send us a contact request](https://knish.io/contact) via our website.
+
+### Support Resources
+
+- 📧 Email: info@wishknish.com
+- 💬 Telegram: [WishKnish Support](https://t.me/wishknish)
+- 🐛 Issues: [GitHub Issues](https://github.com/WishKnish/KnishIO-Client-Kotlin/issues)
+- 🌐 Website: [https://knish.io](https://knish.io)
+- 📚 [Technical Whitepaper](https://github.com/WishKnish/KnishIO-Technical-Whitepaper)
+- 🔗 Related SDKs:
+  - [JavaScript Client](https://github.com/WishKnish/KnishIO-Client-JS)
+  - [PHP Client](https://github.com/WishKnish/KnishIO-Client-PHP)
+  - [Python Client](https://github.com/WishKnish/KnishIO-Client-Python)
+
+## Development Notes
+
+### Cross-Platform Testing
+
+The Kotlin SDK maintains 100% compatibility with the JavaScript SDK through comprehensive test vectors located in `src/test/resources/enhanced-js-test-vectors.json`. These manually-curated test vectors ensure consistent behavior across platforms.
+
+### Prerequisites
+
+- JDK 8 or higher
+- Gradle 6.0 or higher
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/WishKnish/KnishIO-Client-Kotlin.git
+cd KnishIO-Client-Kotlin
+
+# Make gradlew executable
+chmod +x ./gradlew
+
+# Build the project
+./gradlew build
+
+# Run tests
+./gradlew test
+
+# Generate documentation
+./gradlew dokkaHtml
+
+# Create JAR
+./gradlew shadowJar
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+./gradlew test
+
+# Run specific test
+./gradlew test --tests "*MolecularHashTest"
+
+# Generate coverage report  
+./gradlew jacocoTestReport
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Authors
+
+- **WishKnish Corp.** - *Initial work* - [WishKnish](https://wishknish.com)
+- **Eugene Teplitsky** - *Lead Developer*
+
+See also the list of [contributors](https://github.com/WishKnish/KnishIO-Client-Kotlin/contributors) who participated in this project.
+
+---
+
+<div style="text-align:center">
+  <strong>Built with ❤️ for the post-blockchain future</strong>
+</div>
