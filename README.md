@@ -5,11 +5,6 @@
 
 # Knish.IO Kotlin Client SDK
 
-[![CI/CD Pipeline](https://github.com/WishKnish/KnishIO-Client-Kotlin/actions/workflows/ci.yml/badge.svg)](https://github.com/WishKnish/KnishIO-Client-Kotlin/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Maven Central](https://img.shields.io/maven-central/v/io.knish/knishio-client-kotlin.svg?label=Maven%20Central)](https://search.maven.org/artifact/io.knish/knishio-client-kotlin)
-[![codecov](https://codecov.io/gh/WishKnish/KnishIO-Client-Kotlin/branch/main/graph/badge.svg)](https://codecov.io/gh/WishKnish/KnishIO-Client-Kotlin)
-
 This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its purpose is to expose class libraries for building and signing Knish.IO Molecules, composing Atoms, generating Wallets, and much more.
 
 ## Installation
@@ -516,57 +511,6 @@ This method involves individually building Atoms and Molecules, triggering the s
     1. `queryBalance` and `queryContinuId` -> returns a `Wallet` instance
     2. `queryWallets` -> returns a list of `Wallet` instances
     3. `createToken`, `transferToken`, `createWallet`, `createMeta`, and other mutations -> returns molecule metadata
-
-## Demo System
-
-This SDK includes a comprehensive examples system with practical demonstrations. Explore the examples folder to see real implementations:
-
-```bash
-# From the project root directory
-./gradlew build
-
-# Run specific examples
-./gradlew run -PmainClass=examples.BasicUsageKt
-./gradlew run -PmainClass=examples.TokenOperationsKt  
-./gradlew run -PmainClass=examples.MetadataManagementKt
-./gradlew run -PmainClass=examples.WalletManagementKt
-./gradlew run -PmainClass=examples.AdvancedMoleculesKt
-./gradlew run -PmainClass=examples.CompleteExampleKt
-
-# Or compile and run directly  
-java -cp build/libs/knishio-client-kotlin-*.jar examples.BasicUsageKt
-```
-
-The examples system provides:
-- **Basic usage** - Client initialization, authentication, and simple operations
-- **Token operations** - Creating tokens (fungible, NFTs), transfers, and balance verification  
-- **Metadata management** - Data storage, user profiles, product catalogs, complex queries
-- **Wallet management** - Advanced wallet operations, bundle management, shadow wallets
-- **Advanced molecules** - Low-level molecule construction for complex scenarios
-- **Complete workflow** - Full feature demonstration with production patterns
-
-See `examples/README.md` for complete setup instructions and detailed usage guides.
-
-## Security
-
-This SDK implements quantum-resistant cryptography for future-proof security:
-
-- All signatures use XMSS (post-quantum secure)
-- Encryption uses ML-KEM768 (NIST approved)
-- One-time keys prevent signature reuse
-- Secure random generation for all cryptographic operations
-
-For security issues, please email security@wishknish.com instead of using the issue tracker.
-
-## Features
-
-- 🚀 **Post-Blockchain Architecture**: DAG-based distributed ledger with organism-inspired transaction model
-- 🔐 **Quantum-Resistant Security**: XMSS signatures and ML-KEM768 (NIST FIPS-203) encryption
-- ⚡ **Network-Bound Scalability**: Performance improves as the network grows
-- 🔄 **Cross-Platform Compatibility**: Full compatibility with JavaScript client
-- 📦 **Comprehensive SDK**: Complete API for wallets, tokens, metadata, and transactions
-- 🧬 **Molecular Composition**: Atomic operations grouped into molecular transactions
-- 🏢 **Cellular Architecture**: Application-specific sub-ledgers with isolation
 
 ## Getting Help
 

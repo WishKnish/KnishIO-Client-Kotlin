@@ -908,6 +908,7 @@ import kotlin.reflect.full.memberProperties
     batchId: String? = null
   ): Molecule {
     meta.find { mataData -> mataData.key == "token" }?.run { value = token } ?: meta.add(MetaData("token", token))
+    meta.find { mataData -> mataData.key == "amount" }?.run { value = amount.toString() } ?: meta.add(MetaData("amount", amount.toString()))
 
     addAtom(
       Atom(
