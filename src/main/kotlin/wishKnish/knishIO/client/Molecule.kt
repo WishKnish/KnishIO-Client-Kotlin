@@ -51,7 +51,6 @@ package wishKnish.knishIO.client
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.MetaData
@@ -77,8 +76,18 @@ import kotlin.reflect.full.memberProperties
   @JvmField var bundle: String? = null
   @JvmField var molecularHash: String? = null
   @JvmField var atoms: MutableList<Atom> = mutableListOf()
+  
+  private var _cellSlugOrigin: String? = null
 
   init {
+    // Preserve the original cellSlug value
+    _cellSlugOrigin = cellSlug
+    
+    // If sourceWallet is not properly initialized but we have a secret, create a proper sourceWallet
+    if (sourceWallet.position == null && secret != null && molecularHash == null) {
+      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters)
+    }
+    
     if (sourceWallet.position == null && molecularHash == null) {
       throw IllegalArgumentException("SourceWallet parameter not initialized by valid wallet")
     }
@@ -93,11 +102,23 @@ import kotlin.reflect.full.memberProperties
       )
 
       clear()
+      // Set bundle to sourceWallet's bundle after clearing
+      bundle = sourceWallet.bundle
     }
   }
-
-  @Transient var cellSlugOrigin = cellSlug
-
+  
+  var cellSlugOrigin: String?
+    get() {
+      // If cellSlugOrigin hasn't been set yet but cellSlug has a value, use that as the origin
+      if (_cellSlugOrigin == null && cellSlug != null) {
+        _cellSlugOrigin = cellSlug
+      }
+      return _cellSlugOrigin
+    }
+    internal set(value) {
+      _cellSlugOrigin = value
+    }
+  
   /**
    * Returns the Meta Type for ContinuID
    */
@@ -127,6 +148,126 @@ import kotlin.reflect.full.memberProperties
     @JvmStatic
     fun jsonToObject(json: String): Molecule {
       return jsonFormat.decodeFromString(json)
+    }
+
+    /**
+     * Creates a Molecule instance from JSON data (Kotlin best practices)
+     *
+     * Handles cross-SDK deserialization with robust error handling following
+     * JavaScript canonical patterns for perfect cross-platform compatibility.
+     *
+     * @param json JSON string or data to deserialize
+     * @param options Deserialization options
+     * @return Reconstructed molecule instance
+     * @throws Exception If JSON is invalid or required fields are missing
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun fromJSON(
+      json: String,
+      includeValidationContext: Boolean = true,
+      validateStructure: Boolean = true
+    ): Molecule {
+      return try {
+        // Parse JSON safely using Gson for flexibility
+        val gson = com.google.gson.GsonBuilder()
+          .setLenient()
+          .create()
+        val jsonObject = gson.fromJson(json, com.google.gson.JsonObject::class.java)
+        
+        // Validate required fields in strict mode
+        if (validateStructure) {
+          if (!jsonObject.has("molecularHash") || !jsonObject.has("atoms")) {
+            throw IllegalArgumentException("Invalid molecule data: missing molecularHash or atoms array")
+          }
+        }
+
+        // Create minimal molecule instance (never include secret from JSON)
+        val molecule = Molecule(
+          secret = null,
+          cellSlug = jsonObject.get("cellSlug")?.takeIf { !it.isJsonNull }?.asString
+        )
+
+        // Populate core properties
+        molecule.status = jsonObject.get("status")?.takeIf { !it.isJsonNull }?.asString
+        molecule.molecularHash = jsonObject.get("molecularHash")?.takeIf { !it.isJsonNull }?.asString
+        molecule.bundle = jsonObject.get("bundle")?.takeIf { !it.isJsonNull }?.asString
+        molecule.createdAt = jsonObject.get("createdAt")?.takeIf { !it.isJsonNull }?.asString ?: Strings.currentTimeMillis()
+        molecule._cellSlugOrigin = jsonObject.get("cellSlugOrigin")?.takeIf { !it.isJsonNull }?.asString
+
+        // Reconstruct atoms array with proper Atom instances
+        if (jsonObject.has("atoms") && jsonObject.get("atoms").isJsonArray) {
+          val atomsArray = jsonObject.getAsJsonArray("atoms")
+          molecule.atoms.clear()
+          
+          for ((index, atomElement) in atomsArray.withIndex()) {
+            try {
+              val atomJson = gson.toJson(atomElement)
+              val atom = Atom.fromJSON(atomJson)
+              molecule.atoms.add(atom)
+            } catch (e: Exception) {
+              throw Exception("Failed to reconstruct atom $index: ${e.message}")
+            }
+          }
+        }
+
+        // Reconstruct validation context if available and requested
+        if (includeValidationContext) {
+          if (jsonObject.has("sourceWallet") && !jsonObject.get("sourceWallet").isJsonNull) {
+            val sourceWalletObj = jsonObject.getAsJsonObject("sourceWallet")
+            
+            // Create source wallet for validation (without secret for security)
+            val sourceWallet = Wallet(
+              secret = null,
+              token = sourceWalletObj.get("token")?.asString ?: "USER",
+              position = sourceWalletObj.get("position")?.asString,
+              batchId = sourceWalletObj.get("batchId")?.takeIf { !it.isJsonNull }?.asString,
+              characters = sourceWalletObj.get("characters")?.asString ?: "BASE64"
+            )
+
+            // Set additional properties for validation context
+            sourceWallet.balance = sourceWalletObj.get("balance")?.asDouble ?: 0.0
+            sourceWallet.address = sourceWalletObj.get("address")?.asString
+            sourceWallet.bundle = sourceWalletObj.get("bundle")?.asString
+            sourceWallet.pubkey = sourceWalletObj.get("pubkey")?.takeIf { !it.isJsonNull }?.asString
+            
+            // Set token units if present
+            if (sourceWalletObj.has("tokenUnits") && sourceWalletObj.get("tokenUnits").isJsonArray) {
+              // Handle tokenUnits array reconstruction
+              val tokenUnitsArray = sourceWalletObj.getAsJsonArray("tokenUnits")
+              // Note: TokenUnit reconstruction would require full TokenUnit class support
+            }
+
+            molecule.sourceWallet = sourceWallet
+          }
+
+          if (jsonObject.has("remainderWallet") && !jsonObject.get("remainderWallet").isJsonNull) {
+            val remainderWalletObj = jsonObject.getAsJsonObject("remainderWallet")
+            
+            // Create remainder wallet for validation (without secret for security)
+            val remainderWallet = Wallet(
+              secret = null,
+              token = remainderWalletObj.get("token")?.asString ?: "USER",
+              position = remainderWalletObj.get("position")?.asString,
+              batchId = remainderWalletObj.get("batchId")?.takeIf { !it.isJsonNull }?.asString,
+              characters = remainderWalletObj.get("characters")?.asString ?: "BASE64"
+            )
+
+            // Set additional properties for validation context
+            remainderWallet.balance = remainderWalletObj.get("balance")?.asDouble ?: 0.0
+            remainderWallet.address = remainderWalletObj.get("address")?.asString
+            remainderWallet.bundle = remainderWalletObj.get("bundle")?.asString
+            remainderWallet.pubkey = remainderWalletObj.get("pubkey")?.takeIf { !it.isJsonNull }?.asString
+
+            molecule.remainderWallet = remainderWallet
+          }
+        }
+
+        molecule
+
+      } catch (e: Exception) {
+        throw Exception("Molecule deserialization failed: ${e.message}")
+      }
     }
 
     @JvmStatic
@@ -165,6 +306,86 @@ import kotlin.reflect.full.memberProperties
     return (cellSlug ?: "").split(cellSlugDelimiter).first()
   }
 
+  /**
+   * Returns JSON-ready object for cross-SDK compatibility (Kotlin best practices)
+   *
+   * Includes all necessary fields for cross-SDK validation while excluding sensitive data.
+   * Follows JavaScript canonical patterns for perfect cross-platform compatibility.
+   *
+   * @param includeValidationContext Include sourceWallet/remainderWallet for validation (default: true)
+   * @param includeOtsFragments Include OTS signature fragments (default: true)
+   * @param secureMode Extra security checks (default: false)
+   * @return JSON-serializable Map
+   * @throws Exception If molecule is in invalid state for serialization
+   */
+  @JvmOverloads
+  fun toJSON(
+    includeValidationContext: Boolean = true,
+    includeOtsFragments: Boolean = true,
+    secureMode: Boolean = false
+  ): Map<String, Any?> {
+    return try {
+      // Core molecule properties (always included)
+      val serialized = mutableMapOf<String, Any?>(
+        "status" to status,
+        "molecularHash" to molecularHash,
+        "createdAt" to createdAt,
+        "cellSlug" to cellSlug,
+        "cellSlugOrigin" to cellSlugOrigin,
+        "bundle" to bundle,
+        
+        // Serialized atoms array with optional OTS fragments
+        "atoms" to atoms.map { atom -> atom.toJSON(includeOtsFragments) }
+      )
+
+      // Validation context (essential for cross-SDK validation)
+      if (includeValidationContext) {
+        sourceWallet.let { wallet ->
+          if (wallet.position != null) { // Only include if properly initialized
+            serialized["sourceWallet"] = mapOf(
+              "address" to wallet.address,
+              "position" to wallet.position,
+              "token" to wallet.token,
+              "balance" to (wallet.balance ?: 0.0),
+              "bundle" to wallet.bundle,
+              "batchId" to wallet.batchId,
+              "characters" to (wallet.characters ?: "BASE64"),
+              // Exclude sensitive fields like secret, key, privkey
+              "pubkey" to wallet.pubkey,
+              "tokenUnits" to (wallet.tokenUnits ?: emptyList<Any>()),
+              "tradeRates" to emptyMap<String, Any>(),
+              "molecules" to emptyMap<String, Any>()
+            )
+          }
+        }
+
+        remainderWallet?.let { wallet ->
+          if (wallet.position != null) { // Only include if properly initialized
+            serialized["remainderWallet"] = mapOf(
+              "address" to wallet.address,
+              "position" to wallet.position,
+              "token" to wallet.token,
+              "balance" to (wallet.balance ?: 0.0),
+              "bundle" to wallet.bundle,
+              "batchId" to wallet.batchId,
+              "characters" to (wallet.characters ?: "BASE64"),
+              // Exclude sensitive fields
+              "pubkey" to wallet.pubkey,
+              "tokenUnits" to (wallet.tokenUnits ?: emptyList<Any>()),
+              "tradeRates" to emptyMap<String, Any>(),
+              "molecules" to emptyMap<String, Any>()
+            )
+          }
+        }
+      }
+
+      serialized.toMap()
+
+    } catch (e: Exception) {
+      throw Exception("Molecule serialization failed: ${e.message}")
+    }
+  }
+
   private fun toJson(): String {
     return jsonFormat.encodeToString(this)
   }
@@ -191,7 +412,23 @@ import kotlin.reflect.full.memberProperties
     WrongTokenTypeException::class
   )
   fun check(sourceWallet: Wallet? = null): Boolean {
-    return verify(this, sourceWallet)
+    // Return false for empty molecules instead of throwing exception
+    if (atoms.isEmpty()) {
+      return false
+    }
+
+    // Molecular hash is REQUIRED for all molecules to be valid
+    // Without a molecular hash, the molecule hasn't been properly signed
+    if (molecularHash.isNullOrEmpty()) {
+      return false
+    }
+
+    return try {
+      verify(this, sourceWallet)
+      true
+    } catch (e: Exception) {
+      false
+    }
   }
 
   /**
@@ -225,6 +462,42 @@ import kotlin.reflect.full.memberProperties
     return this
   }
 
+
+  /**
+   * Initializes token creation atoms for this molecule
+   */
+  fun initTokenCreation(
+    recipientWallet: Wallet,
+    amount: Double,
+    meta: MutableList<MetaData>
+  ): Molecule {
+    // Add value atom for the token amount
+    val valueAtom = Atom(
+      position = recipientWallet.position ?: "",
+      walletAddress = recipientWallet.address ?: "",
+      isotope = 'V',
+      token = recipientWallet.token,
+      value = amount.toString(),
+      index = atoms.size
+    )
+    addAtom(valueAtom)
+    
+    // Add metadata atom for token information
+    val metaAtom = Atom(
+      position = sourceWallet.position ?: "",
+      walletAddress = sourceWallet.address ?: "",
+      isotope = 'M',
+      token = sourceWallet.token,
+      metaType = "token",
+      metaId = recipientWallet.token,
+      meta = meta.toList(),
+      index = atoms.size
+    )
+    addAtom(metaAtom)
+    
+    return this
+  }
+
   /**
    * Final meta array
    */
@@ -238,9 +511,8 @@ import kotlin.reflect.full.memberProperties
         if (wallet.hasTokenUnits()) {
           it.add(MetaData(key = "tokenUnits", value = wallet.tokenUnitsJson()))
         }
-
-        it.add(MetaData(key = "pubkey", value = wallet.pubkey))
-        it.add(MetaData(key = "characters", value = wallet.characters))
+        // Removed automatic addition of pubkey and characters for cross-SDK compatibility
+        // Only add metadata that is explicitly needed for the specific operation
       }
     }.toList()
   }
@@ -420,7 +692,7 @@ import kotlin.reflect.full.memberProperties
         value = (sourceWallet.balance - amount.toDouble()).toString(),
         batchId = remainderWallet !!.batchId,
         metaType = "walletBundle",
-        metaId = sourceWallet.bundle,
+        metaId = remainderWallet !!.bundle,
         meta = finalMetas(wallet = remainderWallet),
         index = generateIndex()
       )
@@ -636,6 +908,7 @@ import kotlin.reflect.full.memberProperties
     batchId: String? = null
   ): Molecule {
     meta.find { mataData -> mataData.key == "token" }?.run { value = token } ?: meta.add(MetaData("token", token))
+    meta.find { mataData -> mataData.key == "amount" }?.run { value = amount.toString() } ?: meta.add(MetaData("amount", amount.toString()))
 
     addAtom(
       Atom(
@@ -706,7 +979,7 @@ import kotlin.reflect.full.memberProperties
     // Determine signing atom
     val signingAtom = atoms.first()
 
-    // Generate the private signing key for this molecule
+    // Generate the private signing key for this molecule using original secret (same as Wallet constructor)
     val key = Wallet.generatePrivateKey(secret = secret, token = signingAtom.token, position = signingAtom.position)
 
     // Building a one-time-signature
@@ -747,7 +1020,9 @@ import kotlin.reflect.full.memberProperties
       keyChunks.forEachIndexed { idx, keyChunk ->
         var workingChunk = keyChunk
         var iterationCount = 0
-        val condition = 8 + normalizedHash[idx] !! * (if (encode) - 1 else 1)
+        // For signing (encode=true): iterate (8 - normalizedHash[idx]) times
+        // For verification (encode=false): iterate (8 + normalizedHash[idx]) times
+        val condition = if (encode) 8 - normalizedHash[idx]!! else 8 + normalizedHash[idx]!!
 
         while (iterationCount < condition) {
           workingChunk = Shake256.hash(workingChunk, 64)

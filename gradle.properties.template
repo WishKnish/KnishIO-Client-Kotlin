@@ -1,0 +1,35 @@
+# Gradle Properties Template
+# Copy this file to gradle.properties and fill in your values
+# DO NOT commit gradle.properties to version control
+
+# Gradle Configuration
+org.gradle.jvmargs=-Xmx4096m -XX:+UseG1GC
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.daemon=true
+kotlin.code.style=official
+
+# Maven Central (Sonatype OSSRH) Credentials
+# Sign up at https://issues.sonatype.org/
+ossrhUsername=your-ossrh-username
+ossrhPassword=your-ossrh-password
+
+# GPG Signing Configuration
+# Generate GPG key: gpg --gen-key
+# List keys: gpg --list-secret-keys
+# Export key: gpg --export-secret-keys KEY_ID | base64
+signing.keyId=your-gpg-key-id-last-8-chars
+signing.password=your-gpg-passphrase
+signing.secretKeyRingFile=/path/to/your/.gnupg/secring.gpg
+
+# Alternative: Use ASCII-armored key (for CI/CD)
+# Export: gpg --export-secret-keys --armor KEY_ID
+# signing.key=-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----
+
+# GitHub Packages Credentials
+# Generate token at https://github.com/settings/tokens
+gpr.user=your-github-username
+gpr.key=your-github-personal-access-token
+
+# Project Properties
+systemProp.org.gradle.internal.publish.checksums.insecure=true

@@ -77,8 +77,9 @@ import kotlin.jvm.Throws
 ) {
 
   companion object {
+    // Hash schema with JavaScript-compatible property ordering for cross-SDK molecular hash generation
     private val hashSchema
-      get() = mutableMapOf<String, Any?>(
+      get() = linkedMapOf<String, Any?>(
         "position" to null,
         "walletAddress" to null,
         "isotope" to null,
@@ -98,22 +99,33 @@ import kotlin.jvm.Throws
       }
 
     /**
+     * Returns atom properties in the correct order for molecular hash generation.
+     * Ensures JavaScript-compatible property ordering for cross-SDK compatibility.
+     */
+    @JvmStatic
+    private fun getHashableValues(atom: Atom): LinkedHashMap<String, Any?> {
+      // Return properties in exact JavaScript order for cross-SDK compatibility
+      return linkedMapOf(
+        "position" to atom.position,
+        "walletAddress" to atom.walletAddress,
+        "isotope" to atom.isotope,
+        "token" to atom.token,
+        "value" to atom.value,
+        "batchId" to atom.batchId,
+        "metaType" to atom.metaType,
+        "metaId" to atom.metaId,
+        "meta" to atom.meta,
+        "createdAt" to atom.createdAt
+      )
+    }
+
+    /**
      * Populates and returns a schema object according to hash priority list
      * to ensure consistent hashing results across multiple platforms
      */
     @JvmStatic
     private fun molecularHashSchema(atom: Atom): Map<String, Any?> {
-      val schema = hashSchema
-
-      atom::class.memberProperties.forEach {
-        if (it.visibility == KVisibility.PUBLIC) {
-          if (schema.containsKey(it.name)) {
-            schema[it.name] = it.getter.call(atom)
-          }
-        }
-      }
-
-      return schema.toMap()
+      return getHashableValues(atom)
     }
 
     /**
@@ -125,20 +137,107 @@ import kotlin.jvm.Throws
     }
 
     /**
-     * Sort the atoms in a Molecule
+     * Creates an Atom instance from JSON data (Kotlin best practices)
+     * 
+     * Handles cross-SDK atom deserialization with robust error handling following
+     * JavaScript canonical patterns for perfect cross-platform compatibility.
+     *
+     * @param json JSON string or data to deserialize
+     * @param validateStructure Validate required fields (default: true)
+     * @param strictMode Strict validation mode (default: false)
+     * @return Reconstructed atom instance
+     * @throws Exception If JSON is invalid or required fields are missing
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun fromJSON(
+      json: String,
+      validateStructure: Boolean = true,
+      strictMode: Boolean = false
+    ): Atom {
+      return try {
+        // Parse JSON safely using Gson for flexibility
+        val gson = com.google.gson.GsonBuilder()
+          .setLenient()
+          .create()
+        val jsonObject = gson.fromJson(json, com.google.gson.JsonObject::class.java)
+        
+        // Validate required fields in strict mode
+        if (strictMode || validateStructure) {
+          val requiredFields = listOf("position", "walletAddress", "isotope", "token")
+          for (field in requiredFields) {
+            if (!jsonObject.has(field) || jsonObject.get(field).isJsonNull) {
+              throw IllegalArgumentException("Required field '$field' is missing or empty")
+            }
+          }
+        }
+
+        // Create atom instance with required fields
+        val atom = Atom(
+          position = jsonObject.get("position")?.asString ?: "",
+          walletAddress = jsonObject.get("walletAddress")?.asString ?: "",
+          isotope = jsonObject.get("isotope")?.asString?.firstOrNull() ?: 'V',
+          token = jsonObject.get("token")?.asString ?: "",
+          value = jsonObject.get("value")?.takeIf { !it.isJsonNull }?.asString,
+          batchId = jsonObject.get("batchId")?.takeIf { !it.isJsonNull }?.asString,
+          metaType = jsonObject.get("metaType")?.takeIf { !it.isJsonNull }?.asString,
+          metaId = jsonObject.get("metaId")?.takeIf { !it.isJsonNull }?.asString,
+          index = jsonObject.get("index")?.asInt ?: 0,
+          createdAt = jsonObject.get("createdAt")?.asString ?: Strings.currentTimeMillis()
+        )
+
+        // Set additional properties that may not be in constructor
+        if (jsonObject.has("otsFragment") && !jsonObject.get("otsFragment").isJsonNull) {
+          atom.otsFragment = jsonObject.get("otsFragment").asString
+        }
+
+        // Reconstruct meta array if present
+        if (jsonObject.has("meta") && jsonObject.get("meta").isJsonArray) {
+          val metaArray = jsonObject.getAsJsonArray("meta")
+          val metaList = mutableListOf<MetaData>()
+          
+          for (metaElement in metaArray) {
+            if (metaElement.isJsonObject) {
+              val metaObj = metaElement.asJsonObject
+              if (metaObj.has("key") && metaObj.has("value")) {
+                metaList.add(MetaData(
+                  key = metaObj.get("key").asString,
+                  value = metaObj.get("value")?.takeIf { !it.isJsonNull }?.asString
+                ))
+              }
+            }
+          }
+          
+          atom.meta = metaList.toList()
+        }
+
+        atom
+
+      } catch (e: Exception) {
+        throw Exception("Atom deserialization failed: ${e.message}")
+      }
+    }
+
+    /**
+     * Sort the atoms in a Molecule using JavaScript-compatible comparison logic
      */
     @JvmStatic
     fun sortAtoms(atoms: List<Atom>): List<Atom> {
       val atomList = atoms.toMutableList()
 
-      // Sort based on atomic index
-      atomList.sortBy { it.index }
+      // JavaScript-compatible atom sorting for cross-SDK consistency
+      atomList.sortWith { a, b ->
+        when {
+          a.index != b.index -> a.index.compareTo(b.index)
+          else -> 0
+        }
+      }
 
       return atomList.toList()
     }
 
     /**
-     * Produces a hash of the atoms inside a molecule.
+     * Produces a hash of the atoms inside a molecule using JavaScript-compatible patterns.
      * Used to generate the molecularHash field for Molecules.
      */
     @JvmStatic
@@ -151,34 +250,39 @@ import kotlin.jvm.Throws
       for (atom in atomList) {
         molecularSponge.absorb(numberOfAtoms)
 
-        molecularHashSchema(atom).forEach { (property, value) ->
+        // Get atom properties in JavaScript-compatible order
+        getHashableValues(atom).forEach { (property, value) ->
 
-          // Old atoms support (without batch_id field)
-          if (value == null && property in arrayListOf("batchId", "pubkey", "characters")) {
+          // JavaScript-compatible null handling: position and walletAddress always included
+          if (value == null) {
+            if (property in listOf("position", "walletAddress")) {
+              molecularSponge.absorb("")
+            }
+            // Skip other null values (JavaScript behavior)
             return@forEach
           }
 
-          // Hashing individual meta keys and values
-          if (property == "meta") {
-            @Suppress("UNCHECKED_CAST") (value as List<MetaData>).forEach { MetaData ->
-              MetaData.value?.run {
-                molecularSponge.absorb(MetaData.key)
-                molecularSponge.absorb(this)
+          // Handle different property types with JavaScript-compatible patterns
+          when (property) {
+            "meta" -> {
+              // Process metadata with proper ordering
+              @Suppress("UNCHECKED_CAST") 
+              val metaList = value as List<MetaData>
+              for (metaData in metaList) {
+                if (metaData.value != null) {
+                  molecularSponge.absorb(metaData.key)
+                  molecularSponge.absorb(metaData.value!!)
+                }
               }
             }
-            return@forEach
-          }
-
-          if (property in arrayListOf("position", "walletAddress", "isotope")) {
-            val content = value ?: ""
-
-            molecularSponge.absorb(content.toString())
-
-            return@forEach
-          }
-
-          value?.run {
-            molecularSponge.absorb(toString())
+            "isotope" -> {
+              // Isotope character handling
+              molecularSponge.absorb(value.toString())
+            }
+            else -> {
+              // All other properties as strings
+              molecularSponge.absorb(value.toString())
+            }
           }
         }
       }
@@ -202,11 +306,77 @@ import kotlin.jvm.Throws
 
       return when (output) {
         "hex" -> molecularSponge.hexString(32)
-        "base17" -> Strings.charsetBaseConvert(
-          molecularSponge.hexString(32), 16, 17, "0123456789abcdef", "0123456789abcdefg"
-        ).padStart(64, '0')
+        "base17" -> {
+          val hexString = molecularSponge.hexString(32)
+          val base17String = Strings.charsetBaseConvert(
+            hexString, 16, 17, "0123456789abcdef", "0123456789abcdefg"
+          )
+          // Ensure proper 64-character padding with '0' for JavaScript compatibility
+          base17String.padStart(64, '0')
+        }
         else -> null
       }
+    }
+  }
+
+  /**
+   * Returns JSON-ready object for cross-SDK compatibility (Kotlin best practices)
+   * 
+   * Provides clean serialization of atomic operations with optional OTS fragments following
+   * JavaScript canonical patterns for perfect cross-platform compatibility.
+   *
+   * @param includeOtsFragments Include OTS signature fragments (default: true)
+   * @param validateFields Validate required fields (default: false)
+   * @return JSON-serializable Map
+   * @throws Exception If atom is in invalid state for serialization
+   */
+  @JvmOverloads
+  fun toJSON(
+    includeOtsFragments: Boolean = true,
+    validateFields: Boolean = false
+  ): Map<String, Any?> {
+    return try {
+      // Validate required fields if requested
+      if (validateFields) {
+        val requiredFields = listOf("position", "walletAddress", "isotope", "token")
+        for (field in requiredFields) {
+          val fieldValue = when (field) {
+            "position" -> position
+            "walletAddress" -> walletAddress
+            "isotope" -> isotope.toString()
+            "token" -> token
+            else -> null
+          }
+          if (fieldValue.isNullOrBlank()) {
+            throw IllegalArgumentException("Required field '$field' is missing or empty")
+          }
+        }
+      }
+
+      // Core atom properties (always included)
+      val serialized = mutableMapOf<String, Any?>(
+        "position" to position,
+        "walletAddress" to walletAddress,
+        "isotope" to isotope.toString(),
+        "token" to token,
+        "value" to value,
+        "batchId" to batchId,
+        "metaType" to metaType,
+        "metaId" to metaId,
+        "meta" to meta,
+        "index" to index,
+        "createdAt" to createdAt
+      )
+
+      // Optional OTS fragments (can be large, so optional)
+      if (includeOtsFragments && !otsFragment.isNullOrBlank()) {
+        serialized["otsFragment"] = otsFragment
+      }
+
+      serialized.toMap()
+
+    } catch (e: Exception) {
+      throw Exception("Atom serialization failed: ${e.message}")
     }
   }
 

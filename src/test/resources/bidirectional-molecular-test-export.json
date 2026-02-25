@@ -1,0 +1,176 @@
+{
+    "metadata": {
+        "testSuite": "BidirectionalMolecularValidation",
+        "generatedAt": "2025-08-28T04:42:31.564368Z",
+        "platform": "Kotlin → JavaScript",
+        "testPurpose": "Cross-platform molecular validation from Kotlin to JavaScript"
+    },
+    "kotlinToJavaScript": [
+        {
+            "name": "kotlin_metadata_molecule",
+            "description": "Metadata molecule created by Kotlin SDK for JavaScript validation",
+            "sourceSDK": "Kotlin",
+            "targetSDK": "JavaScript",
+            "molecule": {
+                "cellSlug": null,
+                "createdAt": "1756356151554",
+                "status": null,
+                "bundle": "551ee04aafdecce5f010ad6a16a68660ec7749ed00d1d25710938c6637420ffc",
+                "molecularHash": "019gb8ad84e052502cf6892g521e72c0ab2eb64479g684fc251e5d6g016ec815",
+                "atoms": [
+                    {
+                        "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                        "walletAddress": "e62c1f4055d08e72546e56a0c3427fb30a773b3c48d8e5a7118bbf88c7465f6d",
+                        "isotope": "M",
+                        "token": "CROSS_TEST",
+                        "value": null,
+                        "index": 0,
+                        "metaType": "bidirectional-test",
+                        "metaId": "kotlin-to-js-meta-1756356151554",
+                        "meta": [
+                            {
+                                "key": "source_sdk",
+                                "value": "Kotlin"
+                            },
+                            {
+                                "key": "target_sdk",
+                                "value": "JavaScript"
+                            },
+                            {
+                                "key": "test_purpose",
+                                "value": "cross-platform-molecular-validation"
+                            },
+                            {
+                                "key": "isotope_type",
+                                "value": "metadata"
+                            }
+                        ],
+                        "otsFragment": "g6CY/KuFwLr9/HlqhyCCXJaqZIHqmhJ3nrZd/30gG4IfDveOOSI9P+8zb0Oqw/kcR0mCQCTm03StnjKmGTi/x4KsoUVTrncLnw6THMkP2HUIrK+ic5jSj53NM/rHCrw1Ww02+I+rLXJiKecTea6CmaC/P5hJuZLEI4nNA02stOaiNhU3ex9vvsuyL5Nb8U3xdeExYC6gS++LQE+prdAvISgFkTFadDpxc8pSA2IzJRDofq9QCJO5CnkuOeFT2PsRJaRcg7FAVpmw4/TzSOUl5aKznay3JlG7F5GQvUWOOMBmc0hpdQPj8G+4WbZUyHzanVsRfAkm/bMjWnbfPo3XklF1LQAh3kxio8aApm96tok+DzncETi4l4qFm0JDcWHqJB59n1xfnHpJm40E3uAUal8opAjVG7MnhM8ggOnMRqJn1TrAPtvL7gpLNvUYMHcCc9MSpeqBIa0D9n6yg8CVts66F2gD758xmhZ5F8VLnHH8zSve3PTteUKJlQy/EXEys57sR9OZeABUECTKBKfvAs5y1c9gTw97lAq7l07ejJxXcw4YRHQRRfrbNLSym/JEfyljNktXHzdXWVohZlT+bnDKdroQ6rxotadmJ/QMo3N4bo7b7zK0nvDUSGQ3dA8LzvRa6me2AMNLjmJxjY5BRBcDfi8tLL68dfh2jW2omxpNmkXIxPXKch97jx0Or4c68XogWr0vjvU3GTL6+N15Gt9aFpL5sFOFXq4MWtlxH+uHx8etu0LEZlgjCGp5dp/gkgAsll6nlTxHjz8YsdOtLFZxi1fCVFf7xq8u7YykREUHQqr0wEwiqV1pITqOdgY/StEB6TUDlxsWnwaK20NccysSKp6Zae1d/87cPfILTRZHEv5f+ch7dXrY+d7iflwsijRrKe4OUpiiASvmZzOesjJiA7yS6HeOnS7JqR8p80tbygYPcYxa1vPAtlavNAvWBpejPXmnqEqxHASpx3tDZGbkbxypUhZvXlnMy45fbvhmNym24bbU+0CJBoBKoKTl7VNYSPWHTsNPLiTB2zHvQh3e/m1v9PflLbe/2x57+bqtL9zeaud/d+MU7WhMp/JamyabdTJRXyEFp++CGggsMUEJFGcYuM65OT/nBIgzryX//qcaOgjWZxvHpZGG+XFkhtnoUb4+bMjXs81Umnc2zoy1CrT6Pli2mN2B7hlgAXCfYNiMRRkTvYsbHy8c9ppe3sEArF+kCx0OKw6ZL2jqTAw2oGSfv8ksjHRVCBnSv6Wmw+b816Tpz1MAlni4+Gvnkd7Vi+Ev1YoNFzO+hKhEYU0rTHFO47QitBpiXRctbpZH6+lm0ln5z5U6Db+MGf198Kgo1NYZyDi4Vn2+jiF3fg=="
+                    }
+                ]
+            },
+            "expectedValid": true,
+            "testCategory": "metadata_isotope"
+        },
+        {
+            "name": "kotlin_continuid_molecule",
+            "description": "ContinuID molecule created by Kotlin SDK for JavaScript validation",
+            "sourceSDK": "Kotlin",
+            "targetSDK": "JavaScript",
+            "molecule": {
+                "cellSlug": null,
+                "createdAt": "1756356151558",
+                "status": null,
+                "bundle": "551ee04aafdecce5f010ad6a16a68660ec7749ed00d1d25710938c6637420ffc",
+                "molecularHash": "0366fac7b47e4f7f2764a8aae9g18df58172c3ecfcce02caf0b302e29968db52",
+                "atoms": [
+                    {
+                        "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                        "walletAddress": "e62c1f4055d08e72546e56a0c3427fb30a773b3c48d8e5a7118bbf88c7465f6d",
+                        "isotope": "C",
+                        "token": "CROSS_TEST",
+                        "value": null,
+                        "index": 0,
+                        "metaType": null,
+                        "metaId": null,
+                        "meta": [],
+                        "otsFragment": "31zbn8MvVNCmPlKS3pZLE7dqaUGieKlDhkeSNQtLUeiKwRv1Ek9Xy8NrXElwpgKxXDJ9VT3BmXAu07+qtvKIBYKsoUVTrncLnw6THMkP2HUIrK+ic5jSj53NM/rHCrw1Ww02+I+rLXJiKecTea6CmaC/P5hJuZLEI4nNA02stOZEdTK3xZjS/kVai5lFwPHlsRpb+I7u9J/HpsCuSl6prJYXNCdNlJJ+JCA3g1vnClJp1ZqjK6YitfiRLBFdLnG9yCnHdnZmV7Cg0OKSH4n6//yj++11/RA0899zFuOIXGI8hIK7ss7m1RNOZREAS/hs36ZgCKkHat61ZPfZVQUIlE/YvTF4ZeJjEeQ1E8zCB/BBpQe0gHLbvnsbVnjSzqi8Quq1Fs1eSKm6RlEl5ksRVkx2z+/wlEQEZAuaAAZT3O1n1TrAPtvL7gpLNvUYMHcCc9MSpeqBIa0D9n6yg8CVts66F2gD758xmhZ5F8VLnHH8zSve3PTteUKJlQy/EXEys57sR9OZeABUECTKBKfvAs5y1c9gTw97lAq7l07ejJxXcw4YRHQRRfrbNLSym/JEfyljNktXHzdXWVohZlT+bhvVHV7/84wxIjgi++iteYQq8MI3uzb6FY98jNxB/eKjmH7m/5/bWBFzlDrzXId8ef9g+o0gG1gl/1DvJzx/PXwFWO1K1JvgAzPYyAHrGuh4m1gJWZZYud6PFX1XHMLm0pWp87F0th6eR8XFuq03v0Cl6UGPCNVLGH7e5o4Avq9KCaxbwLhk2CmQWROQck4t30A2RyvvhuvTuy4vWeWAIhvQc/u3+9h5BlDOiNMD2hX4OZEmnBAkYOW6fSYfWoNCPaa3X2RIGrg+yahFRWBgulu8lek7iqcqMUKN6LefcjaO8AGFWqnA2n1SwqqsUgaRGBOefRMdl/xaI98xZ5yRB6ALOVnkv9Vr1oTHmHdKLnGe37t+6g3WmngXSAcIZAtnxphQdEW8rtUYYoI/IRxfGokP4iea1F/afG2YOPg7qnFaNxzjVLIRBVrekxTjxsYksGEi4ILK0Lrt95UbLvXneo2El48p5cLrd4XOHBuPLljCDRGLZkpxQqheWTAfDAgb/R2xY5DrWAkm5VoXsOvqosbWD9Cza9lgE5uR505qY8Q3C4j9jErxJPm9aJE01KQJ2C/ads/XrE9oAy0o0iPOfJa8o4F+cNSNR6FUIRCOiVF3Tu+9oMxLIApIwEn8Le1nNmxYMeEU65t9PlfhA1U08x+2XNlyKfCZGS+M+Ci/z7/7vd6ZnSqn4Odmdnu5CEwisBcFjqar8Vb8WUNtP2+fwITDdgk9nHyKPxHJVe3K6999Mw1FkDJKXV41dzInpZmKbA=="
+                    }
+                ]
+            },
+            "expectedValid": true,
+            "testCategory": "continuid_isotope"
+        },
+        {
+            "name": "kotlin_value_transfer_molecule",
+            "description": "Value transfer molecule created by Kotlin SDK for JavaScript validation",
+            "sourceSDK": "Kotlin",
+            "targetSDK": "JavaScript",
+            "molecule": {
+                "cellSlug": null,
+                "createdAt": "1756356151561",
+                "status": null,
+                "bundle": "551ee04aafdecce5f010ad6a16a68660ec7749ed00d1d25710938c6637420ffc",
+                "molecularHash": "048aadfa7cg48bd75647df4d7b970e0af4g4288850g2456cbg77866fg5f38141",
+                "atoms": [
+                    {
+                        "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                        "walletAddress": "e62c1f4055d08e72546e56a0c3427fb30a773b3c48d8e5a7118bbf88c7465f6d",
+                        "isotope": "V",
+                        "token": "CROSS_TEST",
+                        "value": "-100",
+                        "index": 0,
+                        "metaType": null,
+                        "metaId": null,
+                        "meta": [],
+                        "otsFragment": "31zbn8MvVNCmPlKS3pZLE7dqaUGieKlDhkeSNQtLUeiKwRv1Ek9Xy8NrXElwpgKxXDJ9VT3BmXAu07+qtvKIBVA0JEB0mzLYGZITGc9mRm6YwAMfccgQhGjJTF8K6qltRoJNb3mZWAoxgpRfTO9xfaaQn4KPwp1WlY5Yv0SLCEXwurcsqQF84Jz8qVZ1Lwc5FCsa1raL0yHFdDb3BPZgA7jBMqrl5FuzsHBpmBwJnz2C3cHP2YdkAubR1HVuEXuLzDnUE5nKJ67rdy7QAUL+7UtVO3ujzd0iOvG4T5mLbLne/4kSo/3SG96SOzi6MiWrutQvR5bBaRESqhZMVmFSHHz8owUp0uDS6m8QdLRc5EvJACjTj2nkRvazWK/cySSifiXSp3jgMpvJVaTw6r52RTBcPYtwc01c9IwBDFV8AzCMoNd/kaOTct+7R//uMMUAhP9GovqcpXOQLgpyjIWsY7nyPE7i/3+igiL3/Eb4i2Qe3GR/9XWYTo1D+HI0YEGV5FVwtg0bwGeavtC2NSQKXU+V54FTBrK6QMtWMIWqxX/ylk3n/HgipzlQab+Cva3NE4k/d4mcLCKvioxcMO9G89rv59IlYnRb9nGVcBezDMqRnTMkI0ycRIYiEy/45s30+eUnpRrn0ZM0OTBcq1JyUPP+TuLplQQZ2ewdsxhcqDLs"
+                    },
+                    {
+                        "position": "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+                        "walletAddress": "68e96d9ea4cdf2321be5bf102f306de8671a9a960e299071d22fe054c9df506d",
+                        "isotope": "V",
+                        "token": "CROSS_TEST",
+                        "value": "100",
+                        "index": 0,
+                        "metaType": null,
+                        "metaId": null,
+                        "meta": [],
+                        "otsFragment": "rAQtYzQk+pr+aH/mpg29huvHb0dDhGNwk8pKNh/O3HeqrM0ULuO+IGO7qZq+Gz2fCoBo5uYl/G/tUBKKjb2IRN48SHAD/HJK/2LqMqE+uaYMkSEuTSGXzfZVYIr6UuBO2X20QShGa3uA2k+fu5p9BdgmAWSTFy9qKepVXRh2o2EiqKPF+zVJTuay7tId4h1VnpdExQfTxuCAEggb5RihkRCWzxkpq63W7Qrvjm+kih1sJXrcq/oTj7x+pcvGNGubuCCR/niyZLxJwM/4bhkGs+9bbyExznR9TZ0EVv/Z7icT5a46NHs/MAMrNvlV0ZeNyRriGC+gTeJBAiH3xH+gPdxF8VArHBVrk0aRsGdNKCgWpnYYW3sEbyL8hQYij6NLT5LxvtNwkCmgiTskYVZD1bvmrGJ5ws5I50Hw86kUD2tfsPautjbNcl4+JVbOoC73lZshpNdORC7513rLSzH/JGxghX1xCIYfS3VC2GLZqx8038T72qYjn+7Ltrra02t8YIqTardrxR2Fzis5/x/Yl8XNicIW6jWwv5AC8KXx+QAQhleAOrm+Wm2/3A59Ezmd/zI6e9Kvik13M6bdNwswH4hM//sDsQyMZnDyadixX+/BLxgqEdQr1RFJityptTZC6iVlLr4GuZy1CGAlPup3owO3siHAVCTHgTzV6nthvA=="
+                    }
+                ]
+            },
+            "expectedValid": true,
+            "testCategory": "value_isotope"
+        },
+        {
+            "name": "kotlin_cellular_molecule",
+            "description": "Cellular architecture molecule created by Kotlin SDK for JavaScript validation",
+            "sourceSDK": "Kotlin",
+            "targetSDK": "JavaScript",
+            "molecule": {
+                "cellSlug": "app1.payments.bidirectional",
+                "createdAt": "1756356151563",
+                "status": null,
+                "bundle": "551ee04aafdecce5f010ad6a16a68660ec7749ed00d1d25710938c6637420ffc",
+                "molecularHash": "02ce9c7ab656g54ac71d5d5b2564b4569f59dc69a242a7162c6917d00be02f73",
+                "atoms": [
+                    {
+                        "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                        "walletAddress": "e62c1f4055d08e72546e56a0c3427fb30a773b3c48d8e5a7118bbf88c7465f6d",
+                        "isotope": "M",
+                        "token": "CROSS_TEST",
+                        "value": null,
+                        "index": 0,
+                        "metaType": "cellular-test",
+                        "metaId": "cell-routing-validation",
+                        "meta": [
+                            {
+                                "key": "cell_slug",
+                                "value": "app1.payments.bidirectional"
+                            },
+                            {
+                                "key": "cell_depth",
+                                "value": "3"
+                            },
+                            {
+                                "key": "routing_test",
+                                "value": "bidirectional_molecular_validation"
+                            }
+                        ],
+                        "otsFragment": "g6CY/KuFwLr9/HlqhyCCXJaqZIHqmhJ3nrZd/30gG4IfDveOOSI9P+8zb0Oqw/kcR0mCQCTm03StnjKmGTi/x1A0JEB0mzLYGZITGc9mRm6YwAMfccgQhGjJTF8K6qltRoJNb3mZWAoxgpRfTO9xfaaQn4KPwp1WlY5Yv0SLCEUHFDI4LwGu82nuj2zULZPEKuomVAtNfRyW2/YkcTAdjyiEpwBEyrKtayKj2DKSqgybqPXDm9HUqbRFLdvZUJNue2zLTXEEYANlf3snI68XO8VKxJnPmZqSbgR0g/quML6D+Ci7UC3dMUHZlEhtVdaU3Jm+a5BuX6EHtMfSImP3Fty9ha1TAFqqTnaQlCaL2UfG/vyxKOm+asXm7lnbHc3B/j11Y+EQ0mcnOICxU87CexPBM1yWZpRAN5gwD7bX5rhhfMJ9HaWdRyB3/5hQXpb/YLY31Ta3IUrLEeZnGktGkK9i5206P9V5qGGMmP795Xiv+VVHDE7zYMwPOz1Q4bDBUWt5/UG86XZhoHt2wkUp4RD/2QhAxZELGd4NKDYDrdqub0cVf0jfaUqyzsKeb78iSK4pAoqGoHiIj+q5Dlvi1+K0KYu7ATdV2uUxJD/iaVMgMVQfDftY72w04ckNMxU1RzIf6m+TGblnnGFO5xRWUu2qD9PCIKtJ1erxegqHHDf876a8FWCOdB3RfkwSJC/dLYRC5vhu5xbtPfuQ20ffjIEEpMeWbF9G3pPqOiOX5dgmN8ltVu2bTQZxZP7MCX0qiB+xTXGdz/SsauLFuP+ERbWKWwD7ygRg1O27Fknw1ySURMPC6fAEhIcst7u8yXZgQR8a56/nf02EHIsFZFDinUsJujrApP6oL+cchnD5FHXu4H5dM6IfyftpWClD6hBejXgzlG/IpIR6kvFf1Q32nq5zFBjHh3RrJs0Fmk1gKjJPv1CBtbYBtnpxoTJLgvc23OW27FbioKX0TUMqqAQj342veZgTtcrb6rShIc4TfYHPm+/dQQDaK4mZ03ZNV4NiwRN/8z5XTyjpk9nWrsVIyrWBmvm1V4TUdQY7vemhs+TfU1rSJh8Aq8uJArjUQBL5RPUtZ1/o0apmzhUVJmZRZxl6p3BnWH6m66/AbtLKhQGl4ehWTDkC4HNgJGAWhIJ7mAbErrKKWSCAonWwtgc8Q6gDnpH3GL2AYQ0r5fYLGJ/X50vv64uwkUmRHmly9AAiaj8jffGw8I3k1YL5iQiv7N/2L+hTtvDQbbCWknxK8r7eYdoQjfUBS3VzP2pfnzfvevAsP67xQlxAf/o2dn54p4KGF4agHcMh/sq1jgHWTEW1MmRFlb9blqNZZ3sWTBxHwrY1/N+X54BlDi42FoQRNQ=="
+                    }
+                ]
+            },
+            "expectedValid": true,
+            "testCategory": "cellular_architecture"
+        }
+    ],
+    "javaScriptToKotlin": [],
+    "validationResults": {
+        "kotlinToJavaScriptPassed": 0,
+        "kotlinToJavaScriptFailed": 0,
+        "javaScriptToKotlinPassed": 0,
+        "javaScriptToKotlinFailed": 0,
+        "totalCompatibilityScore": 0.0
+    }
+}

@@ -3,13 +3,12 @@
 package wishKnish.knishIO.client.data.json.response.query.walletList
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Wallet
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var Wallet: List<Wallet>? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var wallets: List<Wallet>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

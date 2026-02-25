@@ -7,10 +7,10 @@ import wishKnish.knishIO.client.data.json.variables.BatchHistoryVariable
 
 
 @Serializable data class BatchHistory(@JvmField val variables: BatchHistoryVariable) : QueryInterface {
-  override val query = """
-    query( ${'$'}batchId: String ) {
-      BatchHistory( batchId: ${'$'}batchId ) {
-        ${Batch.getFields()}
+  override val query = $$"""
+    query( $batchId: String ) {
+      BatchHistory( batchId: $batchId ) {
+        $${Batch.getFields()}
       }
     }
   """.trimIndent()

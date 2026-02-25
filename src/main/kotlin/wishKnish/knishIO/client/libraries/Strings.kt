@@ -5,6 +5,7 @@ package wishKnish.knishIO.client.libraries
 import org.bouncycastle.util.encoders.Base64
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
+import java.security.SecureRandom
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -12,6 +13,7 @@ import kotlin.jvm.Throws
 
 class Strings {
   companion object {
+    private val secureRandom = SecureRandom()
 
     @JvmStatic
     fun hexToBase64(str: String): String {
@@ -26,7 +28,13 @@ class Strings {
     @JvmStatic
     @Throws(ArithmeticException::class)
     fun currentTimeMillis(): String {
-      return ZonedDateTime.of(LocalDateTime.now(), ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
+      // Support deterministic timestamps for cross-SDK validation
+      val fixedTimestamp = System.getenv("KNISHIO_FIXED_TIMESTAMP")
+      return if (!fixedTimestamp.isNullOrBlank()) {
+        fixedTimestamp
+      } else {
+        ZonedDateTime.of(LocalDateTime.now(), ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
+      }
     }
 
     @JvmStatic
@@ -36,7 +44,18 @@ class Strings {
       length: Int,
       alphabet: String = "abcdef0123456789"
     ): String {
-      return (1..length).map { alphabet.toList().random() }.joinToString("")
+      require(length > 0) { "Length must be positive" }
+      require(alphabet.isNotEmpty()) { "Alphabet must not be empty" }
+      
+      val alphabetArray = alphabet.toCharArray()
+      val result = CharArray(length)
+      
+      for (i in 0 until length) {
+        val randomIndex = secureRandom.nextInt(alphabetArray.size)
+        result[i] = alphabetArray[randomIndex]
+      }
+      
+      return String(result)
     }
 
     @JvmStatic
@@ -79,7 +98,7 @@ class Strings {
         val idx = value.mod(bigIntegerToBase)
         target = "${destTable[idx.toInt()]}$target"
         value = value.div(bigIntegerToBase)
-      } while (! value.equals(bigIntegerZero))
+      } while (value != bigIntegerZero)
 
       return target
     }

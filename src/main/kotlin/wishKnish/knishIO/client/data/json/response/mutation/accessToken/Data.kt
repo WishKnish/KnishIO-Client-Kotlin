@@ -3,12 +3,11 @@
 package wishKnish.knishIO.client.data.json.response.mutation.accessToken
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.AccessToken
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var AccessToken: AccessToken? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var accessToken: AccessToken? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -19,8 +18,8 @@ import wishKnish.knishIO.client.data.graphql.types.AccessToken
 
     @JvmStatic
     @JvmOverloads
-    fun create(AccessToken: AccessToken? = null): Data {
-      return Data(AccessToken)
+    fun create(accessToken: AccessToken? = null): Data {
+      return Data(accessToken)
     }
 
     @JvmStatic

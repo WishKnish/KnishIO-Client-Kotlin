@@ -8,9 +8,9 @@ import wishKnish.knishIO.client.data.json.variables.AccessTokenMutationVariable
 
 
 @Serializable data class AccessTokenMutation(@JvmField val variables: AccessTokenMutationVariable) : QueryInterface {
-  override val query = """
-    mutation( ${'$'}cellSlug: String, ${'$'}pubkey: String, ${'$'}encrypt: Boolean ) {
-      AccessToken( cellSlug: ${'$'}cellSlug, pubkey: ${'$'}pubkey, encrypt: ${'$'}encrypt ) {
+  override val query = $$"""
+    mutation( $cellSlug: String, $pubkey: String, $encrypt: Boolean ) {
+      AccessToken( cellSlug: $cellSlug, pubkey: $pubkey, encrypt: $encrypt ) {
         token,
         time,
         key,

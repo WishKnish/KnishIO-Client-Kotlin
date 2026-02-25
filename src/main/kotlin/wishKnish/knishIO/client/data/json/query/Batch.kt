@@ -64,12 +64,12 @@ import wishKnish.knishIO.client.data.json.variables.BatchVariable
     }
   }
 
-  override val query = """
-    query( ${'$'}batchId: String ) {
-      Batch( batchId: ${'$'}batchId ) {
-        ${getFields()},
+  override val query = $$"""
+    query( $batchId: String ) {
+      Batch( batchId: $batchId ) {
+        $${getFields()},
         children {
-          ${getFields()}
+          $${getFields()}
         }
       }
     }

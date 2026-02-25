@@ -3,13 +3,12 @@
 package wishKnish.knishIO.client.data.json.response.query.batchHistory
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.BatchInstance
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var BatchHistory: List<BatchInstance>? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var batchHistory: List<BatchInstance>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

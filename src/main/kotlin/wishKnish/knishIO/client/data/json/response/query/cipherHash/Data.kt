@@ -3,12 +3,11 @@
 package wishKnish.knishIO.client.data.json.response.query.cipherHash
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var CipherHash: DataHash? = null) {
+@Serializable data class Data @JvmOverloads constructor(@JvmField var cipherHash: DataHash? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

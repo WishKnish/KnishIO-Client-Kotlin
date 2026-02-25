@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
 import wishKnish.knishIO.client.data.json.variables.ContinuIdVariable
 
 @Serializable data class ContinuId(@JvmField val variables: ContinuIdVariable) : QueryInterface {
-  override val query = """
-    query (${'$'}bundle: String!) {
-      ContinuId(bundle: ${'$'}bundle) {
+  override val query = $$"""
+    query ($bundle: String!) {
+      ContinuId(bundle: $bundle) {
         address,
         bundleHash,
         tokenSlug,
