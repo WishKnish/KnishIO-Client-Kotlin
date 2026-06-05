@@ -38,6 +38,31 @@ class PatentVectorValidationTest {
     }
 
     // =========================================================================
+    // 0. generateSecret cross-SDK parity (Batch AO) — seed -> 2048 hex secret
+    // =========================================================================
+
+    @Nested
+    @DisplayName("generateSecret — cross-SDK parity (Batch AO)")
+    inner class GenerateSecret {
+
+        private val secretTests by lazy {
+            vectors["generate_secret"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("Secret matches canonical 2048-hex vector")
+        fun secretMatchesVector() {
+            val test = secretTests[0].jsonObject
+            val seed = test["seed"]!!.jsonPrimitive.content
+            val expected = test["expectedSecret"]!!.jsonPrimitive.content
+
+            val secret = Crypto.generateSecret(seed)
+            assertEquals(expected, secret,
+                "generateSecret must match the canonical cross-SDK vector")
+        }
+    }
+
+    // =========================================================================
     // 1. ContinuID Chain Relay (Patent Claims 5, 12-14)
     // =========================================================================
 
