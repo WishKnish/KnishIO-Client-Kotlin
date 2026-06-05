@@ -63,6 +63,35 @@ class PatentVectorValidationTest {
     }
 
     // =========================================================================
+    // 0b. Atom value formatting cross-SDK parity (Batch AQ)
+    //     A V/B/F numeric value must serialize as an integer string (the
+    //     validator parses it as i128); whole-number floats carry NO ".0".
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Atom value formatting — cross-SDK parity (Batch AQ)")
+    inner class AtomValueFormat {
+
+        private val valueTests by lazy {
+            vectors["atom_value_format"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("Whole-number value serializes as an integer string (no trailing .0)")
+        fun valueFormatMatchesVector() {
+            valueTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                // Exercise the bug path: format from a Double.
+                val value = test["value"]!!.jsonPrimitive.double
+                val expected = test["expected"]!!.jsonPrimitive.content
+                assertEquals(expected, formatAtomValue(value),
+                    "atom value format mismatch (cross-SDK parity) for $name")
+            }
+        }
+    }
+
+    // =========================================================================
     // 1. ContinuID Chain Relay (Patent Claims 5, 12-14)
     // =========================================================================
 
