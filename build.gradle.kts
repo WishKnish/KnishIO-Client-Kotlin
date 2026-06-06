@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URI
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.KotlinJvm
 
 plugins {
   val kotlinVersion = "2.2.0"
@@ -8,14 +10,17 @@ plugins {
   kotlin("plugin.serialization") version kotlinVersion
   id("com.gradleup.shadow") version "8.3.6"
   id("org.jetbrains.dokka") version "1.9.20"
-  id("maven-publish")
-  id("signing")
+  // Maven Central publishing via the Central Portal (replaces the decommissioned
+  // OSSRH s01 endpoint). Applies + manages maven-publish and signing internally.
+  // Pinned to 0.34.0: the last line that supports this repo's Gradle 8.11.1
+  // (0.35.0+ require Gradle 8.13) AND Dokka v1 / 1.9.20 (0.36.0 dropped Dokka v1).
+  id("com.vanniktech.maven.publish") version "0.34.0"
   id("jacoco")
   `java-library`
 }
 
 group = "io.knish"
-version = "1.0.0-RC1"
+version = "0.8.0"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
 
 repositories {
@@ -25,10 +30,10 @@ repositories {
 }
 
 dependencies {
-  val ktorVersion = "2.3.12"
-  val coroutinesVersion = "1.8.1"
-  val serializationVersion = "1.7.3"
-  val bouncyCastleVersion = "1.79"
+  val ktorVersion = "3.2.0"
+  val coroutinesVersion = "1.10.2"
+  val serializationVersion = "1.9.0"
+  val bouncyCastleVersion = "1.80"
 
   implementation("io.github.instantwebp2p:tweetnacl-java:1.1.2")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
@@ -39,10 +44,13 @@ dependencies {
   implementation("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion")
   implementation("org.bouncycastle:bcutil-jdk18on:$bouncyCastleVersion")
   
-  // KyberKotlin for ML-KEM implementation (NIST FIPS-203 compliant)
-  implementation("asia.hombre:kyber:2.0.0")
-  
-  // GraalJS for JavaScript interop (noble-post-quantum bridge)
+  // NOTE: asia.hombre:kyber (KyberKotlin) removed — it had ZERO references in
+  // src/. ML-KEM is provided by the GraalJS noble-ml-kem bridge below (kept) for
+  // byte-identical cross-SDK parity with the JS SDK.
+
+  // GraalJS for JavaScript interop (noble-post-quantum bridge — LOAD-BEARING:
+  // Wallet.preparePostQuantumKeys + encrypt/decrypt route ML-KEM through the
+  // bundled noble-ml-kem-bundle.js for JS-SDK-identical keys. Do NOT remove.)
   implementation("org.graalvm.polyglot:polyglot:24.0.2")
   implementation("org.graalvm.polyglot:js:24.0.2")
   implementation("org.graalvm.js:js-scriptengine:24.0.2")
@@ -54,33 +62,37 @@ dependencies {
   implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
   implementation("io.ktor:ktor-network-tls-certificates:$ktorVersion")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
+  // kotlinx-coroutines-android removed — Android dispatcher artifact, unused in a JVM SDK.
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutinesVersion")
-  implementation("org.slf4j:slf4j-jdk14:2.0.16")
-  implementation("com.google.code.gson:gson:2.11.0")
+  // slf4j-jdk14 removed — a library must not ship an SLF4J *binding* (forces JUL on
+  // consumers); no slf4j usage in main (Ktor uses its own Logger).
+  implementation("com.google.code.gson:gson:2.14.0")
   implementation("com.graphql-java:graphql-java:22.3")
   
   // Testing dependencies
   testImplementation(kotlin("test"))
   testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-  testImplementation("io.mockk:mockk:1.13.13")
+  testImplementation("io.mockk:mockk:1.14.3")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
-  testImplementation("io.strikt:strikt-core:0.34.1")
+  testImplementation("io.strikt:strikt-core:0.35.1")
 }
 
 kotlin {
   jvmToolchain(17)
 }
 
-java {
-  withJavadocJar()
-  withSourcesJar()
-}
+// NOTE: sources + javadoc jars are produced by the Vanniktech plugin's
+// configure(KotlinJvm(...)) below — do NOT also call java.withSourcesJar()/
+// withJavadocJar() here (duplicate-artifact conflict).
 
+// Unit test suite. Mirrors the other SDKs' shape: two shared cross-SDK vector
+// tests (PatentVectorValidationTest over canonical-patent-vectors.json,
+// CrossPlatformVectorsTest over cross-platform-test-vectors.json) plus
+// per-concern unit tests. No bespoke generators/integration scaffolding.
 tasks.test {
   useJUnitPlatform()
   finalizedBy(tasks.jacocoTestReport)
-  
+
   // Eliminate runtime warnings that mask real SDK issues
   jvmArgs(
     "--enable-native-access=ALL-UNNAMED",  // Fix JANSI native access warnings
@@ -113,7 +125,10 @@ tasks.dokkaHtml {
   dokkaSourceSets {
     configureEach {
       moduleName.set("KnishIO Client Kotlin")
-      includes.from("README.md")
+      // NOTE: do NOT `includes.from("README.md")` — Dokka `includes` expects a
+      // module/package-doc file (must start with "# Module"/"# Package"); the
+      // README starts with an HTML <div> logo and makes dokkaHtml fail
+      // ("Unexpected classifier: <div"). API docs are generated without it.
       sourceLink {
         localDirectory.set(file("src/main/kotlin"))
         remoteUrl.set(URI("https://github.com/WishKnish/KnishIO-Client-Kotlin/tree/main/src/main/kotlin").toURL())
@@ -123,92 +138,69 @@ tasks.dokkaHtml {
   }
 }
 
-val dokkaJavadocJar by tasks.registering(Jar::class) {
-  dependsOn(tasks.dokkaJavadoc)
-  from(tasks.dokkaJavadoc.flatMap { it.outputDirectory })
-  archiveClassifier.set("javadoc")
-}
+// Maven Central publishing via the Sonatype Central Portal (the OSSRH s01
+// endpoint was decommissioned 2025-06-30). The Vanniktech plugin produces the
+// sources + Dokka-javadoc jars, signs all publications, and uploads+releases in
+// a single `publishToMavenCentral` task. Credentials come from the
+// ORG_GRADLE_PROJECT_mavenCentralUsername/Password + signingInMemoryKey* env
+// vars in CI (see .github/workflows/ci.yml); absent locally, signing is skipped
+// so `publishToMavenLocal` still works.
+mavenPublishing {
+  publishToMavenCentral(automaticRelease = true)
 
-publishing {
-  publications {
-    create<MavenPublication>("maven") {
-      from(components["java"])
-      
-      artifact(dokkaJavadocJar)
-      
-      pom {
-        name.set("KnishIO Client Kotlin")
-        description.set("KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography")
-        url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin")
-        
-        licenses {
-          license {
-            name.set("MIT License")
-            url.set("https://opensource.org/licenses/MIT")
-          }
-        }
-        
-        developers {
-          developer {
-            id.set("wishknish")
-            name.set("WishKnish Corp.")
-            email.set("dev@wishknish.com")
-            organization.set("WishKnish Corp.")
-            organizationUrl.set("https://wishknish.com")
-          }
-          developer {
-            id.set("eugene-teplitsky")
-            name.set("Eugene Teplitsky")
-            organization.set("WishKnish Corp.")
-          }
-        }
-        
-        scm {
-          connection.set("scm:git:git://github.com/WishKnish/KnishIO-Client-Kotlin.git")
-          developerConnection.set("scm:git:ssh://github.com:WishKnish/KnishIO-Client-Kotlin.git")
-          url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin")
-        }
-        
-        issueManagement {
-          system.set("GitHub Issues")
-          url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin/issues")
-        }
-      }
-    }
+  // Sign only when a key is configured (CI: the ORG_GRADLE_PROJECT_signingInMemoryKey
+  // secret). Locally there's no key, so skip signing — otherwise publishToMavenLocal
+  // fails with "no configured signatory". Maven Central REQUIRES signatures, so the
+  // CI publish (which sets the secret) always signs.
+  if (project.findProperty("signingInMemoryKey") != null ||
+      System.getenv("ORG_GRADLE_PROJECT_signingInMemoryKey") != null) {
+    signAllPublications()
   }
-  
-  repositories {
-    maven {
-      name = "sonatype"
-      val releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-      val snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-      url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
-      
-      credentials {
-        username = project.findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME")
-        password = project.findProperty("ossrhPassword") as String? ?: System.getenv("OSSRH_PASSWORD")
-      }
-    }
-    
-    maven {
-      name = "GitHubPackages"
-      url = uri("https://maven.pkg.github.com/WishKnish/KnishIO-Client-Kotlin")
-      credentials {
-        username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
-        password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
-      }
-    }
-  }
-}
 
-signing {
-  val signingKeyId = project.findProperty("signing.keyId") as String? ?: System.getenv("SIGNING_KEY_ID")
-  val signingKey = project.findProperty("signing.secretKeyRingFile") as String? ?: System.getenv("SIGNING_KEY")
-  val signingPassword = project.findProperty("signing.password") as String? ?: System.getenv("SIGNING_PASSWORD")
-  
-  if (signingKeyId != null && signingKey != null && signingPassword != null) {
-    useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
-    sign(publishing.publications["maven"])
+  // Explicit, lowercase artifactId (otherwise it defaults to rootProject.name
+  // "KnishIO-Client-Kotlin"); matches the README coords io.knish:knishio-client-kotlin.
+  coordinates("io.knish", "knishio-client-kotlin", version.toString())
+
+  configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaHtml")))  // sourcesJar defaults to true
+
+  pom {
+    name.set("KnishIO Client Kotlin")
+    description.set(project.description)
+    url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin")
+
+    licenses {
+      license {
+        // The LICENSE file is GPL v3; all sibling SDKs are GPL-3.0-or-later.
+        name.set("GNU General Public License v3.0 or later")
+        url.set("https://www.gnu.org/licenses/gpl-3.0.txt")
+      }
+    }
+
+    developers {
+      developer {
+        id.set("wishknish")
+        name.set("WishKnish Corp.")
+        email.set("dev@wishknish.com")
+        organization.set("WishKnish Corp.")
+        organizationUrl.set("https://wishknish.com")
+      }
+      developer {
+        id.set("eugene-teplitsky")
+        name.set("Eugene Teplitsky")
+        organization.set("WishKnish Corp.")
+      }
+    }
+
+    scm {
+      connection.set("scm:git:git://github.com/WishKnish/KnishIO-Client-Kotlin.git")
+      developerConnection.set("scm:git:ssh://git@github.com/WishKnish/KnishIO-Client-Kotlin.git")
+      url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin")
+    }
+
+    issueManagement {
+      system.set("GitHub Issues")
+      url.set("https://github.com/WishKnish/KnishIO-Client-Kotlin/issues")
+    }
   }
 }
 
@@ -216,25 +208,6 @@ tasks.javadoc {
   if (JavaVersion.current().isJava9Compatible) {
     (options as StandardJavadocDocletOptions).addBooleanOption("html5", true)
   }
-}
-
-// Task to run the unified test vector validator
-tasks.register<JavaExec>("validateTestVectors") {
-  description = "Run the unified test vector validator using SDK methods"
-  group = "verification"
-  
-  classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("knishio.test.RunValidator")
-  
-  // Set working directory to project root for file access
-  workingDir = projectDir
-  
-  // Clean runtime environment - eliminate external library warnings
-  jvmArgs(
-    "--enable-native-access=ALL-UNNAMED",  // Fix JANSI native access warnings
-    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",  // Fix NIO warnings
-    "--add-opens=java.base/java.io=ALL-UNNAMED"      // Fix IO warnings
-  )
 }
 
 // Task to run the SDK self-test

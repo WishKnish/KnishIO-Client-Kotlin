@@ -12,7 +12,7 @@ This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its 
 ### Gradle
 ```kotlin
 dependencies {
-    implementation("io.knish:knishio-client-kotlin:1.0.0-RC1")
+    implementation("io.knish:knishio-client-kotlin:0.8.0")
 }
 ```
 
@@ -21,7 +21,7 @@ dependencies {
 <dependency>
   <groupId>io.knish</groupId>
   <artifactId>knishio-client-kotlin</artifactId>
-  <version>1.0.0-RC1</version>
+  <version>0.8.0</version>
 </dependency>
 ```
 
@@ -53,7 +53,7 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:1.0.0-RC1'
+    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:0.8.0'
 }
 ```
 </details>

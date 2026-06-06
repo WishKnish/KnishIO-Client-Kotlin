@@ -136,6 +136,23 @@ import kotlin.reflect.full.memberProperties
       }
 
     /**
+     * Serialize an atom value the way JS String(Number) does: a whole-number
+     * value carries NO trailing ".0". The validator parses V/B/F values as
+     * integers, so "1000.0" would fail to parse and the molecule would be
+     * rejected. JS/TS/PHP/Rust all emit "1000"; Kotlin Double.toString() emits
+     * "1000.0" — this normalizes it (cross-SDK molecular-hash parity).
+     *
+     * Lives in the companion (NOT top-level): a top-level fun in this file would
+     * generate a file-facade class colliding with @file:JvmName("Molecule") +
+     * `class Molecule` ("Duplicate JVM class name").
+     */
+    @JvmStatic
+    internal fun formatAtomValue(n: Number): String {
+      val d = n.toDouble()
+      return if (d.isFinite() && d == kotlin.math.floor(d)) n.toLong().toString() else n.toString()
+    }
+
+    /**
      * Generates the next atomic index
      */
     @JvmStatic
@@ -477,7 +494,7 @@ import kotlin.reflect.full.memberProperties
       walletAddress = recipientWallet.address ?: "",
       isotope = 'V',
       token = recipientWallet.token,
-      value = amount.toString(),
+      value = formatAtomValue(amount),
       index = atoms.size
     )
     addAtom(valueAtom)
@@ -581,7 +598,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
-        value = amount.toString(),
+        value = formatAtomValue(amount),
         batchId = sourceWallet.batchId,
         metaType = "token",
         metaId = token,
@@ -617,7 +634,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = (- amount.toDouble()).toString(),
+        value = formatAtomValue(- amount.toDouble()),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
@@ -630,7 +647,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = remainderWallet !!.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = (sourceWallet.balance - amount.toDouble()).toString(),
+        value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
         batchId = remainderWallet !!.batchId,
         metaType = walletBundle?.let { "walletBundle" },
         metaId = walletBundle,
@@ -660,7 +677,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = (- amount.toDouble()).toString(),
+        value = formatAtomValue(- amount.toDouble()),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
@@ -674,7 +691,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = recipientWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = amount.toDouble().toString(),
+        value = formatAtomValue(amount.toDouble()),
         batchId = recipientWallet.batchId,
         metaType = "walletBundle",
         metaId = recipientWallet.bundle,
@@ -689,7 +706,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = remainderWallet !!.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = (sourceWallet.balance - amount.toDouble()).toString(),
+        value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
         batchId = remainderWallet !!.batchId,
         metaType = "walletBundle",
         metaId = remainderWallet !!.bundle,
@@ -763,7 +780,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
-        value = amount.toString(),
+        value = formatAtomValue(amount),
         batchId = recipientWallet.batchId,
         metaType = "token",
         metaId = recipientWallet.token,
@@ -916,7 +933,7 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'T',
         token = sourceWallet.token,
-        value = amount.toString(),
+        value = formatAtomValue(amount),
         batchId = batchId,
         metaType = metaType,
         metaId = metaId,
