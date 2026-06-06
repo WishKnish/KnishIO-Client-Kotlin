@@ -2,7 +2,6 @@
 .gradle/
 vendor/
 build/
-gradle/
 src/main/kotlin/main.kt
 /local.properties
 
