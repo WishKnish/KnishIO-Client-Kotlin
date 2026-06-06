@@ -196,7 +196,7 @@ class MoleculeTest {
             isNotEmpty()
             any {
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("1000000.0")
+                get { value }.isEqualTo("1000000")
             }
             any {
                 get { isotope }.isEqualTo('M')
@@ -215,9 +215,11 @@ class MoleculeTest {
         // Add an atom
         val wallet = Wallet("test", "TEST")
         molecule.addAtom(createTestAtom(wallet))
-        
-        // Should be valid after adding atom
-        expectThat(molecule.check()).isTrue()
+
+        // Still invalid before signing: check() requires a molecular hash, which is
+        // only produced by signing. An unsigned molecule (molecularHash == null) is
+        // not valid — even with atoms present.
+        expectThat(molecule.check()).isFalse()
     }
     
     @Test
@@ -243,14 +245,14 @@ class MoleculeTest {
             any {
                 get { walletAddress }.isEqualTo(sourceWallet.address)
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("-250.0")
+                get { value }.isEqualTo("-250")
             }
             
             // Second atom: adds value to recipient
             any {
                 get { walletAddress }.isEqualTo(recipientWallet.address)
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("250.0")
+                get { value }.isEqualTo("250")
                 get { metaType }.isEqualTo("walletBundle")
                 get { metaId }.isEqualTo(recipientWallet.bundle)
             }
@@ -259,7 +261,7 @@ class MoleculeTest {
             any {
                 get { walletAddress }.isEqualTo(molecule.remainderWallet?.address)
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("750.0") // 1000 - 250 = 750
+                get { value }.isEqualTo("750") // 1000 - 250 = 750
                 get { metaType }.isEqualTo("walletBundle")
             }
         }

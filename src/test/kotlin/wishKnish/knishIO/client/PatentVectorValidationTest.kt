@@ -85,7 +85,7 @@ class PatentVectorValidationTest {
                 // Exercise the bug path: format from a Double.
                 val value = test["value"]!!.jsonPrimitive.double
                 val expected = test["expected"]!!.jsonPrimitive.content
-                assertEquals(expected, formatAtomValue(value),
+                assertEquals(expected, Molecule.formatAtomValue(value),
                     "atom value format mismatch (cross-SDK parity) for $name")
             }
         }

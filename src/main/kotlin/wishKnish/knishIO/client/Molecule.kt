@@ -62,18 +62,6 @@ import kotlin.reflect.KVisibility
 import kotlin.reflect.full.memberProperties
 
 /**
- * Serialize an atom value the way JS String(Number) does: a whole-number value
- * carries NO trailing ".0". The validator parses V/B/F values as i128
- * (integer-only), so "1000.0" would fail to parse and the molecule would be
- * rejected. JS/TS/PHP/Rust all emit "1000"; Kotlin Double.toString() emits
- * "1000.0" — this normalizes it to match (cross-SDK molecular-hash parity).
- */
-internal fun formatAtomValue(n: Number): String {
-  val d = n.toDouble()
-  return if (d.isFinite() && d == kotlin.math.floor(d)) n.toLong().toString() else n.toString()
-}
-
-/**
  * Molecule class used for committing changes to the ledger
  */
 @Serializable data class Molecule @JvmOverloads constructor(
@@ -146,6 +134,23 @@ internal fun formatAtomValue(n: Number): String {
         encodeDefaults = true
         ignoreUnknownKeys = true
       }
+
+    /**
+     * Serialize an atom value the way JS String(Number) does: a whole-number
+     * value carries NO trailing ".0". The validator parses V/B/F values as
+     * integers, so "1000.0" would fail to parse and the molecule would be
+     * rejected. JS/TS/PHP/Rust all emit "1000"; Kotlin Double.toString() emits
+     * "1000.0" — this normalizes it (cross-SDK molecular-hash parity).
+     *
+     * Lives in the companion (NOT top-level): a top-level fun in this file would
+     * generate a file-facade class colliding with @file:JvmName("Molecule") +
+     * `class Molecule` ("Duplicate JVM class name").
+     */
+    @JvmStatic
+    internal fun formatAtomValue(n: Number): String {
+      val d = n.toDouble()
+      return if (d.isFinite() && d == kotlin.math.floor(d)) n.toLong().toString() else n.toString()
+    }
 
     /**
      * Generates the next atomic index

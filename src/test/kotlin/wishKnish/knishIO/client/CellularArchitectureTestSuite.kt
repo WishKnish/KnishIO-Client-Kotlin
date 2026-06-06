@@ -237,7 +237,7 @@ class CellularArchitectureTestSuite {
                 .and {
                     get { metaType }.isEqualTo("app-config")
                     get { metaId }.isEqualTo("config-123")
-                    get { meta }.hasSize(5) // Original meta (3) + pubkey + characters
+                    get { meta }.hasSize(3) // Original meta only; pubkey/characters intentionally NOT added (see finalMetas — cross-SDK parity)
                 }
         }
     }
@@ -478,7 +478,7 @@ class CellularArchitectureTestSuite {
                 val metaAtom = molecule.atoms.find { it.isotope == 'M' }
                 expectThat(metaAtom)
                     .isNotNull()
-                    .get { meta }.hasSize(metadata.size + 2) // + pubkey + characters
+                    .get { meta }.hasSize(metadata.size) // pubkey/characters intentionally NOT added (see finalMetas — cross-SDK parity)
                 
                 molecule.sign()
                 expectThat(molecule.check()).isTrue()
