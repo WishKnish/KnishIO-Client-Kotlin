@@ -5,6 +5,8 @@
 
 # Knish.IO Kotlin Client SDK
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.knish/knishio-client-kotlin.svg)](https://central.sonatype.com/artifact/io.knish/knishio-client-kotlin)
+
 This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its purpose is to expose class libraries for building and signing Knish.IO Molecules, composing Atoms, generating Wallets, and much more.
 
 ## Installation
@@ -511,6 +513,12 @@ This method involves individually building Atoms and Molecules, triggering the s
     1. `queryBalance` and `queryContinuId` -> returns a `Wallet` instance
     2. `queryWallets` -> returns a list of `Wallet` instances
     3. `createToken`, `transferToken`, `createWallet`, `createMeta`, and other mutations -> returns molecule metadata
+
+## Network Freshness
+
+The GraphQL transport (Ktor) issues a fresh network request per query — there is
+**no response caching** — so a long-lived client never serves a stale read of
+ledger state. No fresh-read knob (e.g. a request policy) is required.
 
 ## Getting Help
 

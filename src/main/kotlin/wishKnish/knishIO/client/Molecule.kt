@@ -550,6 +550,20 @@ import kotlin.reflect.full.memberProperties
    * Add user remainder atom for ContinuID
    */
   fun addUserRemainderAtom(userRemainderWallet: Wallet): Molecule {
+    // ContinuID metadata for chain-integrity validation (mirrors JS Molecule.addContinuIdAtom).
+    // Key ORDER is load-bearing for the cross-SDK molecular hash: previousPosition, pubkey, characters.
+    // Built INLINE (not via finalMetas) so V-atoms stay empty; each entry only when truthy, like JS.
+    val continuIdMeta = mutableListOf<MetaData>()
+    sourceWallet.position?.takeIf { it.isNotEmpty() }?.let {
+      continuIdMeta.add(MetaData(key = "previousPosition", value = it))
+    }
+    userRemainderWallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
+      continuIdMeta.add(MetaData(key = "pubkey", value = it))
+    }
+    userRemainderWallet.characters?.takeIf { it.isNotEmpty() }?.let {
+      continuIdMeta.add(MetaData(key = "characters", value = it))
+    }
+
     return addAtom(
       Atom(
         position = userRemainderWallet.position !!,
@@ -558,7 +572,7 @@ import kotlin.reflect.full.memberProperties
         token = userRemainderWallet.token,
         metaType = "walletBundle",
         metaId = userRemainderWallet.bundle,
-        meta = finalMetas(wallet = userRemainderWallet),
+        meta = continuIdMeta,
         index = generateIndex()
       )
     )

@@ -73,7 +73,7 @@ import kotlin.jvm.Throws
   @JvmField var meta: List<MetaData> = mutableListOf(),
   @JvmField var otsFragment: String? = null,
   @JvmField var index: Int = 0,
-  @JvmField val createdAt: String = Strings.currentTimeMillis()
+  @JvmField var createdAt: String = Strings.currentTimeMillis()
 ) {
 
   companion object {
