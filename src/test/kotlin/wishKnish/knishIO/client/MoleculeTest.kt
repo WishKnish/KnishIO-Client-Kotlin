@@ -192,15 +192,16 @@ class MoleculeTest {
             meta = tokenMetadata.toMutableList()
         )
         
+        // Token creation is a C-atom (issuance) + ContinuID I-atom (the canonical shape;
+        // the C-atom meta is the user meta + the prefixed wallet* keys, no longer == tokenMetadata).
         expectThat(molecule.atoms) {
             isNotEmpty()
             any {
-                get { isotope }.isEqualTo('V')
+                get { isotope }.isEqualTo('C')
                 get { value }.isEqualTo("1000000")
             }
             any {
-                get { isotope }.isEqualTo('M')
-                get { meta }.isEqualTo(tokenMetadata)
+                get { isotope }.isEqualTo('I')
             }
         }
     }

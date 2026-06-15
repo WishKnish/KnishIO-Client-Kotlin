@@ -479,41 +479,6 @@ import kotlin.math.ceil
 
 
   /**
-   * Initializes token creation atoms for this molecule
-   */
-  fun initTokenCreation(
-    recipientWallet: Wallet,
-    amount: Double,
-    meta: MutableList<MetaData>
-  ): Molecule {
-    // Add value atom for the token amount
-    val valueAtom = Atom(
-      position = recipientWallet.position ?: "",
-      walletAddress = recipientWallet.address ?: "",
-      isotope = 'V',
-      token = recipientWallet.token,
-      value = formatAtomValue(amount),
-      index = atoms.size
-    )
-    addAtom(valueAtom)
-    
-    // Add metadata atom for token information
-    val metaAtom = Atom(
-      position = sourceWallet.position ?: "",
-      walletAddress = sourceWallet.address ?: "",
-      isotope = 'M',
-      token = sourceWallet.token,
-      metaType = "token",
-      metaId = recipientWallet.token,
-      meta = meta.toList(),
-      index = atoms.size
-    )
-    addAtom(metaAtom)
-    
-    return this
-  }
-
-  /**
    * Final meta array
    */
   @JvmOverloads
