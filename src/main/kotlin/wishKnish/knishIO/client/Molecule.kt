@@ -58,8 +58,6 @@ import wishKnish.knishIO.client.exception.*
 import wishKnish.knishIO.client.libraries.*
 import kotlin.jvm.Throws
 import kotlin.math.ceil
-import kotlin.reflect.KVisibility
-import kotlin.reflect.full.memberProperties
 
 /**
  * Molecule class used for committing changes to the ledger
@@ -547,6 +545,37 @@ import kotlin.reflect.full.memberProperties
   }
 
   /**
+   * Append wallet metadata in the JS-canonical order for cross-SDK molecular-hash parity
+   * (mirrors AtomMeta.setMetaWallet). Adds the 7 PREFIXED keys — walletTokenSlug, walletBundleHash,
+   * walletAddress, walletPosition, walletBatchId, walletPubkey, walletCharacters — in that insertion
+   * order, each only when non-null/non-empty (empty/None values are hash-skipped anyway, matching JS).
+   */
+  fun setMetaWallet(metas: MutableList<MetaData>, wallet: Wallet): MutableList<MetaData> {
+    wallet.token.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletTokenSlug", value = it))
+    }
+    wallet.bundle?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletBundleHash", value = it))
+    }
+    wallet.address?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletAddress", value = it))
+    }
+    wallet.position?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletPosition", value = it))
+    }
+    wallet.batchId?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletBatchId", value = it))
+    }
+    wallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletPubkey", value = it))
+    }
+    wallet.characters?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletCharacters", value = it))
+    }
+    return metas
+  }
+
+  /**
    * Add user remainder atom for ContinuID
    */
   fun addUserRemainderAtom(userRemainderWallet: Wallet): Molecule {
@@ -771,21 +800,12 @@ import kotlin.reflect.full.memberProperties
     amount: Number,
     meta: MutableList<MetaData> = mutableListOf()
   ): Molecule {
-    val metas = meta.also {
-      setOf("walletAddress", "walletPosition", "walletPubkey", "walletCharacters").forEach { key ->
-        // Importing wallet fields into meta object
-        if (it.none { mataData -> mataData.key == key }) {
-          Wallet::class.memberProperties.find { property ->
-            property.name == key.substring(6).lowercase()
-          }?.let { property ->
-            if (property.visibility == KVisibility.PUBLIC) {
-              val value = property.getter.call(recipientWallet) as? String
-              it.add(MetaData(key = key, value = value))
-            }
-          }
-        }
-      }
-    }
+    // Build the C-atom meta: user meta + the 7 PREFIXED wallet* keys via setMetaWallet, in JS
+    // insertion order (mirrors JS `new AtomMeta(meta).setMetaWallet(recipientWallet)`). Replaces the
+    // prior reflection loop, which injected only 4 keys (missing walletTokenSlug/walletBundleHash/
+    // walletBatchId) in the wrong order.
+    val metas = meta.toMutableList()
+    setMetaWallet(metas, recipientWallet)
 
     // The primary atom tells the ledger that a certain amount of the new token is being issued.
     addAtom(

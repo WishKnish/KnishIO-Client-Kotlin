@@ -204,7 +204,12 @@ class CrossSdkMoleculeDeserializer : JsonDeserializer<Molecule> {
                             val metaObj = metaElement.asJsonObject
                             add(MetaData(
                                 metaObj.get("key").asString,
-                                metaObj.get("value").asString
+                                // Null-safe: a JSON null meta value (e.g. walletBatchId from JS/TS/PHP/Python
+                                // tokenCreation dumps) must stay null, not become the string "null" — otherwise
+                                // the re-hash includes it (the hash skips null meta values) and cross-validation
+                                // mismatches. Mirrors the getStringOrNull pattern used for the atom's own fields.
+                                if (metaObj.has("value") && !metaObj.get("value").isJsonNull)
+                                    metaObj.get("value").asString else null
                             ))
                         }
                     }
@@ -373,6 +378,21 @@ class KotlinSelfTest {
                   "token": "ENCRYPT",
                   "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
                   "plaintext": "Hello ML-KEM768 cross-platform test message!"
+                },
+                "tokenCreation": {
+                  "sourceSeed": "TESTSEED",
+                  "recipientSeed": "RECIPIENTSEED",
+                  "sourceToken": "USER",
+                  "newToken": "TESTTOKEN",
+                  "amount": 1000000,
+                  "sourcePosition": "0123456789abcdeffedcba9876543210fedcba9876543210fedcba9876543210",
+                  "recipientPosition": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                  "metadata": {
+                    "name": "Test Token",
+                    "fungibility": "fungible",
+                    "supply": "limited",
+                    "decimals": "0"
+                  }
                 }
               }
             }"""
@@ -759,6 +779,93 @@ class KotlinSelfTest {
         }
     }
     
+    /**
+     * Test C1: Token Creation Test (cross-SDK parity with JS)
+     * C-atom (issue new token) + ContinuID I-atom; the prefixed setMetaWallet class.
+     */
+    fun testTokenCreation(config: JsonObject): Boolean {
+        log("\nC1. Token Creation Test", Colors.BLUE)
+        val testConfig = config.getAsJsonObject("tests").getAsJsonObject("tokenCreation")
+
+        return try {
+            val sourceSeed = testConfig.get("sourceSeed").asString
+            val recipientSeed = testConfig.get("recipientSeed").asString
+            val sourceToken = testConfig.get("sourceToken").asString
+            val newToken = testConfig.get("newToken").asString
+            // Read as Int so this resolves to the Number overload (C+I), NOT the Double overload (V+M).
+            val amount = testConfig.get("amount").asInt
+            val sourcePosition = testConfig.get("sourcePosition").asString
+            val recipientPosition = testConfig.get("recipientPosition").asString
+
+            // Source wallet (USER token)
+            val sourceSecret = Crypto.generateSecret(sourceSeed, 2048)
+            val sourceWallet = Wallet(sourceSecret, sourceToken, sourcePosition)
+            logTest("Source wallet creation", true)
+
+            // Recipient wallet for the new token
+            val recipientSecret = Crypto.generateSecret(recipientSeed, 2048)
+            val recipientWallet = Wallet(recipientSecret, newToken, recipientPosition)
+            logTest("Recipient wallet creation", true)
+
+            // Canonical USER-token remainder so addUserRemainderAtom keeps the bbbb... wallet
+            val remainderWallet = Wallet(sourceSecret, sourceToken, "bbbb000000000000cccc111111111111dddd222222222222eeee333333333333")
+            logTest("Remainder wallet creation", true)
+
+            val molecule = Molecule(sourceSecret, sourceWallet, remainderWallet)
+
+            // User token meta in JS insertion order (name, fungibility, supply, decimals)
+            val metaObject = testConfig.getAsJsonObject("metadata")
+            val metaList = mutableListOf<MetaData>()
+            for ((key, value) in metaObject.entrySet()) {
+                metaList.add(MetaData(key, value.asString))
+            }
+
+            molecule.initTokenCreation(recipientWallet, amount, metaList)
+            logTest("Token creation initialization", true)
+
+            // Deterministic per-atom timestamps (must precede signing)
+            setFixedTimestamps(molecule)
+
+            molecule.sign()
+            logTest("Molecule signing", true)
+
+            inspectMolecule(molecule, "token creation molecule")
+            diagnoseValidation(molecule, sourceWallet, "token creation molecule")
+
+            var isValid = false
+            var validationError: String? = null
+            try {
+                isValid = molecule.check(sourceWallet)
+                if (!isValid) {
+                    validationError = "Validation returned false (no exception thrown)"
+                }
+            } catch (error: Exception) {
+                isValid = false
+                validationError = error.message
+            }
+
+            logTest("Molecule validation", isValid, validationError)
+
+            moleculeStorage["tokenCreation"] = gson.toJson(molecule)
+
+            testResults["tokenCreation"] = TransferTestResult(
+                passed = isValid,
+                molecularHash = molecule.molecularHash,
+                atomCount = molecule.atoms.size,
+                validationError = validationError
+            )
+
+            isValid
+        } catch (error: Exception) {
+            log("  ❌ ERROR: ${error.message}", Colors.RED)
+            testResults["tokenCreation"] = mapOf(
+                "passed" to false,
+                "error" to (error.message ?: "unknown")
+            )
+            false
+        }
+    }
+
     /**
      * Test 5: ML-KEM768 Encryption Test
      * Tests post-quantum encryption/decryption compatibility
@@ -1164,7 +1271,7 @@ class KotlinSelfTest {
         
         val results = SelfTestResults(
             sdk = "Kotlin",
-            version = "0.8.1",
+            version = "0.8.2",
             timestamp = Instant.now().toString(),
             tests = testResults,
             molecules = moleculeStorage,
@@ -1196,7 +1303,7 @@ class KotlinSelfTest {
         }
         val failedTests = totalTests - passedTests
         
-        log("\nSDK: Kotlin v0.8.1")
+        log("\nSDK: Kotlin v0.8.2")
         log("Timestamp: ${Instant.now()}")
         
         val summaryColor = if (passedTests == totalTests) Colors.GREEN else Colors.RED
@@ -1313,6 +1420,7 @@ class KotlinSelfTest {
         testMetaCreation(config)
         testSimpleTransfer(config)
         testComplexTransfer(config)
+        testTokenCreation(config)
         testMLKEM768(config)
         testNegativeCases(config)
         testCrossSdkValidation(config)
