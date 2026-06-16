@@ -728,14 +728,12 @@ import kotlin.math.ceil
    * Builds Atoms to define a new wallet on the ledger
    */
   fun initWalletCreation(newWallet: Wallet): Molecule {
-    val metas = mutableListOf(
-      MetaData(key = "address", value = newWallet.address),
-      MetaData(key = "token", value = newWallet.token),
-      MetaData(key = "bundle", value = newWallet.bundle),
-      MetaData(key = "position", value = newWallet.position),
-      MetaData(key = "amount", value = "0"),
-      MetaData(key = "batchId", value = newWallet.batchId)
-    )
+    // Build the C-atom meta: the 7 PREFIXED wallet* keys via setMetaWallet, in JS insertion order
+    // (mirrors JS `new AtomMeta().setMetaWallet(newWallet)`). Replaces the prior unprefixed
+    // address/token/bundle/position/amount/batchId list, and sources metaId/batchId from the NEW
+    // wallet (JS uses newWallet.address / newWallet.batchId, not the source wallet's).
+    val metas = mutableListOf<MetaData>()
+    setMetaWallet(metas, newWallet)
 
     addAtom(
       Atom(
@@ -743,11 +741,11 @@ import kotlin.math.ceil
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
-        batchId = sourceWallet.batchId,
+        batchId = newWallet.batchId,
         metaType = "wallet",
-        metaId = sourceWallet.address,
+        metaId = newWallet.address,
         meta = finalMetas(
-          metas = contextMetas(metas).toMutableList(), wallet = newWallet
+          metas = contextMetas(metas).toMutableList(), wallet = sourceWallet
         ),
         index = generateIndex()
       )
@@ -829,13 +827,15 @@ import kotlin.math.ceil
     wallet: Wallet
   ): Molecule {
 
-    // Generate a wallet metas
+    // Build the C-atom meta: the shadowWalletClaim flag FIRST, then the 7 PREFIXED wallet* keys via
+    // setMetaWallet, in JS insertion order (mirrors JS `setShadowWalletClaim(true)` delegating to
+    // initWalletCreation → `[shadowWalletClaim, then setMetaWallet(wallet)]`). Replaces the prior
+    // manual tokenSlug/walletAddress/walletPosition/batchId list. The `token` param is vestigial
+    // (JS takes only the wallet); kept for caller compatibility.
     val metas = mutableListOf(
-      MetaData(key = "tokenSlug", value = token),
-      MetaData(key = "walletAddress", value = wallet.address),
-      MetaData(key = "walletPosition", value = wallet.position),
-      MetaData(key = "batchId", value = wallet.batchId)
+      MetaData(key = "shadowWalletClaim", value = "1")
     )
+    setMetaWallet(metas, wallet)
 
     // Create an 'C' atom
     addAtom(
@@ -844,9 +844,10 @@ import kotlin.math.ceil
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
+        batchId = wallet.batchId,
         metaType = "wallet",
         metaId = wallet.address,
-        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = wallet),
+        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = sourceWallet),
         index = generateIndex()
       )
     )
