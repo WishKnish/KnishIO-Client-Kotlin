@@ -823,15 +823,13 @@ import kotlin.math.ceil
    * Init shadow wallet claim
    */
   fun initShadowWalletClaim(
-    token: String,
     wallet: Wallet
   ): Molecule {
 
     // Build the C-atom meta: the shadowWalletClaim flag FIRST, then the 7 PREFIXED wallet* keys via
     // setMetaWallet, in JS insertion order (mirrors JS `setShadowWalletClaim(true)` delegating to
     // initWalletCreation → `[shadowWalletClaim, then setMetaWallet(wallet)]`). Replaces the prior
-    // manual tokenSlug/walletAddress/walletPosition/batchId list. The `token` param is vestigial
-    // (JS takes only the wallet); kept for caller compatibility.
+    // manual tokenSlug/walletAddress/walletPosition/batchId list.
     val metas = mutableListOf(
       MetaData(key = "shadowWalletClaim", value = "1")
     )

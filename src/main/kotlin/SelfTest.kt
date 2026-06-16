@@ -994,8 +994,7 @@ class KotlinSelfTest {
 
             val molecule = Molecule(sourceSecret, sourceWallet, remainderWallet)
 
-            // The token param is vestigial (JS takes only the wallet); pass claimToken for compat.
-            molecule.initShadowWalletClaim(claimToken, claimWallet)
+            molecule.initShadowWalletClaim(claimWallet)
             logTest("Shadow wallet claim initialization", true)
 
             // Deterministic per-atom timestamps (must precede signing)

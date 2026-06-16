@@ -18,7 +18,7 @@ class MutationClaimShadowWallet @JvmOverloads constructor(
   ) {
     val wallet = Wallet.create(molecule() !!.secret, token, batchId)
     molecule?.apply {
-      initShadowWalletClaim(token, wallet)
+      initShadowWalletClaim(wallet)
       sign()
       check()
     }
