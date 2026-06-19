@@ -629,7 +629,7 @@ import kotlin.math.ceil
   @Throws(NegativeAmountException::class)
   fun burnToken(
     amount: Number,
-    walletBundle: String? = null
+    walletBundle: String? = null // vestigial (JS parity): the burn always targets the all-zeros bundle
   ): Molecule {
     if (amount.toDouble() < 0.0) {
       throw NegativeAmountException("Molecule::burnToken() - Amount to burn must be positive!")
@@ -639,20 +639,49 @@ import kotlin.math.ceil
       throw BalanceInsufficientException()
     }
 
-    // Initializing a new Atom to remove tokens from source
+    // Burn-address wallet: the all-zeros bundle = token destruction. No secret, so it has
+    // no position/address (coerced to "" below; the hash absorbs "" as a no-op). The
+    // validator credits the burn amount to this unspendable bundle, satisfying V-isotope
+    // conservation (sum == 0) while permanently destroying the tokens. Mirrors JS burnToken.
+    val burnWallet = Wallet.create(
+      "0000000000000000000000000000000000000000000000000000000000000000",
+      sourceWallet.token
+    )
+
+    // V-atom 1: debit the ENTIRE source balance (UTXO model). Must be -balance (not -amount):
+    // the burn target gets +amount and the remainder gets +(balance-amount), so the three
+    // V-atoms sum to zero. -amount left the molecule unbalanced (validator: TransferUnbalanced)
+    // and only emitted 2 atoms (validator requires exactly 3) — the pre-fix bug.
     addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = formatAtomValue(- amount.toDouble()),
+        value = formatAtomValue(- sourceWallet.balance),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
       )
     )
 
+    // V-atom 2: credit the burn amount to the all-zeros burn address (destruction).
+    addAtom(
+      Atom(
+        position = burnWallet.position ?: "",
+        walletAddress = burnWallet.address ?: "",
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(amount.toDouble()),
+        batchId = burnWallet.batchId,
+        metaType = "walletBundle",
+        metaId = burnWallet.bundle,
+        meta = finalMetas(wallet = burnWallet),
+        index = generateIndex()
+      )
+    )
+
+    // V-atom 3: remainder back to the source identity.
     return addAtom(
       Atom(
         position = remainderWallet !!.position !!,
@@ -661,8 +690,8 @@ import kotlin.math.ceil
         token = sourceWallet.token,
         value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
         batchId = remainderWallet !!.batchId,
-        metaType = walletBundle?.let { "walletBundle" },
-        metaId = walletBundle,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
         meta = finalMetas(wallet = remainderWallet),
         index = generateIndex()
       )
