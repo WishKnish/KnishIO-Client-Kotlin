@@ -75,7 +75,11 @@ import kotlin.math.ceil
   @JvmField var molecularHash: String? = null
   @JvmField var atoms: MutableList<Atom> = mutableListOf()
   
-  private var _cellSlugOrigin: String? = null
+  // Internal backing field for the cellSlugOrigin computed property — must NOT serialize
+  // onto the wire (the validator's MoleculeInput rejects the unknown "_cellSlugOrigin"
+  // field). It was silently omitted under encodeDefaults=false but leaks once defaults
+  // are encoded (needed for atom index=0), so mark it @Transient explicitly.
+  @Transient private var _cellSlugOrigin: String? = null
 
   init {
     // Preserve the original cellSlug value
@@ -678,25 +682,33 @@ import kotlin.math.ceil
       throw BalanceInsufficientException()
     }
 
-    // Initializing a new Atom to remove tokens from source
+    // Initializing a new Atom to remove the ENTIRE balance from source (UTXO model).
+    // Must be -balance (not -amount): recipient gets +amount and remainder gets
+    // +(balance-amount), so the three V-atoms sum to zero. Using -amount left the
+    // molecule unbalanced (validator: TransferUnbalanced) whenever amount != balance;
+    // the offline self-test masked it by transferring the whole balance.
     addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = formatAtomValue(- amount.toDouble()),
+        value = formatAtomValue(- sourceWallet.balance),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
       )
     )
 
-    // Initializing a new Atom to add tokens to recipient
+    // Initializing a new Atom to add tokens to recipient.
+    // A shadow/batched recipient (Wallet.create(bundleHash, token)) has no
+    // position/address (it is keyed by bundle + batchId, assigned at claim time);
+    // coerce null -> "" instead of asserting (the hash already absorbs "" for
+    // null/empty position/walletAddress, so it stays consistent).
     addAtom(
       Atom(
-        position = recipientWallet.position !!,
-        walletAddress = recipientWallet.address !!,
+        position = recipientWallet.position ?: "",
+        walletAddress = recipientWallet.address ?: "",
         isotope = 'V',
         token = sourceWallet.token,
         value = formatAtomValue(amount.toDouble()),

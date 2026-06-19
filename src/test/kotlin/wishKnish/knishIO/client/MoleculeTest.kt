@@ -242,11 +242,11 @@ class MoleculeTest {
         expectThat(molecule.atoms) {
             hasSize(3) // Should have 3 atoms: source (negative), recipient (positive), remainder
             
-            // First atom: removes value from source
+            // First atom: removes the ENTIRE source balance (UTXO model)
             any {
                 get { walletAddress }.isEqualTo(sourceWallet.address)
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("-250")
+                get { value }.isEqualTo("-1000")
             }
             
             // Second atom: adds value to recipient
@@ -267,8 +267,8 @@ class MoleculeTest {
             }
         }
         
-        // Verify atoms are created correctly (following JS SDK pattern)
-        // Note: We don't check balance conservation as the sum includes negative values
+        // Conservation now holds (UTXO model): -1000 (source) + 250 (recipient) + 750 (remainder) = 0,
+        // matching the JS/cross-SDK reference and what the validator accepts.
     }
     
     private fun createTestAtom(wallet: Wallet, value: String = "test"): Atom {

@@ -73,12 +73,13 @@ class KnishIOClient @JvmOverloads constructor(
   @JvmField val uris: List<URI>,
   @JvmField val serverSdkVersion: Int = 3,
   @JvmField val logging: Boolean = false,
-  encrypt: Boolean = false
+  encrypt: Boolean = false,
+  insecureTls: Boolean = false
 ) {
   @JvmField var authTokenObjects = mutableMapOf<String, AuthToken?>()
   private var authToken: AuthToken? = null
   @JvmField var authInProcess: Boolean = false
-  private val client = HttpClient(getRandomUri())
+  private val client = HttpClient(getRandomUri(), insecureTls = insecureTls)
   private var secret = ""
   @JvmField var bundle = ""
   @JvmField var remainderWallet: Wallet? = null

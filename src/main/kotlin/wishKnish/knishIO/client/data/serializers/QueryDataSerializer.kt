@@ -44,6 +44,15 @@ class QueryDataSerializer : KSerializer<QueryData> {
     encoder: Encoder,
     value: QueryData
   ) {
-    error("Serialization is not supported")
+    // Emit the GraphQL request body { "query": ..., "variables": {...} }. `variables`
+    // is a PRE-ENCODED JSON string (HttpClient encodes each *Variable with its own
+    // serializer), so it must be inlined as raw JSON — not re-quoted as a string.
+    // Previously this threw, so no live mutation/query could be sent.
+    val jsonOutput = encoder as? JsonEncoder ?: error("Can be serialized only by JSON")
+    val obj = buildJsonObject {
+      put("query", value.query)
+      value.variables?.let { put("variables", jsonOutput.json.parseToJsonElement(it)) }
+    }
+    jsonOutput.encodeJsonElement(obj)
   }
 }
