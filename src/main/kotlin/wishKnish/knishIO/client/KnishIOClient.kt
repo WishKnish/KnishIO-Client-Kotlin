@@ -897,11 +897,16 @@ class KnishIOClient @JvmOverloads constructor(
     units: MutableList<TokenUnit> = mutableListOf(),
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
+    // Resolve the signing wallet ONCE (the passed source, else the on-ledger balance wallet).
+    // Every downstream use must be this resolved wallet — referencing the nullable `sourceWallet`
+    // param NPEs when the caller omits it (the common burnTokens(token, amount) call). Mirrors
+    // transferToken's resolve-once pattern.
     val signingWallet = sourceWallet ?: queryBalance(token).payload()
-    val remainderWallet = Wallet.create(getSecret(), token, characters = sourceWallet !!.characters)
+      ?: throw TransferBalanceException()
+    val remainderWallet = Wallet.create(getSecret(), token, characters = signingWallet.characters)
     var burnAmount = amount
 
-    remainderWallet.initBatchId(signingWallet !!, true)
+    remainderWallet.initBatchId(signingWallet, true)
 
     // Calculate amount & set meta key
     if (units.isNotEmpty()) {
@@ -915,11 +920,11 @@ class KnishIOClient @JvmOverloads constructor(
       burnAmount = units.size
 
       // Token units splitting
-      sourceWallet.splitUnits(units, remainderWallet)
+      signingWallet.splitUnits(units, remainderWallet)
     }
 
     // Burn tokens
-    val molecule = createMolecule(null, sourceWallet, remainderWallet)
+    val molecule = createMolecule(null, signingWallet, remainderWallet)
 
     molecule.burnToken(burnAmount)
     molecule.sign()
