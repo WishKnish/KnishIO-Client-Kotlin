@@ -301,22 +301,25 @@ class WalletTest {
         
         expectThat(wallet.tokenUnits).hasSize(3)
         
-        // Create remainder wallet (JS uses createRemainder, we'll create manually)
+        // Create the transfer targets (the new remainder + the recipient)
         val remainderWallet = Wallet(testSecret + "-remainder", "TEST")
-        
-        // Test manual token unit management to match JS SDK concept
-        // Instead of using splitUnits (which has implementation issues),
-        // manually assign units to match JS test pattern
-        val unitsToSend = wallet.tokenUnits.filter { it.id in listOf("unit1", "unit2") }
-        val unitsToKeep = wallet.tokenUnits.filter { it.id !in listOf("unit1", "unit2") }
-        
-        wallet.tokenUnits = unitsToSend.toMutableList()
-        remainderWallet.tokenUnits = unitsToKeep.toMutableList()
-        
-        // Verify split results match JS test expectations
-        expectThat(wallet.tokenUnits).hasSize(2) // Should have the transferred units
-        expectThat(remainderWallet.tokenUnits).hasSize(1) // Should have the remaining unit
-        expectThat(wallet.tokenUnits[0].id).isEqualTo("unit1")
+        val recipientWallet = Wallet(testSecret + "-recipient", "TEST")
+
+        // splitUnits partitions the source's units: SENT (unit1, unit2) -> source + recipient,
+        // KEPT (unit3) -> remainder. (Pre-fix this LOST the KEPT unit and duplicated a SENT unit
+        // into the remainder -> the validator's Phase 2a SENT∩KEPT==∅ check rejected the transfer.)
+        wallet.splitUnits(
+            wallet.tokenUnits.filter { it.id in listOf("unit1", "unit2") },
+            remainderWallet,
+            recipientWallet
+        )
+
+        // Source (drained in the UTXO transfer) + recipient declare the SENT units
+        expectThat(wallet.tokenUnits).hasSize(2)
+        expectThat(wallet.tokenUnits.map { it.id }).isEqualTo(listOf("unit1", "unit2"))
+        expectThat(recipientWallet.tokenUnits.map { it.id }).isEqualTo(listOf("unit1", "unit2"))
+        // Remainder carries the KEPT unit (the fix: unit3 preserved, not lost/duplicated)
+        expectThat(remainderWallet.tokenUnits).hasSize(1)
         expectThat(remainderWallet.tokenUnits[0].id).isEqualTo("unit3")
     }
 }

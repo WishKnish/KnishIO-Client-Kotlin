@@ -301,29 +301,25 @@ class Wallet @JvmOverloads constructor(
       return
     }
 
-    // Init recipient & remainder token units
-    val recipientTokenUnits = arrayListOf<TokenUnit>()
-    val remainderTokenUnits = arrayListOf<TokenUnit>()
-
+    // Partition the SOURCE's own units by membership in the send-list (single pass, mirror
+    // PHP/Rust): SENT -> source + recipient; KEPT -> remainder. Use the source's own TokenUnit
+    // objects (full id/name/metas), not the param stubs. (The prior nested
+    // `tokenUnits.forEach { units.filter{…} }` lost the KEPT units and duplicated a SENT unit
+    // into the remainder, so the remainder atom carried SENT -> validator Phase 2a rejected it.)
+    val sendIds = units.map { it.id }.toSet()
+    val recipientTokenUnits = arrayListOf<TokenUnit>()  // SENT
+    val remainderTokenUnits = arrayListOf<TokenUnit>()  // KEPT
     tokenUnits.forEach {
-
-      units.filter { unit ->
-        it.id == unit.id
-      }.forEach { unit ->
-        recipientTokenUnits.add(unit)
-      }
-
-      units.filter { unit ->
-        it.id != unit.id
-      }.forEach { unit ->
-        remainderTokenUnits.add(unit)
+      if (sendIds.contains(it.id)) {
+        recipientTokenUnits.add(it)
+      } else {
+        remainderTokenUnits.add(it)
       }
     }
 
-    // Reset token units to the sending value
+    // Source (fully drained in the UTXO transfer) declares the SENT units; the recipient gets
+    // the same SENT list; the new remainder wallet carries the KEPT units.
     tokenUnits = recipientTokenUnits
-
-    // Set token units to recipient & remainder
     recipientWallet?.let {
       it.tokenUnits = recipientTokenUnits
     }
