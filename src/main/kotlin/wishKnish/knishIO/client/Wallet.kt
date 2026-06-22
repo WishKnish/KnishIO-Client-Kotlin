@@ -338,6 +338,39 @@ class Wallet @JvmOverloads constructor(
     remainderWallet.tokenUnits = remainderTokenUnits
   }
 
+  /**
+   * Split token units across MULTIPLE recipients (N-way sibling of splitUnits).
+   *
+   * The source retains the SENT union (all units leaving), each recipientWallets[i] gets its own
+   * subset (recipientUnitLists[i], by id), and remainderWallet keeps the KEPT units (those not
+   * assigned to any recipient). recipientUnitLists is parallel to recipientWallets; ids are matched
+   * against this wallet's own TokenUnit objects. No-op when no units are sent (fungible).
+   */
+  fun splitUnitsMulti(
+    recipientUnitLists: List<List<String>>,
+    recipientWallets: List<Wallet>,
+    remainderWallet: Wallet
+  ) {
+    val sentIds = recipientUnitLists.flatten().toSet()
+
+    // Nothing to split (fungible transfer) — leave token units untouched
+    if (sentIds.isEmpty()) {
+      return
+    }
+
+    // Each recipient gets its own subset of the source's token units
+    recipientWallets.forEachIndexed { i, recipientWallet ->
+      val ids = recipientUnitLists.getOrElse(i) { emptyList() }.toSet()
+      recipientWallet.tokenUnits = tokenUnits.filter { it.id in ids }.toMutableList()
+    }
+
+    // The remainder keeps everything not sent to any recipient (KEPT)
+    remainderWallet.tokenUnits = tokenUnits.filter { it.id !in sentIds }.toMutableList()
+
+    // The source carries the SENT union (the ownership authority the validator reads)
+    tokenUnits = tokenUnits.filter { it.id in sentIds }.toMutableList()
+  }
+
   fun isShadow(): Boolean {
     return position == null && address == null
   }

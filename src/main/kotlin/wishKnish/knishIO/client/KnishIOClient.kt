@@ -66,6 +66,18 @@ import wishKnish.knishIO.client.exception.*
 import kotlin.jvm.Throws
 
 /**
+ * One destination of a multi-recipient stackable transfer (see KnishIOClient.transferTokens).
+ * Provide EITHER units (stackable/NFT: amount = units.size) OR amount (fungible), not both.
+ * batchId makes the recipient a claimable shadow under that batch.
+ */
+data class TransferRecipient(
+  val bundleHash: String,
+  val units: List<String> = emptyList(),
+  val amount: Number? = null,
+  val batchId: String? = null
+)
+
+/**
  * Base client class providing a powerful but user-friendly wrapper
  * around complex Knish.IO ledger transactions.
  */
@@ -400,9 +412,13 @@ class KnishIOClient @JvmOverloads constructor(
     token: String,
     bundle: String? = null
   ): ResponseBalance {
-    // Execute query with either the provided bundle hash or the active client's bundle
+    // Execute query with either the provided bundle hash or the active client's bundle.
+    // Default to the client's own bundle when none is given (the documented contract + cross-SDK
+    // parity: JS/TS/Python/PHP/C++ all self-scope a bundle-less queryBalance). Passing null sent
+    // bundleHash:null to the validator -> a token-global query that returns an arbitrary wallet
+    // (a stale-read footgun; e.g. a multi-recipient claimant read back another bundle's unit).
     val query = createQuery(QueryBalance::class) as QueryBalance
-    return query.execute(BalanceVariable(token = token, bundleHash = bundle)) as ResponseBalance
+    return query.execute(BalanceVariable(token = token, bundleHash = bundle ?: bundle())) as ResponseBalance
   }
 
   /**
@@ -889,6 +905,64 @@ class KnishIOClient @JvmOverloads constructor(
     }
 
     return transferToken(recipientWallet, token, amount, units, batchId, sourceWallet)
+  }
+
+  /**
+   * Creates and executes a Molecule that funds N recipients from a single source in ONE molecule
+   * (multi-recipient sibling of transferToken). Each recipient gets its own subset of stackable
+   * units (or a fungible amount); a remainder returns the rest to the sender.
+   */
+  @JvmOverloads
+  fun transferTokens(
+    token: String,
+    recipients: List<TransferRecipient>,
+    sourceWallet: Wallet? = null
+  ): ResponseProposeMolecule {
+    val signingWallet = sourceWallet ?: queryBalance(token).payload()
+    ?: throw TransferBalanceException()
+
+    // Per-recipient amount: stackable -> unit count; fungible -> explicit amount (never both)
+    val amounts: List<Number> = recipients.map { recipient ->
+      if (recipient.units.isNotEmpty()) {
+        if ((recipient.amount?.toDouble() ?: 0.0) > 0) {
+          throw StackableUnitAmountException()
+        }
+        recipient.units.size
+      } else {
+        recipient.amount ?: 0
+      }
+    }
+    val total = amounts.sumOf { it.toDouble() }
+
+    // Do you have enough tokens?
+    if (signingWallet.balance < total) {
+      throw TransferBalanceException()
+    }
+
+    // A shadow recipient wallet per destination + a distinct batch id
+    val recipientWallets = recipients.map { recipient ->
+      Wallet.create(recipient.bundleHash, token).also { rw ->
+        recipient.batchId?.let { rw.batchId = it } ?: rw.initBatchId(signingWallet)
+      }
+    }
+
+    remainderWallet = Wallet.create(
+      getSecret(), token, characters = signingWallet.characters
+    )
+    remainderWallet !!.initBatchId(signingWallet, true)
+
+    // Stackable (NFT): partition the source's tokenUnits across source (SENT union), each recipient
+    // (its subset), and remainder (KEPT) before the molecule is built. No-op for fungible.
+    if (recipients.any { it.units.isNotEmpty() }) {
+      signingWallet.splitUnitsMulti(recipients.map { it.units }, recipientWallets, remainderWallet !!)
+    }
+
+    val molecule = createMolecule(sourceWallet = signingWallet, remainderWallet = remainderWallet)
+    val query = createMoleculeMutation(MutationTransferTokens::class, molecule) as MutationTransferTokens
+
+    query.fillMoleculeMulti(recipientWallets, amounts)
+
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
 
   /**

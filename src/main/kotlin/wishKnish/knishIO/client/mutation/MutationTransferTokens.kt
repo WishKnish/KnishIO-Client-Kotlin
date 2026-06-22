@@ -20,4 +20,15 @@ class MutationTransferTokens @JvmOverloads constructor(
       check(sourceWallet)
     }
   }
+
+  fun fillMoleculeMulti(
+    recipientWallets: List<Wallet>,
+    amounts: List<Number>
+  ) {
+    molecule?.apply {
+      initValues(recipientWallets, amounts)
+      sign()
+      check(sourceWallet)
+    }
+  }
 }

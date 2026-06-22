@@ -766,6 +766,70 @@ import kotlin.math.ceil
   }
 
   /**
+   * Initialize a MULTI-recipient V-type molecule: one source debits its FULL balance to fund
+   * N recipients (each its own amount + stackable units) plus a remainder back to the sender.
+   * Multi-recipient sibling of initValue (WP line 544). recipientWallets is parallel to amounts.
+   */
+  fun initValues(
+    recipientWallets: List<Wallet>,
+    amounts: List<Number>
+  ): Molecule {
+    val total = amounts.sumOf { it.toDouble() }
+    if (sourceWallet.balance - total < 0) {
+      throw BalanceInsufficientException()
+    }
+
+    // Source atom: debit the ENTIRE balance (UTXO drain); carries the SENT union of token units
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(- sourceWallet.balance),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
+      )
+    )
+
+    // One atom per recipient: +amount_i, walletBundle -> recipient bundle, its own SENT units.
+    // Shadow recipients (Wallet.create(bundle, token)) have no position/address -> coerce null to "".
+    recipientWallets.forEachIndexed { i, recipientWallet ->
+      addAtom(
+        Atom(
+          position = recipientWallet.position ?: "",
+          walletAddress = recipientWallet.address ?: "",
+          isotope = 'V',
+          token = sourceWallet.token,
+          value = formatAtomValue(amounts[i].toDouble()),
+          batchId = recipientWallet.batchId,
+          metaType = "walletBundle",
+          metaId = recipientWallet.bundle,
+          meta = finalMetas(wallet = recipientWallet),
+          index = generateIndex()
+        )
+      )
+    }
+
+    // Remainder atom: +(balance - total), walletBundle -> sender bundle, KEPT units
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(sourceWallet.balance - total),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
+  }
+
+  /**
    * Builds Atoms to define a new wallet on the ledger
    */
   fun initWalletCreation(newWallet: Wallet): Molecule {
