@@ -7,8 +7,12 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.json.errors.Errors
 
-@Serializable data class Response @JvmOverloads constructor(@JvmField var data: Data? = null) : IResponse {
+@Serializable data class Response @JvmOverloads constructor(
+  @JvmField var data: Data? = null,
+  // Deserialize GraphQL `errors` from the response JSON (was hardcoded empty -> a validator
+  // error surfaced as the misleading "Response does not match the key" instead of the real message).
   override val errors: List<Errors> = listOf()
+) : IResponse {
   override val message: String? = null
   override val exception: Boolean? = null
 

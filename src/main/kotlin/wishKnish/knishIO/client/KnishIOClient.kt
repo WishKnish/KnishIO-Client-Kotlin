@@ -377,15 +377,19 @@ class KnishIOClient @JvmOverloads constructor(
    * Retrieves this session's wallet used for signing the next Molecule
    */
   fun sourceWallet(): Wallet {
-    return queryContinuId(bundle()).payload() ?: Wallet(getSecret())
+    // Resolve the bundle's live USER ContinuID position (mirror C++/Python: ContinuId needs the
+    // token arg, else the validator can't resolve the chain head and returns null). Null ->
+    // genesis fallback (Wallet(getSecret()) is a USER wallet by default).
+    return queryContinuId(bundle(), "USER").payload() ?: Wallet(getSecret())
   }
 
   /**
    * Queries the ledger for the next ContinuId wallet
    */
-  fun queryContinuId(bundle: String): ResponseContinuId {
+  @JvmOverloads
+  fun queryContinuId(bundle: String, token: String = "USER"): ResponseContinuId {
     val query = createQuery(QueryContinuId::class) as QueryContinuId
-    return query.execute(ContinuIdVariable(bundle)) as ResponseContinuId
+    return query.execute(ContinuIdVariable(bundle, token)) as ResponseContinuId
   }
 
   /**
