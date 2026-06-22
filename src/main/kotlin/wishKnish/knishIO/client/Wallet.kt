@@ -107,9 +107,9 @@ class Wallet @JvmOverloads constructor(
     bundle = secret?.let {
       // Validate position or generate a new one
       position = when {
-        position == null -> Crypto.generateWalletPosition(secret = it, index = 0)
+        position == null -> Wallet.generatePosition()
         position!!.matches(Regex("^[a-f0-9]{64}$")) -> position
-        else -> Crypto.generateWalletPosition(secret = it, index = 0) // Invalid position, generate new one
+        else -> Wallet.generatePosition() // Invalid position, generate a fresh random one
       }
       val bundleHash = Crypto.generateBundleHash(it)
       prepareKeys(it)
@@ -138,7 +138,7 @@ class Wallet @JvmOverloads constructor(
       }
 
       val position = secret?.let {
-        Crypto.generateWalletPosition(secret = it, index = 1) // Use index 1 for remainder wallet
+        generatePosition() // fresh random position (mirror JS; chaining resolved via ContinuId)
       }
 
       // Wallet initialization
@@ -239,6 +239,18 @@ class Wallet @JvmOverloads constructor(
         // Fallback to random for backward compatibility
         Strings.randomString(saltLength, "abcdef0123456789")
       }
+    }
+
+    /**
+     * Generates a fresh RANDOM wallet position (mirrors JS Wallet.generatePosition). KnishIO
+     * one-time signatures require a unique position per wallet; deriving positions
+     * deterministically from (secret, index) collided the auth source with the createToken
+     * source (OTS reuse). Random matches JS/C/C++; chaining is resolved via ContinuId queries.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun generatePosition(saltLength: Int = 64): String {
+      return Strings.randomString(saltLength, "abcdef0123456789")
     }
 
     /**
