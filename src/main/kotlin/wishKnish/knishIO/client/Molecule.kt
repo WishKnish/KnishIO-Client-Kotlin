@@ -1055,7 +1055,7 @@ import kotlin.math.ceil
   fun initAuthorization(meta: MutableList<MetaData>): Molecule {
 
     // Initializing a new Atom to hold our metadata
-    return addAtom(
+    addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
@@ -1066,6 +1066,11 @@ import kotlin.math.ceil
         index = generateIndex()
       )
     )
+
+    // ContinuID I-atom — registers the bundle's relay head on-ledger so subsequent molecules
+    // advance the chain instead of falling to fresh genesis (mirror JS initAuthorization + every
+    // other init*; remainderWallet is set to USER in getProfileAuthToken).
+    return addUserRemainderAtom(remainderWallet !!)
   }
 
   /**

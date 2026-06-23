@@ -298,7 +298,10 @@ class KnishIOClient @JvmOverloads constructor(
     setSecret(secret)
 
     val wallet = Wallet(secret, "AUTH")
-    val molecule = createMolecule(secret, wallet)
+    // Explicit USER remainder (mirror JS createMolecule), so the ContinuID I-atom added by
+    // initAuthorization is USER-token. Without it, createMolecule auto-derives the remainder from
+    // the AUTH source token → a wrong-token I-atom.
+    val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER"))
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
     query.fillMolecule(listOf(MetaData("encrypt", if (encrypt) "true" else "false")))
