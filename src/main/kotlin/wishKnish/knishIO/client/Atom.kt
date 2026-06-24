@@ -77,7 +77,10 @@ import kotlin.jvm.Throws
 ) {
 
   companion object {
-    // Hash schema with JavaScript-compatible property ordering for cross-SDK molecular hash generation
+    // Hash schema with JavaScript-compatible property ordering for cross-SDK molecular hash generation.
+    // Kept as the canonical cross-SDK field-order reference (live hashing uses getHashableValues,
+    // which mirrors this order); intentionally unreferenced → suppress the unused finding.
+    @Suppress("UnusedPrivateProperty")
     private val hashSchema
       get() = linkedMapOf<String, Any?>(
         "position" to null,
@@ -124,6 +127,7 @@ import kotlin.jvm.Throws
      * to ensure consistent hashing results across multiple platforms
      */
     @JvmStatic
+    @Suppress("UnusedPrivateMember")  // documentary wrapper over getHashableValues; kept for cross-SDK parity reference
     private fun molecularHashSchema(atom: Atom): Map<String, Any?> {
       return getHashableValues(atom)
     }

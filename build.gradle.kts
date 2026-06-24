@@ -16,6 +16,7 @@ plugins {
   // (0.35.0+ require Gradle 8.13) AND Dokka v1 / 1.9.20 (0.36.0 dropped Dokka v1).
   id("com.vanniktech.maven.publish") version "0.34.0"
   id("jacoco")
+  id("io.gitlab.arturbosch.detekt") version "1.23.8"
   `java-library`
 }
 
@@ -112,6 +113,23 @@ tasks.jacocoTestReport {
 
 jacoco {
   toolVersion = "0.8.11"
+}
+
+// detekt static-analysis lint gate (cycle 113). Pragmatic baseline: the genuinely-
+// valuable rule sets (potential-bugs, empty-blocks, coroutines, exceptions,
+// performance) are the enforced gate; the crypto/DLT firehose (complexity,
+// MagicNumber, line-length/formatting) is relaxed in config/detekt/detekt.yml —
+// mirrors the Rust clippy::all (not pedantic) + Python ruff F (not E501) philosophy.
+// Scope = src/main/kotlin minus SelfTest.kt (dev tooling); detekt is read-only static
+// analysis (no --auto-correct) so it cannot move the frozen self-test molecular hashes.
+detekt {
+  buildUponDefaultConfig = true
+  config.setFrom(files("config/detekt/detekt.yml"))
+  source.setFrom(files("src/main/kotlin"))
+  ignoreFailures = false
+}
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+  exclude("**/SelfTest.kt")
 }
 
 tasks.withType<KotlinCompile> {

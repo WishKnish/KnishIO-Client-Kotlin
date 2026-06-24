@@ -24,8 +24,6 @@ import kotlin.jvm.Throws
 class PostQuantumCrypto {
     
     companion object {
-        private const val ML_KEM_768_KEYSIZE = 768
-        private const val AES_KEY_SIZE = 256
         private const val AES_GCM_IV_LENGTH = 12
         private const val AES_GCM_TAG_LENGTH = 16
         

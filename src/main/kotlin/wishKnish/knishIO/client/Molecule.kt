@@ -253,6 +253,7 @@ import kotlin.math.ceil
             // Set token units if present
             if (sourceWalletObj.has("tokenUnits") && sourceWalletObj.get("tokenUnits").isJsonArray) {
               // Handle tokenUnits array reconstruction
+              @Suppress("UnusedPrivateProperty")  // stub: full TokenUnit reconstruction not yet implemented
               val tokenUnitsArray = sourceWalletObj.getAsJsonArray("tokenUnits")
               // Note: TokenUnit reconstruction would require full TokenUnit class support
             }
