@@ -525,28 +525,6 @@ class KnishIOClient @JvmOverloads constructor(
     return query.execute(ActiveSessionVariable(bundleHash, metaType, metaId)) as ResponseActiveSession
   }
 
-  @JvmOverloads
-  fun queryUserActivity(
-    bundleHash: String? = null,
-    metaType: String? = null,
-    metaId: String? = null,
-    ipAddress: String? = null,
-    browser: String? = null,
-    osCpu: String? = null,
-    resolution: String? = null,
-    timeZone: String? = null,
-    countBy: List<CountByUserActivity>? = null,
-    interval: Span = Span.HOUR
-  ): ResponseUserActivity {
-    val query = createQuery(QueryUserActivity::class) as QueryUserActivity
-
-    return query.execute(
-      UserActivityVariable(
-        bundleHash, metaType, metaId, ipAddress, browser, osCpu, resolution, timeZone, countBy, interval
-      )
-    ) as ResponseUserActivity
-  }
-
   /**
    * Retrieves a list of your active wallets (unspent)
    */
