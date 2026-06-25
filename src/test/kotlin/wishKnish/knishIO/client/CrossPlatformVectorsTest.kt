@@ -15,6 +15,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Assertions.*
 import wishKnish.knishIO.client.libraries.Crypto
@@ -90,5 +91,39 @@ class CrossPlatformVectorsTest {
                 assertEquals(expectedAddress, wallet.address, "Wallet address mismatch for wallet: $name")
             }
         }
+    }
+
+    // ML-KEM768 keygen-from-seed is deterministic (FIPS-203) → byte-frozen pubkey, like a SHAKE vector.
+    @Test
+    @DisplayName("ML-KEM768 keygen")
+    fun mlkem768Keygen() {
+        val v = vectors["mlkem768"]!!.jsonObject["keygen"]!!.jsonObject
+        val secret = v["secret"]!!.jsonPrimitive.content
+        val token = v["token"]!!.jsonPrimitive.content
+        val position = v["position"]!!.jsonPrimitive.content
+        val expectedPubkey = v["expectedPubkey"]!!.jsonPrimitive.content
+
+        val wallet = Wallet(secret = secret, token = token, position = position)
+        assertEquals(expectedPubkey, wallet.pubkey, "ML-KEM768 keygen pubkey mismatch")
+    }
+
+    // Encapsulation is non-deterministic, but decapsulation + AES-256-GCM decrypt is deterministic →
+    // one frozen {cipherText, encryptedMessage} sample must decrypt to the canonical plaintext.
+    @Test
+    @DisplayName("ML-KEM768 decrypt")
+    fun mlkem768Decrypt() {
+        val v = vectors["mlkem768"]!!.jsonObject["decrypt"]!!.jsonObject
+        val secret = v["secret"]!!.jsonPrimitive.content
+        val token = v["token"]!!.jsonPrimitive.content
+        val position = v["position"]!!.jsonPrimitive.content
+        val cipherText = v["cipherText"]!!.jsonPrimitive.content
+        val encryptedMessage = v["encryptedMessage"]!!.jsonPrimitive.content
+        val expectedPlaintext = v["expectedPlaintext"]!!.jsonPrimitive.content
+
+        val wallet = Wallet(secret = secret, token = token, position = position)
+        val plaintext = wallet.decryptMessage(
+            mapOf("cipherText" to cipherText, "encryptedMessage" to encryptedMessage)
+        )
+        assertEquals(expectedPlaintext, plaintext, "ML-KEM768 decrypt plaintext mismatch")
     }
 }
