@@ -667,7 +667,12 @@ class Wallet @JvmOverloads constructor(
   // =============================================================================
 
   /**
-   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly)
+   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly).
+   *
+   * CANONICAL cross-SDK ML-KEM768 envelope: returns `{ cipherText, encryptedMessage }`
+   * (b64(KEM ciphertext) + b64(IV‖AES-256-GCM ct‖tag)) — the form every KnishIO SDK
+   * interoperates on, asserted by the cross-platform vector layer + strong cross-validation.
+   * Prefer this over the non-canonical hex-joined [libraries.PostQuantumCrypto.encryptMessage].
    */
   fun encryptMessage(message: String, recipientPubkey: String): Map<String, String> {
     // Convert message to JSON string then bytes (matching JavaScript JSON.stringify)
@@ -692,7 +697,11 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
-   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly)
+   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly).
+   *
+   * CANONICAL cross-SDK ML-KEM768 envelope: consumes `{ cipherText, encryptedMessage }` — the
+   * form every KnishIO SDK interoperates on. Prefer this over the non-canonical hex-joined
+   * [libraries.PostQuantumCrypto.decryptMessage].
    */
   fun decryptMessage(encryptedData: Map<String, String>): String? {
     return try {

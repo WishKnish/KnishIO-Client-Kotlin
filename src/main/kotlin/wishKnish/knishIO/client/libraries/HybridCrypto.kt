@@ -91,6 +91,8 @@ class HybridCrypto {
         /**
          * Encrypt using post-quantum ML-KEM768 + AES-GCM
          */
+        // Intentionally uses the non-canonical PostQuantumCrypto envelope (experimental hybrid path).
+        @Suppress("DEPRECATION")
         @Throws(Exception::class)
         private fun encryptPostQuantum(
             message: String,
@@ -126,6 +128,8 @@ class HybridCrypto {
         /**
          * Decrypt post-quantum encrypted message
          */
+        // Intentionally uses the non-canonical PostQuantumCrypto envelope (experimental hybrid path).
+        @Suppress("DEPRECATION")
         @Throws(Exception::class)
         private fun decryptPostQuantum(
             encryptedMessage: Map<String, String>,

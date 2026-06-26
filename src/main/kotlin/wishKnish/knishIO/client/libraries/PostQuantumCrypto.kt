@@ -60,8 +60,15 @@ class PostQuantumCrypto {
         }
         
         /**
-         * Encrypt message using ML-KEM768 + AES-GCM (compatible with JavaScript client)
+         * Encrypt message using ML-KEM768 + AES-GCM.
+         *
+         * NON-CANONICAL ENVELOPE: produces a hex-joined [PostQuantumEncryptedMessage]
+         * (version/encapsulation/iv/ciphertext) that no other KnishIO SDK can decrypt. The
+         * canonical cross-SDK ML-KEM768 envelope is [Wallet.encryptMessage]'s
+         * `{ cipherText, encryptedMessage }` map (the one asserted by the cross-platform
+         * vector layer + strong cross-validation). Use that for interop.
          */
+        @Deprecated("Non-canonical hex-joined ML-KEM envelope; use Wallet.encryptMessage for the canonical cross-SDK { cipherText, encryptedMessage } envelope.")
         @Throws(Exception::class)
         fun encryptMessage(
             message: String,
@@ -93,8 +100,13 @@ class PostQuantumCrypto {
         }
         
         /**
-         * Decrypt message using ML-KEM768 + AES-GCM
+         * Decrypt message using ML-KEM768 + AES-GCM.
+         *
+         * NON-CANONICAL ENVELOPE: consumes the hex-joined [PostQuantumEncryptedMessage]. The
+         * canonical cross-SDK ML-KEM768 envelope is [Wallet.decryptMessage]'s
+         * `{ cipherText, encryptedMessage }` map. Use that for interop.
          */
+        @Deprecated("Non-canonical hex-joined ML-KEM envelope; use Wallet.decryptMessage for the canonical cross-SDK { cipherText, encryptedMessage } envelope.")
         @Throws(Exception::class)
         fun decryptMessage(
             encryptedMessage: PostQuantumEncryptedMessage,
