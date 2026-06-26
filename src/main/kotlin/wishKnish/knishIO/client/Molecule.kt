@@ -767,6 +767,83 @@ import kotlin.math.ceil
   }
 
   /**
+   * Initialize a buffer-deposit (B-isotope) molecule: debit the FULL source balance, deposit
+   * [amount] into a new buffer wallet via a B-atom, and route the change back to the remainder.
+   * The deposit-buffer half of the B/F isotope family; sibling of [initValue]. Mirrors the
+   * JS/PHP reference so the three V+B atoms conserve to zero (source -balance + buffer +amount +
+   * remainder +(balance-amount) = 0 — the validator's b_isotope conservation check). A partial
+   * deposit (amount < balance) MUST still conserve via the full-balance debit + remainder.
+   * Cross-SDK conservation lock: buffer_deposit_conservation (Batch BF).
+   *
+   * @param amount the amount to deposit into the buffer.
+   * @param tradeRates rides for cross-SDK API parity (JS/PHP set bufferWallet.tradeRates); the
+   *   Kotlin Wallet has no tradeRates field yet, so this parameter is currently unused.
+   */
+  @JvmOverloads
+  @Throws(BalanceInsufficientException::class)
+  fun initDepositBuffer(
+    amount: Number,
+    tradeRates: Map<String, Any> = emptyMap()
+  ): Molecule {
+    if (sourceWallet.balance - amount.toDouble() < 0) {
+      throw BalanceInsufficientException()
+    }
+
+    // Create the buffer wallet (the B-atom destination), derived from the same secret.
+    val bufferWallet = Wallet.create(
+      secretOrBundle = secret,
+      token = sourceWallet.token,
+      batchId = sourceWallet.batchId
+    )
+
+    // Source V-atom: debit the ENTIRE balance (UTXO drain) so the B + remainder atoms conserve.
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(- sourceWallet.balance),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
+      )
+    )
+
+    // Buffer B-atom: credit the deposit amount to the buffer wallet.
+    addAtom(
+      Atom(
+        position = bufferWallet.position !!,
+        walletAddress = bufferWallet.address !!,
+        isotope = 'B',
+        token = sourceWallet.token,
+        value = formatAtomValue(amount.toDouble()),
+        batchId = bufferWallet.batchId,
+        metaType = "walletBundle",
+        metaId = bufferWallet.bundle,
+        meta = finalMetas(wallet = bufferWallet),
+        index = generateIndex()
+      )
+    )
+
+    // Remainder V-atom: route the change (balance - amount) back to the remainder wallet.
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
+  }
+
+  /**
    * Initialize a MULTI-recipient V-type molecule: one source debits its FULL balance to fund
    * N recipients (each its own amount + stackable units) plus a remainder back to the sender.
    * Multi-recipient sibling of initValue (WP line 544). recipientWallets is parallel to amounts.

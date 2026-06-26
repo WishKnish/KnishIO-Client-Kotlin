@@ -92,6 +92,66 @@ class PatentVectorValidationTest {
     }
 
     // =========================================================================
+    // 0c. Buffer-deposit conservation cross-SDK parity (Batch BF)
+    //     init_deposit_buffer debits the FULL source balance so a PARTIAL deposit
+    //     still conserves: source V -balance + buffer B +amount + remainder V
+    //     +(balance-amount) = 0. Kotlin is the 5th SDK to join this lock
+    //     (JS/PHP/Rust/Python already did — Kotlin previously lacked initDepositBuffer).
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Buffer-deposit conservation — cross-SDK parity (Batch BF)")
+    inner class BufferDepositConservation {
+
+        private val bufferTests by lazy {
+            vectors["buffer_deposit_conservation"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("initDepositBuffer conserves (V+B sum 0; full-balance debit)")
+        fun bufferDepositConserves() {
+            // The vector pins no secret — the assertion is value-only; any valid secret works.
+            val secret = Crypto.generateSecret("BUFFER_DEPOSIT_TESTSEED")
+            bufferTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                val sourceBalance = test["sourceBalance"]!!.jsonPrimitive.double
+                val amount = test["amount"]!!.jsonPrimitive.int
+                val expectedSourceValue = test["expectedSourceValue"]!!.jsonPrimitive.content
+                val expectedBufferValue = test["expectedBufferValue"]!!.jsonPrimitive.content
+                val expectedRemainderValue = test["expectedRemainderValue"]!!.jsonPrimitive.content
+                val expectedSum = test["expectedSum"]!!.jsonPrimitive.content
+
+                val source = Wallet.create(secret, "BUFTOK")
+                source.balance = sourceBalance
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = source,
+                    remainderWallet = Wallet.create(secret, "BUFTOK"),
+                    cellSlug = "buftest"
+                )
+                molecule.initDepositBuffer(amount)
+
+                var sum = 0L
+                val vValues = mutableListOf<String>()
+                var bValue: String? = null
+                molecule.atoms.forEach { atom ->
+                    if (atom.isotope == 'V' || atom.isotope == 'B') {
+                        sum += (atom.value ?: "0").toLong()
+                        if (atom.isotope == 'V') vValues.add(atom.value ?: "") else bValue = atom.value
+                    }
+                }
+
+                // Emit order: source V (full-balance debit), buffer B (+amount), remainder V (+change).
+                assertEquals(expectedSum, sum.toString(), "V+B conservation sum for $name")
+                assertEquals(expectedSourceValue, vValues[0], "source V (full-balance debit) for $name")
+                assertEquals(expectedBufferValue, bValue, "buffer B for $name")
+                assertEquals(expectedRemainderValue, vValues[1], "remainder V for $name")
+            }
+        }
+    }
+
+    // =========================================================================
     // 1. ContinuID Chain Relay (Patent Claims 5, 12-14)
     // =========================================================================
 
