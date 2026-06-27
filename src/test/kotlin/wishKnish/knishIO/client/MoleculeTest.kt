@@ -351,6 +351,33 @@ class MoleculeTest {
         expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
     }
 
+    @Test
+    fun `client-shaped buffer deposit signs and checks (V-B-V, fresh remainder)`() {
+        // Mirrors KnishIOClient.depositBufferToken: source is the regular balance wallet, the
+        // change routes to a FRESH remainder, and initDepositBuffer adds an internal buffer B-atom.
+        // Proves the mutation flow (initDepositBuffer + sign + check) validates the V-B-V molecule —
+        // i.e. the c145 isotopeV B/F-bypass also accepts the deposit buffer shape.
+        val secret = "deposit-buffer-clientshape-secret"
+        val source = Wallet.create(secret, "DEPTOK")
+        source.balance = 100.0
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "DEPTOK"),
+            cellSlug = "deptest"
+        )
+        molecule.initDepositBuffer(40)
+        molecule.sign()
+
+        // No-throw + true == the V-B-V buffer molecule validates (c145 hasCrossIsotope bypass).
+        expectThat(molecule.check(source)).isTrue()
+        expectThat(molecule.molecularHash).isNotNull()
+        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('V', 'B', 'V'))
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "40", "60"))
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+    }
+
     private fun createTestAtom(wallet: Wallet, value: String = "test"): Atom {
         return Atom(
             position = wallet.position ?: "",

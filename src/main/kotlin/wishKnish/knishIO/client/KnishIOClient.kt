@@ -1029,6 +1029,39 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
+   * Deposits [amount] of [token] from the caller's regular balance wallet INTO a buffer
+   * (B-isotope) wallet.
+   *
+   * Client-level wrapper over [Molecule.initDepositBuffer] (V-B-V), mirroring JS
+   * `depositBufferToken` / Rust `deposit_buffer_token`: the source is the regular balance wallet
+   * and the change routes to a FRESH remainder (unlike `withdrawBufferToken`, where the buffer
+   * wallet is both source and remainder). Pass an explicit [sourceWallet] to override the
+   * resolved balance wallet; [tradeRates] rides for cross-SDK API parity.
+   */
+  @JvmOverloads
+  fun depositBufferToken(
+    token: String,
+    amount: Number,
+    tradeRates: Map<String, Any> = emptyMap(),
+    sourceWallet: Wallet? = null
+  ): ResponseProposeMolecule {
+    // Resolve the source (the passed wallet, else the on-ledger balance wallet).
+    val source = sourceWallet ?: queryBalance(token).payload()
+      ?: throw TransferBalanceException()
+
+    // Deposit routes the change to a FRESH remainder (not the source, unlike withdraw).
+    val remainder = Wallet.create(getSecret(), token, characters = source.characters)
+    remainder.initBatchId(source, true)
+
+    val molecule = createMolecule(sourceWallet = source, remainderWallet = remainder)
+    val query = createMoleculeMutation(MutationDepositBufferToken::class, molecule) as MutationDepositBufferToken
+
+    query.fillMolecule(amount, tradeRates)
+
+    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+  }
+
+  /**
    * Returns the currently defined Cell identifier for this session
    */
   fun cellSlug(): String? {
