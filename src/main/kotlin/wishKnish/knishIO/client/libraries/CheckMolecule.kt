@@ -302,7 +302,12 @@ class CheckMolecule {
       val firstAtom = molecule.atoms.first()
       val isotope = molecule.atoms.filter { it.isotope == 'V' }
 
-      if (firstAtom.isotope == 'V' && isotope.size == 2) {
+      // Cross-SDK parity (JS CheckMolecule.isotopeV): when B/F isotopes are present (buffer
+      // deposit/withdraw, token fusion), the V-only conservation is NOT enforced — the B/F atoms
+      // own the cross-isotope conservation. Bypass the V-only 2-atom/sum/remainder checks below.
+      val hasCrossIsotope = molecule.atoms.any { it.isotope == 'B' || it.isotope == 'F' }
+
+      if (!hasCrossIsotope && firstAtom.isotope == 'V' && isotope.size == 2) {
         val endAtom = isotope.last()
 
         if (firstAtom.token != endAtom.token) {
@@ -352,8 +357,8 @@ class CheckMolecule {
 
       }
       
-      // All atoms must sum to zero for a balanced transaction
-      if (sum != 0.0) {
+      // All atoms must sum to zero for a balanced transaction (V-only; bypassed when B/F present)
+      if (!hasCrossIsotope && sum != 0.0) {
         throw TransferUnbalancedException()
       }
       
@@ -369,11 +374,12 @@ class CheckMolecule {
           throw TransferBalanceException()
         }
         // Does the remainder match what should be there in the source wallet, if provided?
-        if (remainder != sum) {
+        // (V-only invariant; bypassed when B/F atoms own the cross-isotope conservation.)
+        if (!hasCrossIsotope && remainder != sum) {
           throw TransferRemainderException()
         }
       } ?: run {
-        if (value != 0.0) throw TransferRemainderException() // No sourceWallet, but have a remainder?
+        if (!hasCrossIsotope && value != 0.0) throw TransferRemainderException() // No sourceWallet, but have a remainder?
       }
 
       // Looks like we passed all the tests!
