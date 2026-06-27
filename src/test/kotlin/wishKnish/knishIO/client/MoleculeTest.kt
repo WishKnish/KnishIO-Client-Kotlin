@@ -271,6 +271,57 @@ class MoleculeTest {
         // matching the JS/cross-SDK reference and what the validator accepts.
     }
     
+    @Test
+    fun `molecule initializes buffer withdraw correctly (BVB conserves)`() {
+        // initWithdrawBuffer: source B -balance, recipient V atoms (+amount), remainder B
+        // +(balance-Σ); the B+V atom values conserve to 0. Mirrors JS/PHP/Rust/Python.
+        val secret = "withdraw-buffer-test-secret"
+        val source = Wallet.create(secret, "WTHTOK")
+        source.balance = 100.0
+        val bundleA = "a".repeat(64)
+        val bundleB = "b".repeat(64)
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "WTHTOK"),
+            cellSlug = "wthtest"
+        )
+        molecule.initWithdrawBuffer(mapOf(bundleA to 30, bundleB to 20))
+
+        expectThat(molecule.atoms).hasSize(4)
+        // Emit order: source B (-balance), recipient V x2 (+amount), remainder B (+change).
+        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('B', 'V', 'V', 'B'))
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "30", "20", "50"))
+        // Conservation: B+V atom values sum to zero.
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+        // Recipient V-atoms are wallet-less (empty position/address), keyed by metaId = bundle.
+        expectThat(molecule.atoms[1]) {
+            get { metaType }.isEqualTo("walletBundle")
+            get { metaId }.isEqualTo(bundleA)
+            get { position }.isEqualTo("")
+        }
+        expectThat(molecule.atoms[2].metaId).isEqualTo(bundleB)
+    }
+
+    @Test
+    fun `molecule buffer withdraw with full balance leaves zero remainder`() {
+        val secret = "withdraw-buffer-full-secret"
+        val source = Wallet.create(secret, "WTHTOK")
+        source.balance = 50.0
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "WTHTOK"),
+            cellSlug = "wthtest"
+        )
+        molecule.initWithdrawBuffer(mapOf("c".repeat(64) to 50))
+
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-50", "50", "0"))
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+    }
+
     private fun createTestAtom(wallet: Wallet, value: String = "test"): Atom {
         return Atom(
             position = wallet.position ?: "",
