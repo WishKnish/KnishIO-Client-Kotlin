@@ -152,6 +152,67 @@ class PatentVectorValidationTest {
     }
 
     // =========================================================================
+    // 0b. Buffer-withdraw conservation — cross-SDK lock (cycle 149)
+    //     initWithdrawBuffer debits the FULL source balance so a partial
+    //     withdraw still conserves (B+V sum 0). The withdraw analog of the
+    //     deposit lock above; emits TWO B atoms (source, remainder) + ONE V
+    //     atom (recipient). Kotlin was already correct — this regression-locks it.
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Buffer-withdraw conservation — cross-SDK parity (cycle 149)")
+    inner class BufferWithdrawConservation {
+
+        private val bufferTests by lazy {
+            vectors["buffer_withdraw_conservation"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("initWithdrawBuffer conserves (B+V sum 0; full-balance debit)")
+        fun bufferWithdrawConserves() {
+            // The vector pins no secret — the assertion is value-only; any valid secret works.
+            val secret = Crypto.generateSecret("BUFFER_WITHDRAW_TESTSEED")
+            bufferTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                val sourceBalance = test["sourceBalance"]!!.jsonPrimitive.double
+                val amount = test["amount"]!!.jsonPrimitive.int
+                val expectedSourceValue = test["expectedSourceValue"]!!.jsonPrimitive.content
+                val expectedRecipientValue = test["expectedRecipientValue"]!!.jsonPrimitive.content
+                val expectedRemainderValue = test["expectedRemainderValue"]!!.jsonPrimitive.content
+                val expectedSum = test["expectedSum"]!!.jsonPrimitive.content
+
+                val source = Wallet.create(secret, "BUFTOK")
+                source.balance = sourceBalance
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = source,
+                    remainderWallet = Wallet.create(secret, "BUFTOK"),
+                    cellSlug = "buftest"
+                )
+                // Withdraw to the caller's own bundle (single recipient), mirroring the client wrapper.
+                molecule.initWithdrawBuffer(mapOf(source.bundle !! to amount))
+
+                var sum = 0L
+                val bValues = mutableListOf<String>()
+                var vValue: String? = null
+                molecule.atoms.forEach { atom ->
+                    if (atom.isotope == 'V' || atom.isotope == 'B') {
+                        sum += (atom.value ?: "0").toLong()
+                        if (atom.isotope == 'B') bValues.add(atom.value ?: "") else vValue = atom.value
+                    }
+                }
+
+                // Emit order: source B (full-balance debit), recipient V (+amount), remainder B (+change).
+                assertEquals(expectedSum, sum.toString(), "B+V conservation sum for $name")
+                assertEquals(expectedSourceValue, bValues[0], "source B (full-balance debit) for $name")
+                assertEquals(expectedRecipientValue, vValue, "recipient V for $name")
+                assertEquals(expectedRemainderValue, bValues[1], "remainder B for $name")
+            }
+        }
+    }
+
+    // =========================================================================
     // 1. ContinuID Chain Relay (Patent Claims 5, 12-14)
     // =========================================================================
 
