@@ -7,8 +7,8 @@ import wishKnish.knishIO.client.data.json.variables.ContinuIdVariable
 
 @Serializable data class ContinuId(@JvmField val variables: ContinuIdVariable) : QueryInterface {
   override val query = $$"""
-    query ($bundle: String!) {
-      ContinuId(bundle: $bundle) {
+    query ($bundle: String!, $token: String) {
+      ContinuId(bundle: $bundle, token: $token) {
         address,
         bundleHash,
         tokenSlug,

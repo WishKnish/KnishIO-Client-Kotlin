@@ -1,4 +1,4 @@
-@file:JvmName("MutationClaimShadowWallet")
+@file:JvmName("MutationWithdrawBufferToken")
 
 package wishKnish.knishIO.client.mutation
 
@@ -6,21 +6,19 @@ import wishKnish.knishIO.client.Molecule
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.httpClient.HttpClient
 
-class MutationClaimShadowWallet @JvmOverloads constructor(
+class MutationWithdrawBufferToken @JvmOverloads constructor(
   httpClient: HttpClient,
   override val molecule: Molecule? = null
 ) : MutationProposeMolecule(httpClient, molecule) {
-
   @JvmOverloads
   fun fillMolecule(
-    token: String,
-    batchId: String? = null
+    recipients: Map<String, Number>,
+    signingWallet: Wallet? = null
   ) {
-    val wallet = Wallet.create(molecule() !!.secret, token, batchId)
     molecule?.apply {
-      initShadowWalletClaim(wallet)
+      initWithdrawBuffer(recipients, signingWallet)
       sign()
-      check()
+      check(sourceWallet)
     }
   }
 }

@@ -107,9 +107,9 @@ class Wallet @JvmOverloads constructor(
     bundle = secret?.let {
       // Validate position or generate a new one
       position = when {
-        position == null -> Crypto.generateWalletPosition(secret = it, index = 0)
+        position == null -> Wallet.generatePosition()
         position!!.matches(Regex("^[a-f0-9]{64}$")) -> position
-        else -> Crypto.generateWalletPosition(secret = it, index = 0) // Invalid position, generate new one
+        else -> Wallet.generatePosition() // Invalid position, generate a fresh random one
       }
       val bundleHash = Crypto.generateBundleHash(it)
       prepareKeys(it)
@@ -138,7 +138,7 @@ class Wallet @JvmOverloads constructor(
       }
 
       val position = secret?.let {
-        Crypto.generateWalletPosition(secret = it, index = 1) // Use index 1 for remainder wallet
+        generatePosition() // fresh random position (mirror JS; chaining resolved via ContinuId)
       }
 
       // Wallet initialization
@@ -242,6 +242,18 @@ class Wallet @JvmOverloads constructor(
     }
 
     /**
+     * Generates a fresh RANDOM wallet position (mirrors JS Wallet.generatePosition). KnishIO
+     * one-time signatures require a unique position per wallet; deriving positions
+     * deterministically from (secret, index) collided the auth source with the createToken
+     * source (OTS reuse). Random matches JS/C/C++; chaining is resolved via ContinuId queries.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun generatePosition(saltLength: Int = 64): String {
+      return Strings.randomString(saltLength, "abcdef0123456789")
+    }
+
+    /**
      * Generates a public key (wallet address)
      */
     @JvmStatic
@@ -301,33 +313,62 @@ class Wallet @JvmOverloads constructor(
       return
     }
 
-    // Init recipient & remainder token units
-    val recipientTokenUnits = arrayListOf<TokenUnit>()
-    val remainderTokenUnits = arrayListOf<TokenUnit>()
-
+    // Partition the SOURCE's own units by membership in the send-list (single pass, mirror
+    // PHP/Rust): SENT -> source + recipient; KEPT -> remainder. Use the source's own TokenUnit
+    // objects (full id/name/metas), not the param stubs. (The prior nested
+    // `tokenUnits.forEach { units.filter{…} }` lost the KEPT units and duplicated a SENT unit
+    // into the remainder, so the remainder atom carried SENT -> validator Phase 2a rejected it.)
+    val sendIds = units.map { it.id }.toSet()
+    val recipientTokenUnits = arrayListOf<TokenUnit>()  // SENT
+    val remainderTokenUnits = arrayListOf<TokenUnit>()  // KEPT
     tokenUnits.forEach {
-
-      units.filter { unit ->
-        it.id == unit.id
-      }.forEach { unit ->
-        recipientTokenUnits.add(unit)
-      }
-
-      units.filter { unit ->
-        it.id != unit.id
-      }.forEach { unit ->
-        remainderTokenUnits.add(unit)
+      if (sendIds.contains(it.id)) {
+        recipientTokenUnits.add(it)
+      } else {
+        remainderTokenUnits.add(it)
       }
     }
 
-    // Reset token units to the sending value
+    // Source (fully drained in the UTXO transfer) declares the SENT units; the recipient gets
+    // the same SENT list; the new remainder wallet carries the KEPT units.
     tokenUnits = recipientTokenUnits
-
-    // Set token units to recipient & remainder
     recipientWallet?.let {
       it.tokenUnits = recipientTokenUnits
     }
     remainderWallet.tokenUnits = remainderTokenUnits
+  }
+
+  /**
+   * Split token units across MULTIPLE recipients (N-way sibling of splitUnits).
+   *
+   * The source retains the SENT union (all units leaving), each recipientWallets[i] gets its own
+   * subset (recipientUnitLists[i], by id), and remainderWallet keeps the KEPT units (those not
+   * assigned to any recipient). recipientUnitLists is parallel to recipientWallets; ids are matched
+   * against this wallet's own TokenUnit objects. No-op when no units are sent (fungible).
+   */
+  fun splitUnitsMulti(
+    recipientUnitLists: List<List<String>>,
+    recipientWallets: List<Wallet>,
+    remainderWallet: Wallet
+  ) {
+    val sentIds = recipientUnitLists.flatten().toSet()
+
+    // Nothing to split (fungible transfer) — leave token units untouched
+    if (sentIds.isEmpty()) {
+      return
+    }
+
+    // Each recipient gets its own subset of the source's token units
+    recipientWallets.forEachIndexed { i, recipientWallet ->
+      val ids = recipientUnitLists.getOrElse(i) { emptyList() }.toSet()
+      recipientWallet.tokenUnits = tokenUnits.filter { it.id in ids }.toMutableList()
+    }
+
+    // The remainder keeps everything not sent to any recipient (KEPT)
+    remainderWallet.tokenUnits = tokenUnits.filter { it.id !in sentIds }.toMutableList()
+
+    // The source carries the SENT union (the ownership authority the validator reads)
+    tokenUnits = tokenUnits.filter { it.id in sentIds }.toMutableList()
   }
 
   fun isShadow(): Boolean {
@@ -431,6 +472,24 @@ class Wallet @JvmOverloads constructor(
       )
     }
     return encrypt.toJsonElement().toString()
+  }
+
+  /**
+   * Post-quantum (ML-KEM768) variant of [encryptString] for the `CipherHash` transport.
+   *
+   * Builds the canonical cross-SDK multi-recipient envelope keyed by `hashShare(recipientPubkey)`
+   * with the **object-valued** ML-KEM message `{cipherText, encryptedMessage}` (via [encryptMessage]),
+   * NOT the classical NaCl String. This matches the Rust validator's `CipherHash` handler
+   * (it parses `Hash` as `{ "<hashShare>": {cipherText, encryptedMessage} }`). Single recipient —
+   * the validator reads only its own entry — so no self-recipient is added.
+   */
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
+  fun encryptStringML768(message: String, recipientPubkey: String): String {
+    val envelope = encryptMessage(message, recipientPubkey)
+    val recipientMap = mapOf(
+      Crypto.hashShare(recipientPubkey, characters ?: "BASE64") to envelope
+    )
+    return com.google.gson.Gson().toJson(recipientMap)
   }
 
   /**
@@ -626,7 +685,12 @@ class Wallet @JvmOverloads constructor(
   // =============================================================================
 
   /**
-   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly)
+   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly).
+   *
+   * CANONICAL cross-SDK ML-KEM768 envelope: returns `{ cipherText, encryptedMessage }`
+   * (b64(KEM ciphertext) + b64(IV‖AES-256-GCM ct‖tag)) — the form every KnishIO SDK
+   * interoperates on, asserted by the cross-platform vector layer + strong cross-validation.
+   * Prefer this over the non-canonical hex-joined [libraries.PostQuantumCrypto.encryptMessage].
    */
   fun encryptMessage(message: String, recipientPubkey: String): Map<String, String> {
     // Convert message to JSON string then bytes (matching JavaScript JSON.stringify)
@@ -651,7 +715,11 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
-   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly)
+   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly).
+   *
+   * CANONICAL cross-SDK ML-KEM768 envelope: consumes `{ cipherText, encryptedMessage }` — the
+   * form every KnishIO SDK interoperates on. Prefer this over the non-canonical hex-joined
+   * [libraries.PostQuantumCrypto.decryptMessage].
    */
   fun decryptMessage(encryptedData: Map<String, String>): String? {
     return try {
@@ -680,6 +748,46 @@ class Wallet @JvmOverloads constructor(
       gson.fromJson(decryptedString, String::class.java)
     } catch (e: Exception) {
       println("Wallet::decryptMessage() - Decryption failed: ${e.message}")
+      null
+    }
+  }
+
+  /**
+   * Post-quantum (ML-KEM768) variant of [decryptMyMessage] for the `CipherHash` transport.
+   *
+   * Selects this wallet's entry by `hashShare(this.pubkey)` — the wallet's **ML-KEM** public key
+   * (the one sent at auth, which the validator encrypts the response to) — then decapsulates with
+   * `mlkemRawPrivkey` + AES-256-GCM. Returns the **RAW decrypted JSON text** (the GraphQL response
+   * object `{"data":…}`), NOT a gson-parsed String — [decryptMessage] assumes a string payload and
+   * would fail on the validator's object response.
+   */
+  fun decryptMyMessageML768(message: Map<String, Map<String, String>>): String? {
+    val myPubkey = pubkey ?: return null
+    val envelope = message[Crypto.hashShare(myPubkey, characters ?: "BASE64")] ?: return null
+    return mlkemDecryptToString(envelope)
+  }
+
+  /**
+   * Decapsulate (ML-KEM768) + AES-256-GCM-decrypt a `{cipherText, encryptedMessage}` envelope with
+   * this wallet's ML-KEM private key, returning the raw UTF-8 plaintext. Shared by the transport
+   * decrypt path; kept separate from [decryptMessage] (which is cross-platform-vector-asserted and
+   * additionally gson-parses the result as a String).
+   */
+  private fun mlkemDecryptToString(encryptedData: Map<String, String>): String? {
+    return try {
+      val cipherText = encryptedData["cipherText"] ?: return null
+      val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
+
+      val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
+      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
+      val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
+      val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
+
+      val encryptedMessageBytes = java.util.Base64.getDecoder().decode(encryptedMessage)
+      val decryptedBytes = decryptWithSharedSecret(encryptedMessageBytes, sharedSecret)
+      String(decryptedBytes, Charsets.UTF_8)
+    } catch (e: Exception) {
+      println("Wallet::mlkemDecryptToString() - Decryption failed: ${e.message}")
       null
     }
   }

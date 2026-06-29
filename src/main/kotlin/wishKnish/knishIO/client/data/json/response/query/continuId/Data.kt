@@ -8,7 +8,11 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Wallet
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var continuIdWallet: Wallet? = null) {
+// Property named `ContinuId` to match BOTH the wire field (data.ContinuId) for kotlinx
+// deserialization AND the abstract Response's dataKey reflection-navigation by property name
+// (mirrors the working balance Data, whose property is `Balance`). The prior `continuIdWallet`
+// name matched neither -> the response neither deserialized nor navigated (threw / returned null).
+@Serializable data class Data @JvmOverloads constructor(@JvmField var ContinuId: Wallet? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -19,8 +23,8 @@ import wishKnish.knishIO.client.data.graphql.types.Wallet
 
     @JvmStatic
     @JvmOverloads
-    fun create(continuIdWallet: Wallet? = null): Data {
-      return Data(continuIdWallet)
+    fun create(continuId: Wallet? = null): Data {
+      return Data(continuId)
     }
 
     @JvmStatic

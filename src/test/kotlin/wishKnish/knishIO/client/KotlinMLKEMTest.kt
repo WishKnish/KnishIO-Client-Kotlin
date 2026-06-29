@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 class KotlinMLKEMTest {
     
     @Test
+    @Suppress("DEPRECATION") // exercises the non-canonical PostQuantumCrypto envelope on purpose
     fun testKotlinToKotlinEncryption() {
         println("🔐 Testing Kotlin-to-Kotlin ML-KEM encryption...")
         

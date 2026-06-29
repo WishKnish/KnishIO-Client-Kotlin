@@ -204,7 +204,12 @@ class CrossSdkMoleculeDeserializer : JsonDeserializer<Molecule> {
                             val metaObj = metaElement.asJsonObject
                             add(MetaData(
                                 metaObj.get("key").asString,
-                                metaObj.get("value").asString
+                                // Null-safe: a JSON null meta value (e.g. walletBatchId from JS/TS/PHP/Python
+                                // tokenCreation dumps) must stay null, not become the string "null" — otherwise
+                                // the re-hash includes it (the hash skips null meta values) and cross-validation
+                                // mismatches. Mirrors the getStringOrNull pattern used for the atom's own fields.
+                                if (metaObj.has("value") && !metaObj.get("value").isJsonNull)
+                                    metaObj.get("value").asString else null
                             ))
                         }
                     }
@@ -373,6 +378,37 @@ class KotlinSelfTest {
                   "token": "ENCRYPT",
                   "position": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
                   "plaintext": "Hello ML-KEM768 cross-platform test message!"
+                },
+                "tokenCreation": {
+                  "sourceSeed": "TESTSEED",
+                  "recipientSeed": "RECIPIENTSEED",
+                  "sourceToken": "USER",
+                  "newToken": "TESTTOKEN",
+                  "amount": 1000000,
+                  "sourcePosition": "0123456789abcdeffedcba9876543210fedcba9876543210fedcba9876543210",
+                  "recipientPosition": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                  "metadata": {
+                    "name": "Test Token",
+                    "fungibility": "fungible",
+                    "supply": "limited",
+                    "decimals": "0"
+                  }
+                },
+                "walletCreation": {
+                  "sourceSeed": "TESTSEED",
+                  "newWalletSeed": "NEWWALLETSEED",
+                  "sourceToken": "USER",
+                  "newToken": "TESTTOKEN",
+                  "sourcePosition": "0123456789abcdeffedcba9876543210fedcba9876543210fedcba9876543210",
+                  "newWalletPosition": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+                },
+                "shadowWalletClaim": {
+                  "sourceSeed": "TESTSEED",
+                  "claimSeed": "CLAIMSEED",
+                  "sourceToken": "USER",
+                  "claimToken": "TESTTOKEN",
+                  "sourcePosition": "0123456789abcdeffedcba9876543210fedcba9876543210fedcba9876543210",
+                  "claimPosition": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
                 }
               }
             }"""
@@ -759,6 +795,251 @@ class KotlinSelfTest {
         }
     }
     
+    /**
+     * Test C1: Token Creation Test (cross-SDK parity with JS)
+     * C-atom (issue new token) + ContinuID I-atom; the prefixed setMetaWallet class.
+     */
+    fun testTokenCreation(config: JsonObject): Boolean {
+        log("\nC1. Token Creation Test", Colors.BLUE)
+        val testConfig = config.getAsJsonObject("tests").getAsJsonObject("tokenCreation")
+
+        return try {
+            val sourceSeed = testConfig.get("sourceSeed").asString
+            val recipientSeed = testConfig.get("recipientSeed").asString
+            val sourceToken = testConfig.get("sourceToken").asString
+            val newToken = testConfig.get("newToken").asString
+            // Read as Int so this resolves to the Number overload (C+I), NOT the Double overload (V+M).
+            val amount = testConfig.get("amount").asInt
+            val sourcePosition = testConfig.get("sourcePosition").asString
+            val recipientPosition = testConfig.get("recipientPosition").asString
+
+            // Source wallet (USER token)
+            val sourceSecret = Crypto.generateSecret(sourceSeed, 2048)
+            val sourceWallet = Wallet(sourceSecret, sourceToken, sourcePosition)
+            logTest("Source wallet creation", true)
+
+            // Recipient wallet for the new token
+            val recipientSecret = Crypto.generateSecret(recipientSeed, 2048)
+            val recipientWallet = Wallet(recipientSecret, newToken, recipientPosition)
+            logTest("Recipient wallet creation", true)
+
+            // Canonical USER-token remainder so addUserRemainderAtom keeps the bbbb... wallet
+            val remainderWallet = Wallet(sourceSecret, sourceToken, "bbbb000000000000cccc111111111111dddd222222222222eeee333333333333")
+            logTest("Remainder wallet creation", true)
+
+            val molecule = Molecule(sourceSecret, sourceWallet, remainderWallet)
+
+            // User token meta in JS insertion order (name, fungibility, supply, decimals)
+            val metaObject = testConfig.getAsJsonObject("metadata")
+            val metaList = mutableListOf<MetaData>()
+            for ((key, value) in metaObject.entrySet()) {
+                metaList.add(MetaData(key, value.asString))
+            }
+
+            molecule.initTokenCreation(recipientWallet, amount, metaList)
+            logTest("Token creation initialization", true)
+
+            // Deterministic per-atom timestamps (must precede signing)
+            setFixedTimestamps(molecule)
+
+            molecule.sign()
+            logTest("Molecule signing", true)
+
+            inspectMolecule(molecule, "token creation molecule")
+            diagnoseValidation(molecule, sourceWallet, "token creation molecule")
+
+            var isValid = false
+            var validationError: String? = null
+            try {
+                isValid = molecule.check(sourceWallet)
+                if (!isValid) {
+                    validationError = "Validation returned false (no exception thrown)"
+                }
+            } catch (error: Exception) {
+                isValid = false
+                validationError = error.message
+            }
+
+            logTest("Molecule validation", isValid, validationError)
+
+            moleculeStorage["tokenCreation"] = gson.toJson(molecule)
+
+            testResults["tokenCreation"] = TransferTestResult(
+                passed = isValid,
+                molecularHash = molecule.molecularHash,
+                atomCount = molecule.atoms.size,
+                validationError = validationError
+            )
+
+            isValid
+        } catch (error: Exception) {
+            log("  ❌ ERROR: ${error.message}", Colors.RED)
+            testResults["tokenCreation"] = mapOf(
+                "passed" to false,
+                "error" to (error.message ?: "unknown")
+            )
+            false
+        }
+    }
+
+    /**
+     * C2. Wallet Creation Test — define a new wallet on the ledger.
+     * C-atom (metaType 'wallet', setMetaWallet 7 prefixed keys, metaId/batchId from the new wallet)
+     * + ContinuID I-atom.
+     */
+    fun testWalletCreation(config: JsonObject): Boolean {
+        log("\nC2. Wallet Creation Test", Colors.BLUE)
+        val testConfig = config.getAsJsonObject("tests").getAsJsonObject("walletCreation")
+
+        return try {
+            val sourceSeed = testConfig.get("sourceSeed").asString
+            val newWalletSeed = testConfig.get("newWalletSeed").asString
+            val sourceToken = testConfig.get("sourceToken").asString
+            val newToken = testConfig.get("newToken").asString
+            val sourcePosition = testConfig.get("sourcePosition").asString
+            val newWalletPosition = testConfig.get("newWalletPosition").asString
+
+            // Source wallet (USER token)
+            val sourceSecret = Crypto.generateSecret(sourceSeed, 2048)
+            val sourceWallet = Wallet(sourceSecret, sourceToken, sourcePosition)
+            logTest("Source wallet creation", true)
+
+            // New wallet to define on the ledger
+            val newWalletSecret = Crypto.generateSecret(newWalletSeed, 2048)
+            val newWallet = Wallet(newWalletSecret, newToken, newWalletPosition)
+            logTest("New wallet creation", true)
+
+            // Canonical USER-token remainder so addUserRemainderAtom keeps the bbbb... wallet
+            val remainderWallet = Wallet(sourceSecret, sourceToken, "bbbb000000000000cccc111111111111dddd222222222222eeee333333333333")
+            logTest("Remainder wallet creation", true)
+
+            val molecule = Molecule(sourceSecret, sourceWallet, remainderWallet)
+
+            molecule.initWalletCreation(newWallet)
+            logTest("Wallet creation initialization", true)
+
+            // Deterministic per-atom timestamps (must precede signing)
+            setFixedTimestamps(molecule)
+
+            molecule.sign()
+            logTest("Molecule signing", true)
+
+            inspectMolecule(molecule, "wallet creation molecule")
+            diagnoseValidation(molecule, sourceWallet, "wallet creation molecule")
+
+            var isValid = false
+            var validationError: String? = null
+            try {
+                isValid = molecule.check(sourceWallet)
+                if (!isValid) {
+                    validationError = "Validation returned false (no exception thrown)"
+                }
+            } catch (error: Exception) {
+                isValid = false
+                validationError = error.message
+            }
+
+            logTest("Molecule validation", isValid, validationError)
+
+            moleculeStorage["walletCreation"] = gson.toJson(molecule)
+
+            testResults["walletCreation"] = TransferTestResult(
+                passed = isValid,
+                molecularHash = molecule.molecularHash,
+                atomCount = molecule.atoms.size,
+                validationError = validationError
+            )
+
+            isValid
+        } catch (error: Exception) {
+            log("  ❌ ERROR: ${error.message}", Colors.RED)
+            testResults["walletCreation"] = mapOf(
+                "passed" to false,
+                "error" to (error.message ?: "unknown")
+            )
+            false
+        }
+    }
+
+    /**
+     * C3. Shadow Wallet Claim Test — claim a shadow wallet.
+     * C-atom (metaType 'wallet', meta = [shadowWalletClaim, then setMetaWallet 7 keys]) + ContinuID
+     * I-atom. The token param is vestigial (JS takes only the wallet).
+     */
+    fun testShadowWalletClaim(config: JsonObject): Boolean {
+        log("\nC3. Shadow Wallet Claim Test", Colors.BLUE)
+        val testConfig = config.getAsJsonObject("tests").getAsJsonObject("shadowWalletClaim")
+
+        return try {
+            val sourceSeed = testConfig.get("sourceSeed").asString
+            val claimSeed = testConfig.get("claimSeed").asString
+            val sourceToken = testConfig.get("sourceToken").asString
+            val claimToken = testConfig.get("claimToken").asString
+            val sourcePosition = testConfig.get("sourcePosition").asString
+            val claimPosition = testConfig.get("claimPosition").asString
+
+            // Source wallet (USER token)
+            val sourceSecret = Crypto.generateSecret(sourceSeed, 2048)
+            val sourceWallet = Wallet(sourceSecret, sourceToken, sourcePosition)
+            logTest("Source wallet creation", true)
+
+            // Wallet being claimed
+            val claimSecret = Crypto.generateSecret(claimSeed, 2048)
+            val claimWallet = Wallet(claimSecret, claimToken, claimPosition)
+            logTest("Claim wallet creation", true)
+
+            // Canonical USER-token remainder so addUserRemainderAtom keeps the bbbb... wallet
+            val remainderWallet = Wallet(sourceSecret, sourceToken, "bbbb000000000000cccc111111111111dddd222222222222eeee333333333333")
+            logTest("Remainder wallet creation", true)
+
+            val molecule = Molecule(sourceSecret, sourceWallet, remainderWallet)
+
+            molecule.initShadowWalletClaim(claimWallet)
+            logTest("Shadow wallet claim initialization", true)
+
+            // Deterministic per-atom timestamps (must precede signing)
+            setFixedTimestamps(molecule)
+
+            molecule.sign()
+            logTest("Molecule signing", true)
+
+            inspectMolecule(molecule, "shadow wallet claim molecule")
+            diagnoseValidation(molecule, sourceWallet, "shadow wallet claim molecule")
+
+            var isValid = false
+            var validationError: String? = null
+            try {
+                isValid = molecule.check(sourceWallet)
+                if (!isValid) {
+                    validationError = "Validation returned false (no exception thrown)"
+                }
+            } catch (error: Exception) {
+                isValid = false
+                validationError = error.message
+            }
+
+            logTest("Molecule validation", isValid, validationError)
+
+            moleculeStorage["shadowWalletClaim"] = gson.toJson(molecule)
+
+            testResults["shadowWalletClaim"] = TransferTestResult(
+                passed = isValid,
+                molecularHash = molecule.molecularHash,
+                atomCount = molecule.atoms.size,
+                validationError = validationError
+            )
+
+            isValid
+        } catch (error: Exception) {
+            log("  ❌ ERROR: ${error.message}", Colors.RED)
+            testResults["shadowWalletClaim"] = mapOf(
+                "passed" to false,
+                "error" to (error.message ?: "unknown")
+            )
+            false
+        }
+    }
+
     /**
      * Test 5: ML-KEM768 Encryption Test
      * Tests post-quantum encryption/decryption compatibility
@@ -1164,7 +1445,7 @@ class KotlinSelfTest {
         
         val results = SelfTestResults(
             sdk = "Kotlin",
-            version = "0.8.1",
+            version = "0.8.2",
             timestamp = Instant.now().toString(),
             tests = testResults,
             molecules = moleculeStorage,
@@ -1196,7 +1477,7 @@ class KotlinSelfTest {
         }
         val failedTests = totalTests - passedTests
         
-        log("\nSDK: Kotlin v0.8.1")
+        log("\nSDK: Kotlin v0.8.2")
         log("Timestamp: ${Instant.now()}")
         
         val summaryColor = if (passedTests == totalTests) Colors.GREEN else Colors.RED
@@ -1313,6 +1594,9 @@ class KotlinSelfTest {
         testMetaCreation(config)
         testSimpleTransfer(config)
         testComplexTransfer(config)
+        testTokenCreation(config)
+        testWalletCreation(config)
+        testShadowWalletClaim(config)
         testMLKEM768(config)
         testNegativeCases(config)
         testCrossSdkValidation(config)

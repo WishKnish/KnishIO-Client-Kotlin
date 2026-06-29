@@ -1,0 +1,77 @@
+# Pragmatic detekt baseline for the KnishIO Kotlin SDK (cycle 113).
+#
+# build.gradle.kts sets buildUponDefaultConfig = true, so detekt's full default
+# config applies and this file only RELAXES the firehose for a crypto/DLT codebase.
+# The genuinely-valuable rule sets stay the enforced gate (potential-bugs,
+# empty-blocks, coroutines, performance, comments, most of style/naming, UnusedImport,
+# UnusedPrivateProperty/Member) — mirrors the Rust clippy::all-not-pedantic (c111) +
+# Python ruff-F-not-E501 (c112) philosophy. Scope = src/main/kotlin minus SelfTest.kt
+# (set in build.gradle.kts).
+
+complexity:
+  # The SHAKE/WOTS+ pipelines + isotopeV/molecule validation chains are inherently
+  # long/branchy and load-bearing — refactoring them would risk the frozen hashes.
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  ComplexCondition:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  NestedBlockDepth:
+    active: false
+  TooManyFunctions:
+    active: false
+  LargeClass:
+    active: false
+
+style:
+  MagicNumber:
+    active: false        # SHAKE/WOTS+ constants (the -8..8 enumerate map, iteration counts) are spec-fixed
+  ReturnCount:
+    active: false        # guard-heavy validation returns early by design
+  MaxLineLength:
+    active: false        # formatting is ktlint's job, not this analysis gate (the E501 analog)
+  ForbiddenComment:
+    active: false        # TODO/FIXME comments are not gate failures
+  WildcardImport:
+    active: false        # ktor/serialization/java.security wildcard imports are deliberate
+  NewLineAtEndOfFile:
+    active: false        # the project's .editorconfig sets insert_final_newline = false
+  UseRequire:
+    active: false        # explicit throw IllegalArgumentException is fine in validation paths (idiom preference)
+  UtilityClassWithPublicConstructor:
+    active: false        # Crypto/HybridCrypto utility classes — converting to `object` would change the API
+  ThrowsCount:
+    active: false        # molecule/isotope validation is throw-heavy by design
+  UnusedParameter:
+    active: false        # cross-SDK-parity signature params (Molecule.secureMode/walletBundle, Wallet.secret) + interface conformance
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false        # catch(Exception) is intentional at the SDK/transport boundary
+  TooGenericExceptionThrown:
+    active: false        # a few boundary throws; specific-exception migration is a separate effort
+  SwallowedException:
+    active: false        # intentional boundary swallows / fallbacks across the SDK
+
+naming:
+  PackageNaming:
+    active: false        # the fixed org package `wishKnish.knishIO.client` — renaming breaks Maven coords + every import
+  ConstructorParameterNaming:
+    active: false        # PascalCase @Serializable props (ProposeMolecule/Balance/ContinuId/Hash) match GraphQL wire fields
+  VariableNaming:
+    active: false        # leading-underscore backing fields (_secret) are a deliberate convention
+  MatchingDeclarationName:
+    active: false        # IResponse files group a differently-named declaration by design
+  MemberNameEqualsClassName:
+    active: false        # Response.response / Query.query accessors are deliberate
+
+performance:
+  ForEachOnRange:
+    active: false        # the 2 sites are WOTS+/seal crypto loops — not worth a perf micro-rewrite risk
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: false        # the insecure-TLS trust-all manager + interface stubs are intentionally empty

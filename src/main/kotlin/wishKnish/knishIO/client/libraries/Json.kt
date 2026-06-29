@@ -3,7 +3,7 @@ package wishKnish.knishIO.client.libraries
 import kotlinx.serialization.json.*
 
 
-private fun JsonObject.toMap(): Map<String, *> = keys.asSequence().associateWith { it ->
+private fun JsonObject.toMap(): Map<String, *> = keys.asSequence().associateWith {
   when (val value = this[it]) {
     is JsonArray -> {
       val map = (0 until value.size).associate {

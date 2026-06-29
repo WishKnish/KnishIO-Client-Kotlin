@@ -53,13 +53,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.exception.*
 import wishKnish.knishIO.client.libraries.*
 import kotlin.jvm.Throws
 import kotlin.math.ceil
-import kotlin.reflect.KVisibility
-import kotlin.reflect.full.memberProperties
 
 /**
  * Molecule class used for committing changes to the ledger
@@ -77,7 +77,11 @@ import kotlin.reflect.full.memberProperties
   @JvmField var molecularHash: String? = null
   @JvmField var atoms: MutableList<Atom> = mutableListOf()
   
-  private var _cellSlugOrigin: String? = null
+  // Internal backing field for the cellSlugOrigin computed property — must NOT serialize
+  // onto the wire (the validator's MoleculeInput rejects the unknown "_cellSlugOrigin"
+  // field). It was silently omitted under encodeDefaults=false but leaks once defaults
+  // are encoded (needed for atom index=0), so mark it @Transient explicitly.
+  @Transient private var _cellSlugOrigin: String? = null
 
   init {
     // Preserve the original cellSlug value
@@ -251,6 +255,7 @@ import kotlin.reflect.full.memberProperties
             // Set token units if present
             if (sourceWalletObj.has("tokenUnits") && sourceWalletObj.get("tokenUnits").isJsonArray) {
               // Handle tokenUnits array reconstruction
+              @Suppress("UnusedPrivateProperty")  // stub: full TokenUnit reconstruction not yet implemented
               val tokenUnitsArray = sourceWalletObj.getAsJsonArray("tokenUnits")
               // Note: TokenUnit reconstruction would require full TokenUnit class support
             }
@@ -481,41 +486,6 @@ import kotlin.reflect.full.memberProperties
 
 
   /**
-   * Initializes token creation atoms for this molecule
-   */
-  fun initTokenCreation(
-    recipientWallet: Wallet,
-    amount: Double,
-    meta: MutableList<MetaData>
-  ): Molecule {
-    // Add value atom for the token amount
-    val valueAtom = Atom(
-      position = recipientWallet.position ?: "",
-      walletAddress = recipientWallet.address ?: "",
-      isotope = 'V',
-      token = recipientWallet.token,
-      value = formatAtomValue(amount),
-      index = atoms.size
-    )
-    addAtom(valueAtom)
-    
-    // Add metadata atom for token information
-    val metaAtom = Atom(
-      position = sourceWallet.position ?: "",
-      walletAddress = sourceWallet.address ?: "",
-      isotope = 'M',
-      token = sourceWallet.token,
-      metaType = "token",
-      metaId = recipientWallet.token,
-      meta = meta.toList(),
-      index = atoms.size
-    )
-    addAtom(metaAtom)
-    
-    return this
-  }
-
-  /**
    * Final meta array
    */
   @JvmOverloads
@@ -544,6 +514,37 @@ import kotlin.reflect.full.memberProperties
         it.add(MetaData(key = "context", value = context ?: DEFAULT_META_CONTEXT))
       }
     }.toList()
+  }
+
+  /**
+   * Append wallet metadata in the JS-canonical order for cross-SDK molecular-hash parity
+   * (mirrors AtomMeta.setMetaWallet). Adds the 7 PREFIXED keys — walletTokenSlug, walletBundleHash,
+   * walletAddress, walletPosition, walletBatchId, walletPubkey, walletCharacters — in that insertion
+   * order, each only when non-null/non-empty (empty/None values are hash-skipped anyway, matching JS).
+   */
+  fun setMetaWallet(metas: MutableList<MetaData>, wallet: Wallet): MutableList<MetaData> {
+    wallet.token.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletTokenSlug", value = it))
+    }
+    wallet.bundle?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletBundleHash", value = it))
+    }
+    wallet.address?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletAddress", value = it))
+    }
+    wallet.position?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletPosition", value = it))
+    }
+    wallet.batchId?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletBatchId", value = it))
+    }
+    wallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletPubkey", value = it))
+    }
+    wallet.characters?.takeIf { it.isNotEmpty() }?.let {
+      metas.add(MetaData(key = "walletCharacters", value = it))
+    }
+    return metas
   }
 
   /**
@@ -631,7 +632,7 @@ import kotlin.reflect.full.memberProperties
   @Throws(NegativeAmountException::class)
   fun burnToken(
     amount: Number,
-    walletBundle: String? = null
+    walletBundle: String? = null // vestigial (JS parity): the burn always targets the all-zeros bundle
   ): Molecule {
     if (amount.toDouble() < 0.0) {
       throw NegativeAmountException("Molecule::burnToken() - Amount to burn must be positive!")
@@ -641,20 +642,49 @@ import kotlin.reflect.full.memberProperties
       throw BalanceInsufficientException()
     }
 
-    // Initializing a new Atom to remove tokens from source
+    // Burn-address wallet: the all-zeros bundle = token destruction. No secret, so it has
+    // no position/address (coerced to "" below; the hash absorbs "" as a no-op). The
+    // validator credits the burn amount to this unspendable bundle, satisfying V-isotope
+    // conservation (sum == 0) while permanently destroying the tokens. Mirrors JS burnToken.
+    val burnWallet = Wallet.create(
+      "0000000000000000000000000000000000000000000000000000000000000000",
+      sourceWallet.token
+    )
+
+    // V-atom 1: debit the ENTIRE source balance (UTXO model). Must be -balance (not -amount):
+    // the burn target gets +amount and the remainder gets +(balance-amount), so the three
+    // V-atoms sum to zero. -amount left the molecule unbalanced (validator: TransferUnbalanced)
+    // and only emitted 2 atoms (validator requires exactly 3) — the pre-fix bug.
     addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = formatAtomValue(- amount.toDouble()),
+        value = formatAtomValue(- sourceWallet.balance),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
       )
     )
 
+    // V-atom 2: credit the burn amount to the all-zeros burn address (destruction).
+    addAtom(
+      Atom(
+        position = burnWallet.position ?: "",
+        walletAddress = burnWallet.address ?: "",
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(amount.toDouble()),
+        batchId = burnWallet.batchId,
+        metaType = "walletBundle",
+        metaId = burnWallet.bundle,
+        meta = finalMetas(wallet = burnWallet),
+        index = generateIndex()
+      )
+    )
+
+    // V-atom 3: remainder back to the source identity.
     return addAtom(
       Atom(
         position = remainderWallet !!.position !!,
@@ -663,8 +693,8 @@ import kotlin.reflect.full.memberProperties
         token = sourceWallet.token,
         value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
         batchId = remainderWallet !!.batchId,
-        metaType = walletBundle?.let { "walletBundle" },
-        metaId = walletBundle,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
         meta = finalMetas(wallet = remainderWallet),
         index = generateIndex()
       )
@@ -684,25 +714,33 @@ import kotlin.reflect.full.memberProperties
       throw BalanceInsufficientException()
     }
 
-    // Initializing a new Atom to remove tokens from source
+    // Initializing a new Atom to remove the ENTIRE balance from source (UTXO model).
+    // Must be -balance (not -amount): recipient gets +amount and remainder gets
+    // +(balance-amount), so the three V-atoms sum to zero. Using -amount left the
+    // molecule unbalanced (validator: TransferUnbalanced) whenever amount != balance;
+    // the offline self-test masked it by transferring the whole balance.
     addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
         isotope = 'V',
         token = sourceWallet.token,
-        value = formatAtomValue(- amount.toDouble()),
+        value = formatAtomValue(- sourceWallet.balance),
         batchId = sourceWallet.batchId,
         meta = finalMetas(),
         index = generateIndex()
       )
     )
 
-    // Initializing a new Atom to add tokens to recipient
+    // Initializing a new Atom to add tokens to recipient.
+    // A shadow/batched recipient (Wallet.create(bundleHash, token)) has no
+    // position/address (it is keyed by bundle + batchId, assigned at claim time);
+    // coerce null -> "" instead of asserting (the hash already absorbs "" for
+    // null/empty position/walletAddress, so it stays consistent).
     addAtom(
       Atom(
-        position = recipientWallet.position !!,
-        walletAddress = recipientWallet.address !!,
+        position = recipientWallet.position ?: "",
+        walletAddress = recipientWallet.address ?: "",
         isotope = 'V',
         token = sourceWallet.token,
         value = formatAtomValue(amount.toDouble()),
@@ -731,17 +769,247 @@ import kotlin.reflect.full.memberProperties
   }
 
   /**
+   * Initialize a buffer-deposit (B-isotope) molecule: debit the FULL source balance, deposit
+   * [amount] into a new buffer wallet via a B-atom, and route the change back to the remainder.
+   * The deposit-buffer half of the B/F isotope family; sibling of [initValue]. Mirrors the
+   * JS/PHP reference so the three V+B atoms conserve to zero (source -balance + buffer +amount +
+   * remainder +(balance-amount) = 0 — the validator's b_isotope conservation check). A partial
+   * deposit (amount < balance) MUST still conserve via the full-balance debit + remainder.
+   * Cross-SDK conservation lock: buffer_deposit_conservation (Batch BF).
+   *
+   * @param amount the amount to deposit into the buffer.
+   * @param tradeRates rides for cross-SDK API parity (JS/PHP set bufferWallet.tradeRates); the
+   *   Kotlin Wallet has no tradeRates field yet, so this parameter is currently unused.
+   */
+  @JvmOverloads
+  @Throws(BalanceInsufficientException::class)
+  fun initDepositBuffer(
+    amount: Number,
+    tradeRates: Map<String, Any> = emptyMap()
+  ): Molecule {
+    if (sourceWallet.balance - amount.toDouble() < 0) {
+      throw BalanceInsufficientException()
+    }
+
+    // Create the buffer wallet (the B-atom destination), derived from the same secret.
+    val bufferWallet = Wallet.create(
+      secretOrBundle = secret,
+      token = sourceWallet.token,
+      batchId = sourceWallet.batchId
+    )
+
+    // Source V-atom: debit the ENTIRE balance (UTXO drain) so the B + remainder atoms conserve.
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(- sourceWallet.balance),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
+      )
+    )
+
+    // Buffer B-atom: credit the deposit amount to the buffer wallet.
+    addAtom(
+      Atom(
+        position = bufferWallet.position !!,
+        walletAddress = bufferWallet.address !!,
+        isotope = 'B',
+        token = sourceWallet.token,
+        value = formatAtomValue(amount.toDouble()),
+        batchId = bufferWallet.batchId,
+        metaType = "walletBundle",
+        metaId = bufferWallet.bundle,
+        meta = finalMetas(wallet = bufferWallet),
+        index = generateIndex()
+      )
+    )
+
+    // Remainder V-atom: route the change (balance - amount) back to the remainder wallet.
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(sourceWallet.balance - amount.toDouble()),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
+  }
+
+  /**
+   * Initialize a buffer-WITHDRAW (B-isotope) molecule: debit the FULL source balance via a
+   * B-atom, credit N recipients with V-atoms, and route the change back via a remainder B-atom
+   * (a BVB / BV..VB molecule). The withdraw half of the B/F buffer family; inverse of
+   * [initDepositBuffer]. Mirrors the JS/PHP/Rust/Python reference so the B+V atoms conserve to
+   * zero (source -balance + Σ recipients + remainder +(balance-Σ) = 0).
+   *
+   * @param recipients map of recipient bundle-hash -> amount.
+   * @param signingWallet optional signing wallet whose data is attached to the source atom's meta
+   *   (for molecule reconciliation), mirroring JS AtomMeta.setSigningWallet.
+   */
+  @JvmOverloads
+  @Throws(BalanceInsufficientException::class)
+  fun initWithdrawBuffer(
+    recipients: Map<String, Number>,
+    signingWallet: Wallet? = null
+  ): Molecule {
+    val amount = recipients.values.sumOf { it.toDouble() }
+    if (sourceWallet.balance - amount < 0) {
+      throw BalanceInsufficientException()
+    }
+
+    // Optional signing-wallet meta on the source atom (JS AtomMeta.setSigningWallet parity).
+    val sourceMetas = mutableListOf<MetaData>()
+    if (signingWallet != null) {
+      sourceMetas.add(
+        MetaData(
+          key = "signingWallet",
+          value = buildJsonObject {
+            put("tokenSlug", signingWallet.token)
+            put("bundleHash", signingWallet.bundle)
+            put("address", signingWallet.address)
+            put("position", signingWallet.position)
+            put("pubkey", signingWallet.pubkey)
+            put("characters", signingWallet.characters)
+          }.toString()
+        )
+      )
+    }
+
+    // Source B-atom: debit the ENTIRE balance (UTXO drain) so the V + remainder atoms conserve.
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'B',
+        token = sourceWallet.token,
+        value = formatAtomValue(- sourceWallet.balance),
+        batchId = sourceWallet.batchId,
+        metaType = "walletBundle",
+        metaId = sourceWallet.bundle,
+        meta = finalMetas(metas = sourceMetas, wallet = sourceWallet),
+        index = generateIndex()
+      )
+    )
+
+    // Recipient V-atoms: credit each recipient bundle (no wallet — keyed by metaId = bundle).
+    recipients.forEach { (recipientBundle, recipientAmount) ->
+      addAtom(
+        Atom(
+          position = "",
+          walletAddress = "",
+          isotope = 'V',
+          token = sourceWallet.token,
+          value = formatAtomValue(recipientAmount.toDouble()),
+          batchId = if (sourceWallet.batchId != null) Crypto.generateBatchId() else null,
+          metaType = "walletBundle",
+          metaId = recipientBundle,
+          meta = listOf(),
+          index = generateIndex()
+        )
+      )
+    }
+
+    // Remainder B-atom: route the change (balance - Σamounts) back to the remainder wallet.
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'B',
+        token = sourceWallet.token,
+        value = formatAtomValue(sourceWallet.balance - amount),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
+  }
+
+  /**
+   * Initialize a MULTI-recipient V-type molecule: one source debits its FULL balance to fund
+   * N recipients (each its own amount + stackable units) plus a remainder back to the sender.
+   * Multi-recipient sibling of initValue (WP line 544). recipientWallets is parallel to amounts.
+   */
+  fun initValues(
+    recipientWallets: List<Wallet>,
+    amounts: List<Number>
+  ): Molecule {
+    val total = amounts.sumOf { it.toDouble() }
+    if (sourceWallet.balance - total < 0) {
+      throw BalanceInsufficientException()
+    }
+
+    // Source atom: debit the ENTIRE balance (UTXO drain); carries the SENT union of token units
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(- sourceWallet.balance),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
+      )
+    )
+
+    // One atom per recipient: +amount_i, walletBundle -> recipient bundle, its own SENT units.
+    // Shadow recipients (Wallet.create(bundle, token)) have no position/address -> coerce null to "".
+    recipientWallets.forEachIndexed { i, recipientWallet ->
+      addAtom(
+        Atom(
+          position = recipientWallet.position ?: "",
+          walletAddress = recipientWallet.address ?: "",
+          isotope = 'V',
+          token = sourceWallet.token,
+          value = formatAtomValue(amounts[i].toDouble()),
+          batchId = recipientWallet.batchId,
+          metaType = "walletBundle",
+          metaId = recipientWallet.bundle,
+          meta = finalMetas(wallet = recipientWallet),
+          index = generateIndex()
+        )
+      )
+    }
+
+    // Remainder atom: +(balance - total), walletBundle -> sender bundle, KEPT units
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(sourceWallet.balance - total),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
+  }
+
+  /**
    * Builds Atoms to define a new wallet on the ledger
    */
   fun initWalletCreation(newWallet: Wallet): Molecule {
-    val metas = mutableListOf(
-      MetaData(key = "address", value = newWallet.address),
-      MetaData(key = "token", value = newWallet.token),
-      MetaData(key = "bundle", value = newWallet.bundle),
-      MetaData(key = "position", value = newWallet.position),
-      MetaData(key = "amount", value = "0"),
-      MetaData(key = "batchId", value = newWallet.batchId)
-    )
+    // Build the C-atom meta: the 7 PREFIXED wallet* keys via setMetaWallet, in JS insertion order
+    // (mirrors JS `new AtomMeta().setMetaWallet(newWallet)`). Replaces the prior unprefixed
+    // address/token/bundle/position/amount/batchId list, and sources metaId/batchId from the NEW
+    // wallet (JS uses newWallet.address / newWallet.batchId, not the source wallet's).
+    val metas = mutableListOf<MetaData>()
+    setMetaWallet(metas, newWallet)
 
     addAtom(
       Atom(
@@ -749,11 +1017,11 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
-        batchId = sourceWallet.batchId,
+        batchId = newWallet.batchId,
         metaType = "wallet",
-        metaId = sourceWallet.address,
+        metaId = newWallet.address,
         meta = finalMetas(
-          metas = contextMetas(metas).toMutableList(), wallet = newWallet
+          metas = contextMetas(metas).toMutableList(), wallet = sourceWallet
         ),
         index = generateIndex()
       )
@@ -771,21 +1039,12 @@ import kotlin.reflect.full.memberProperties
     amount: Number,
     meta: MutableList<MetaData> = mutableListOf()
   ): Molecule {
-    val metas = meta.also {
-      setOf("walletAddress", "walletPosition", "walletPubkey", "walletCharacters").forEach { key ->
-        // Importing wallet fields into meta object
-        if (it.none { mataData -> mataData.key == key }) {
-          Wallet::class.memberProperties.find { property ->
-            property.name == key.substring(6).lowercase()
-          }?.let { property ->
-            if (property.visibility == KVisibility.PUBLIC) {
-              val value = property.getter.call(recipientWallet) as? String
-              it.add(MetaData(key = key, value = value))
-            }
-          }
-        }
-      }
-    }
+    // Build the C-atom meta: user meta + the 7 PREFIXED wallet* keys via setMetaWallet, in JS
+    // insertion order (mirrors JS `new AtomMeta(meta).setMetaWallet(recipientWallet)`). Replaces the
+    // prior reflection loop, which injected only 4 keys (missing walletTokenSlug/walletBundleHash/
+    // walletBatchId) in the wrong order.
+    val metas = meta.toMutableList()
+    setMetaWallet(metas, recipientWallet)
 
     // The primary atom tells the ledger that a certain amount of the new token is being issued.
     addAtom(
@@ -840,17 +1099,17 @@ import kotlin.reflect.full.memberProperties
    * Init shadow wallet claim
    */
   fun initShadowWalletClaim(
-    token: String,
     wallet: Wallet
   ): Molecule {
 
-    // Generate a wallet metas
+    // Build the C-atom meta: the shadowWalletClaim flag FIRST, then the 7 PREFIXED wallet* keys via
+    // setMetaWallet, in JS insertion order (mirrors JS `setShadowWalletClaim(true)` delegating to
+    // initWalletCreation → `[shadowWalletClaim, then setMetaWallet(wallet)]`). Replaces the prior
+    // manual tokenSlug/walletAddress/walletPosition/batchId list.
     val metas = mutableListOf(
-      MetaData(key = "tokenSlug", value = token),
-      MetaData(key = "walletAddress", value = wallet.address),
-      MetaData(key = "walletPosition", value = wallet.position),
-      MetaData(key = "batchId", value = wallet.batchId)
+      MetaData(key = "shadowWalletClaim", value = "1")
     )
+    setMetaWallet(metas, wallet)
 
     // Create an 'C' atom
     addAtom(
@@ -859,9 +1118,10 @@ import kotlin.reflect.full.memberProperties
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
+        batchId = wallet.batchId,
         metaType = "wallet",
         metaId = wallet.address,
-        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = wallet),
+        meta = finalMetas(metas = contextMetas(metas).toMutableList(), wallet = sourceWallet),
         index = generateIndex()
       )
     )
@@ -966,7 +1226,7 @@ import kotlin.reflect.full.memberProperties
   fun initAuthorization(meta: MutableList<MetaData>): Molecule {
 
     // Initializing a new Atom to hold our metadata
-    return addAtom(
+    addAtom(
       Atom(
         position = sourceWallet.position !!,
         walletAddress = sourceWallet.address !!,
@@ -977,6 +1237,11 @@ import kotlin.reflect.full.memberProperties
         index = generateIndex()
       )
     )
+
+    // ContinuID I-atom — registers the bundle's relay head on-ledger so subsequent molecules
+    // advance the chain instead of falling to fresh genesis (mirror JS initAuthorization + every
+    // other init*; remainderWallet is set to USER in getProfileAuthToken).
+    return addUserRemainderAtom(remainderWallet !!)
   }
 
   /**

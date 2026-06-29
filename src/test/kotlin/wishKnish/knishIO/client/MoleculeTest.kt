@@ -192,15 +192,16 @@ class MoleculeTest {
             meta = tokenMetadata.toMutableList()
         )
         
+        // Token creation is a C-atom (issuance) + ContinuID I-atom (the canonical shape;
+        // the C-atom meta is the user meta + the prefixed wallet* keys, no longer == tokenMetadata).
         expectThat(molecule.atoms) {
             isNotEmpty()
             any {
-                get { isotope }.isEqualTo('V')
+                get { isotope }.isEqualTo('C')
                 get { value }.isEqualTo("1000000")
             }
             any {
-                get { isotope }.isEqualTo('M')
-                get { meta }.isEqualTo(tokenMetadata)
+                get { isotope }.isEqualTo('I')
             }
         }
     }
@@ -241,11 +242,11 @@ class MoleculeTest {
         expectThat(molecule.atoms) {
             hasSize(3) // Should have 3 atoms: source (negative), recipient (positive), remainder
             
-            // First atom: removes value from source
+            // First atom: removes the ENTIRE source balance (UTXO model)
             any {
                 get { walletAddress }.isEqualTo(sourceWallet.address)
                 get { isotope }.isEqualTo('V')
-                get { value }.isEqualTo("-250")
+                get { value }.isEqualTo("-1000")
             }
             
             // Second atom: adds value to recipient
@@ -266,10 +267,117 @@ class MoleculeTest {
             }
         }
         
-        // Verify atoms are created correctly (following JS SDK pattern)
-        // Note: We don't check balance conservation as the sum includes negative values
+        // Conservation now holds (UTXO model): -1000 (source) + 250 (recipient) + 750 (remainder) = 0,
+        // matching the JS/cross-SDK reference and what the validator accepts.
     }
     
+    @Test
+    fun `molecule initializes buffer withdraw correctly (BVB conserves)`() {
+        // initWithdrawBuffer: source B -balance, recipient V atoms (+amount), remainder B
+        // +(balance-Σ); the B+V atom values conserve to 0. Mirrors JS/PHP/Rust/Python.
+        val secret = "withdraw-buffer-test-secret"
+        val source = Wallet.create(secret, "WTHTOK")
+        source.balance = 100.0
+        val bundleA = "a".repeat(64)
+        val bundleB = "b".repeat(64)
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "WTHTOK"),
+            cellSlug = "wthtest"
+        )
+        molecule.initWithdrawBuffer(mapOf(bundleA to 30, bundleB to 20))
+
+        expectThat(molecule.atoms).hasSize(4)
+        // Emit order: source B (-balance), recipient V x2 (+amount), remainder B (+change).
+        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('B', 'V', 'V', 'B'))
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "30", "20", "50"))
+        // Conservation: B+V atom values sum to zero.
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+        // Recipient V-atoms are wallet-less (empty position/address), keyed by metaId = bundle.
+        expectThat(molecule.atoms[1]) {
+            get { metaType }.isEqualTo("walletBundle")
+            get { metaId }.isEqualTo(bundleA)
+            get { position }.isEqualTo("")
+        }
+        expectThat(molecule.atoms[2].metaId).isEqualTo(bundleB)
+    }
+
+    @Test
+    fun `molecule buffer withdraw with full balance leaves zero remainder`() {
+        val secret = "withdraw-buffer-full-secret"
+        val source = Wallet.create(secret, "WTHTOK")
+        source.balance = 50.0
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "WTHTOK"),
+            cellSlug = "wthtest"
+        )
+        molecule.initWithdrawBuffer(mapOf("c".repeat(64) to 50))
+
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-50", "50", "0"))
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+    }
+
+    @Test
+    fun `client-shaped buffer withdraw signs and checks (remainder = source)`() {
+        // Mirrors KnishIOClient.withdrawBufferToken: the buffer wallet is BOTH source and
+        // remainder, a single recipient (the caller's own bundle). Proves the mutation flow
+        // (initWithdrawBuffer + sign + check) validates the B-V-B molecule end-to-end — i.e.
+        // CheckMolecule accepts the two-same-position-B-atom buffer shape the client builds.
+        val secret = "withdraw-buffer-clientshape-secret"
+        val source = Wallet.create(secret, "WTHTOK")
+        source.balance = 100.0
+        val ownBundle = "d".repeat(64)
+
+        // remainderWallet = source (the JS buffer-is-source-and-remainder semantics)
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = source,
+            cellSlug = "wthtest"
+        )
+        molecule.initWithdrawBuffer(mapOf(ownBundle to 40))
+        molecule.sign()
+
+        // No-throw + true == the B-V-B molecule (two B-atoms at the source position) validates.
+        expectThat(molecule.check(source)).isTrue()
+        expectThat(molecule.molecularHash).isNotNull()
+        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('B', 'V', 'B'))
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "40", "60"))
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+    }
+
+    @Test
+    fun `client-shaped buffer deposit signs and checks (V-B-V, fresh remainder)`() {
+        // Mirrors KnishIOClient.depositBufferToken: source is the regular balance wallet, the
+        // change routes to a FRESH remainder, and initDepositBuffer adds an internal buffer B-atom.
+        // Proves the mutation flow (initDepositBuffer + sign + check) validates the V-B-V molecule —
+        // i.e. the c145 isotopeV B/F-bypass also accepts the deposit buffer shape.
+        val secret = "deposit-buffer-clientshape-secret"
+        val source = Wallet.create(secret, "DEPTOK")
+        source.balance = 100.0
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, "DEPTOK"),
+            cellSlug = "deptest"
+        )
+        molecule.initDepositBuffer(40)
+        molecule.sign()
+
+        // No-throw + true == the V-B-V buffer molecule validates (c145 hasCrossIsotope bypass).
+        expectThat(molecule.check(source)).isTrue()
+        expectThat(molecule.molecularHash).isNotNull()
+        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('V', 'B', 'V'))
+        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "40", "60"))
+        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
+    }
+
     private fun createTestAtom(wallet: Wallet, value: String = "test"): Atom {
         return Atom(
             position = wallet.position ?: "",
