@@ -1,7 +1,6 @@
 package wishKnish.knishIO.client
 
 import org.junit.jupiter.api.Assumptions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
 import strikt.assertions.isEqualTo
@@ -11,26 +10,15 @@ import java.net.URI
 
 /**
  * Live ML-KEM768 `CipherHash` encrypted-transport round-trip against a running validator
- * (PQ-transport Phase E, cycle 161).
+ * (PQ-transport Phase E, completed cycle 162).
  *
- * The Kotlin transport CODE (NaCl→ML-KEM) is migrated and the REQUEST side is proven live: the
- * validator ML-KEM-decrypts the encrypted request and executes the inner query. But the full
- * round-trip is blocked on an **auth-pubkey conveyance gap** (validator + SDK): the validator's
- * `encrypt_response` needs the client's ML-KEM pubkey, yet the U-isotope auth molecule conveys
- * only the U-atom `wallet_address` (hex) and the USER-remainder I-atom `pubkey` — NOT the AUTH
- * **source** wallet's ML-KEM pubkey, which is the one the client decrypts responses with. So the
- * validator fails with `ML-KEM encrypt failed: DecryptionKey`.
- *
- * @Disabled until that gap is closed (SDK conveys the source wallet's ML-KEM pubkey at auth +
- * the validator stores it). Then this asserts the encrypted result matches the plaintext one.
- * Run live (once enabled):
+ * End-to-end: the encrypted client authenticates (conveying its AUTH source wallet's ML-KEM
+ * pubkey via a signed `walletPubkey` U-atom meta), then issues an encrypted `queryBalance` — the
+ * validator ML-KEM-decrypts the request, executes it, and encrypts the response back to the
+ * client's ML-KEM pubkey, which the client decrypts. Asserts the encrypted result matches the
+ * plaintext baseline. Run live (gated: skips cleanly when no validator is reachable):
  * `CIPHERHASH_TEST_URL=http://localhost:8081/graphql ./gradlew test --tests …CipherHashLiveTest`
  */
-@Disabled(
-    "PQ-transport Phase E: blocked on the auth-pubkey conveyance fix (validator + SDK) — " +
-        "the auth molecule does not convey the AUTH source wallet's ML-KEM pubkey. See the " +
-        "cycle-161 gauntlet entry; enable once the validator stores the client ML-KEM pubkey."
-)
 class CipherHashLiveTest {
 
     private fun serverUrl(): String =

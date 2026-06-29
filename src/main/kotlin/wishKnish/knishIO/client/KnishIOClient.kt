@@ -304,7 +304,15 @@ class KnishIOClient @JvmOverloads constructor(
     val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER"))
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
-    query.fillMolecule(listOf(MetaData("encrypt", if (encrypt) "true" else "false")))
+    // PQ-transport (cycle 162): convey the AUTH source wallet's ML-KEM768 public key as a
+    // SIGNED `walletPubkey` meta on the U-atom (initAuthorization → finalMetas → sign), so the
+    // validator can encrypt CipherHash responses back to THIS wallet (the one the client
+    // decrypts with). Signed → tamper-proof. Only when present (PQ-capable wallet).
+    val authMeta = mutableListOf(MetaData("encrypt", if (encrypt) "true" else "false"))
+    wallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
+      authMeta.add(MetaData("walletPubkey", it))
+    }
+    query.fillMolecule(authMeta)
 
     val response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
 
