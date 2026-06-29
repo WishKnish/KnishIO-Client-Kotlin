@@ -475,6 +475,24 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
+   * Post-quantum (ML-KEM768) variant of [encryptString] for the `CipherHash` transport.
+   *
+   * Builds the canonical cross-SDK multi-recipient envelope keyed by `hashShare(recipientPubkey)`
+   * with the **object-valued** ML-KEM message `{cipherText, encryptedMessage}` (via [encryptMessage]),
+   * NOT the classical NaCl String. This matches the Rust validator's `CipherHash` handler
+   * (it parses `Hash` as `{ "<hashShare>": {cipherText, encryptedMessage} }`). Single recipient —
+   * the validator reads only its own entry — so no self-recipient is added.
+   */
+  @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
+  fun encryptStringML768(message: String, recipientPubkey: String): String {
+    val envelope = encryptMessage(message, recipientPubkey)
+    val recipientMap = mapOf(
+      Crypto.hashShare(recipientPubkey, characters ?: "BASE64") to envelope
+    )
+    return com.google.gson.Gson().toJson(recipientMap)
+  }
+
+  /**
    * Attempts to decrypt the given string
    */
   @JvmOverloads
@@ -730,6 +748,46 @@ class Wallet @JvmOverloads constructor(
       gson.fromJson(decryptedString, String::class.java)
     } catch (e: Exception) {
       println("Wallet::decryptMessage() - Decryption failed: ${e.message}")
+      null
+    }
+  }
+
+  /**
+   * Post-quantum (ML-KEM768) variant of [decryptMyMessage] for the `CipherHash` transport.
+   *
+   * Selects this wallet's entry by `hashShare(this.pubkey)` — the wallet's **ML-KEM** public key
+   * (the one sent at auth, which the validator encrypts the response to) — then decapsulates with
+   * `mlkemRawPrivkey` + AES-256-GCM. Returns the **RAW decrypted JSON text** (the GraphQL response
+   * object `{"data":…}`), NOT a gson-parsed String — [decryptMessage] assumes a string payload and
+   * would fail on the validator's object response.
+   */
+  fun decryptMyMessageML768(message: Map<String, Map<String, String>>): String? {
+    val myPubkey = pubkey ?: return null
+    val envelope = message[Crypto.hashShare(myPubkey, characters ?: "BASE64")] ?: return null
+    return mlkemDecryptToString(envelope)
+  }
+
+  /**
+   * Decapsulate (ML-KEM768) + AES-256-GCM-decrypt a `{cipherText, encryptedMessage}` envelope with
+   * this wallet's ML-KEM private key, returning the raw UTF-8 plaintext. Shared by the transport
+   * decrypt path; kept separate from [decryptMessage] (which is cross-platform-vector-asserted and
+   * additionally gson-parses the result as a String).
+   */
+  private fun mlkemDecryptToString(encryptedData: Map<String, String>): String? {
+    return try {
+      val cipherText = encryptedData["cipherText"] ?: return null
+      val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
+
+      val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
+      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
+      val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
+      val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
+
+      val encryptedMessageBytes = java.util.Base64.getDecoder().decode(encryptedMessage)
+      val decryptedBytes = decryptWithSharedSecret(encryptedMessageBytes, sharedSecret)
+      String(decryptedBytes, Charsets.UTF_8)
+    } catch (e: Exception) {
+      println("Wallet::mlkemDecryptToString() - Decryption failed: ${e.message}")
       null
     }
   }

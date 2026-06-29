@@ -67,7 +67,6 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.ClientTokenData
@@ -285,7 +284,10 @@ class HttpClient @JvmOverloads constructor(
       return body
     }
 
-    val cipherHash = CipherHash(CipherHashVariable(wallet().encryptString(body, pubkey())))
+    // PQ-transport (cycle 161): the live CipherHash transport is post-quantum ML-KEM768
+    // (was classical NaCl). encryptStringML768 produces the canonical envelope the Rust
+    // validator's CipherHash handler decrypts: { "<hashShare>": {cipherText, encryptedMessage} }.
+    val cipherHash = CipherHash(CipherHashVariable(wallet().encryptStringML768(body, pubkey())))
     return cipherHash.toJson()
   }
 
@@ -294,15 +296,11 @@ class HttpClient @JvmOverloads constructor(
   )
   private fun decryptBody(body: String): String? {
     RCipherHash.jsonToObject(body).data?.cipherHash?.hash?.let {
-      val message = decryptionJson.decodeFromString<Map<String, String>>(it)
-
-      wallet().decryptMyMessage(message)?.let { decrypt ->
-        return when (decrypt) {
-          is JsonObject -> decrypt.toString()
-          is String -> decrypt
-          else -> decrypt.toString()
-        }
-      }
+      // PQ-transport (cycle 161): the response is the ML-KEM envelope map keyed by hashShare,
+      // each value the object {cipherText, encryptedMessage} (not the classical NaCl String).
+      // decryptMyMessageML768 returns the RAW decrypted GraphQL response JSON text.
+      val message = decryptionJson.decodeFromString<Map<String, Map<String, String>>>(it)
+      return wallet().decryptMyMessageML768(message)
     }
     return null
   }
