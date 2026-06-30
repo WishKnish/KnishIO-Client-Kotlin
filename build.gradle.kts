@@ -21,7 +21,7 @@ plugins {
 }
 
 group = "io.knish"
-version = "0.9.0"
+version = "0.9.1"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
 
 repositories {

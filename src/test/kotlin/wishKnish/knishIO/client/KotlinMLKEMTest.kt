@@ -9,9 +9,27 @@ import org.junit.jupiter.api.Test
 import wishKnish.knishIO.client.*
 import wishKnish.knishIO.client.libraries.PostQuantumCrypto
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class KotlinMLKEMTest {
-    
+
+    @Test
+    fun encryptMessageRejectsNon1184Key() {
+        // PQ-transport hardening: a stale/non-PQ validator advertises a ~48-byte `key`; encryptMessage
+        // must fail with an actionable error, not a cryptic bridge crash.
+        val wallet = Wallet(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "USER",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        )
+        val shortKey = java.util.Base64.getEncoder().encodeToString(ByteArray(48))
+        val ex = assertFailsWith<IllegalArgumentException> {
+            wallet.encryptMessage("{\"q\":1}", shortKey)
+        }
+        assertTrue(ex.message!!.contains("expected 1184 (ML-KEM-768)"))
+    }
+
     @Test
     @Suppress("DEPRECATION") // exercises the non-canonical PostQuantumCrypto envelope on purpose
     fun testKotlinToKotlinEncryption() {

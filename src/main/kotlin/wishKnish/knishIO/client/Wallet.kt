@@ -700,8 +700,18 @@ class Wallet @JvmOverloads constructor(
     
     // Deserialize public key from Base64 to raw bytes (like JavaScript)
     val recipientPublicKeyBytes = java.util.Base64.getDecoder().decode(recipientPubkey)
-    
-    // Create MLKEMPublicKey from raw bytes (not X509 encoded)  
+
+    // ML-KEM-768 public keys are exactly 1184 bytes. A wrong-length key here almost always means the
+    // node did not advertise an ML-KEM public key in its auth `key` field (e.g. a validator predating
+    // the PQ-transport build). Fail with an actionable message rather than a cryptic bridge error.
+    val mlKem768PublicKeyBytes = 1184
+    require(recipientPublicKeyBytes.size == mlKem768PublicKeyBytes) {
+      "KnishIO: cannot ML-KEM-encrypt — recipient public key is ${recipientPublicKeyBytes.size} bytes, " +
+        "expected $mlKem768PublicKeyBytes (ML-KEM-768). The node likely did not advertise an ML-KEM " +
+        "public key (upgrade the validator to a PQ-transport build), or authenticate with encrypt=false."
+    }
+
+    // Create MLKEMPublicKey from raw bytes (not X509 encoded)
     val recipientPublicKey = NobleMLKEMBridge.Companion.MLKEMPublicKey(recipientPublicKeyBytes)
     val (sharedSecret, cipherText) = NobleMLKEMBridge.encapsulate(recipientPublicKey)
     
