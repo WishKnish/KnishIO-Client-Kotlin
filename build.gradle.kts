@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URI
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
+import org.gradle.api.component.AdhocComponentWithVariants
 
 plugins {
   val kotlinVersion = "2.2.0"
@@ -221,6 +222,17 @@ mavenPublishing {
     }
   }
 }
+
+// Do NOT publish the Shadow fat jar to Maven Central. The `com.gradleup.shadow`
+// plugin auto-attaches a `shadowRuntimeElements` variant (the `-all.jar`) to the
+// `java` component, and the Vanniktech plugin publishes that whole component — so
+// the fat jar was uploaded to Central, where at 0.9.1 it bundled the GraalVM JS
+// engine (~87 MB) + BouncyCastle + Ktor and hit ~208 MB, past Sonatype's 80 MB
+// limit. A library only needs the thin jar; consumers resolve GraalVM/BouncyCastle/
+// Ktor transitively via the POM. `./gradlew shadowJar` still works locally for any
+// standalone/CLI use — this only removes the fat jar from the *published* artifact.
+(components["java"] as AdhocComponentWithVariants)
+  .withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
 
 tasks.javadoc {
   if (JavaVersion.current().isJava9Compatible) {
