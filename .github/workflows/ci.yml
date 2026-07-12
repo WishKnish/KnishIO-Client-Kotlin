@@ -85,6 +85,37 @@ jobs:
     - name: Run detekt static analysis
       run: ./gradlew detekt --no-daemon
 
+  audit:
+    name: Dependency audit (OSV via CycloneDX SBOM)
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # Gradle has no committed lockfile; the CycloneDX SBOM (scoped to runtimeClasspath
+    # in build.gradle.kts) is the scannable picture of what consumers actually get.
+    - name: Generate runtime-scoped SBOM
+      run: ./gradlew cyclonedxDirectBom --no-daemon
+
+    - name: OSV scan (runtime dependency graph)
+      uses: google/osv-scanner-action/osv-scanner-action@v2
+      with:
+        scan-args: |-
+          -L
+          build/reports/cyclonedx-direct/bom.json
+
   build:
     name: Build and Package
     runs-on: ubuntu-latest

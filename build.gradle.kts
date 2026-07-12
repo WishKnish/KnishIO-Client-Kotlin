@@ -18,12 +18,22 @@ plugins {
   id("com.vanniktech.maven.publish") version "0.34.0"
   id("jacoco")
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
+  // CycloneDX SBOM for dependency auditing (CI runs osv-scanner against the BOM;
+  // Gradle has no committed lockfile, so the SBOM is the scannable dependency graph).
+  id("org.cyclonedx.bom") version "3.2.4"
   `java-library`
 }
 
 group = "io.knish"
 version = "0.9.1"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
+
+// SBOM for dependency auditing: scope to the SHIPPED graph (runtimeClasspath) so the
+// osv-scanner CI gate reflects what consumers install, not build-plugin classpaths
+// (Dokka 1.9.x drags jackson 2.12 into the plugin classpath — build-time only).
+tasks.cyclonedxDirectBom {
+  includeConfigs = listOf("runtimeClasspath")
+}
 
 repositories {
   mavenCentral()
@@ -32,10 +42,10 @@ repositories {
 }
 
 dependencies {
-  val ktorVersion = "3.2.0"
+  val ktorVersion = "3.5.1"
   val coroutinesVersion = "1.10.2"
   val serializationVersion = "1.9.0"
-  val bouncyCastleVersion = "1.80"
+  val bouncyCastleVersion = "1.85"
 
   implementation("io.github.instantwebp2p:tweetnacl-java:1.1.2")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
@@ -53,9 +63,9 @@ dependencies {
   // GraalJS for JavaScript interop (noble-post-quantum bridge — LOAD-BEARING:
   // Wallet.preparePostQuantumKeys + encrypt/decrypt route ML-KEM through the
   // bundled noble-ml-kem-bundle.js for JS-SDK-identical keys. Do NOT remove.)
-  implementation("org.graalvm.polyglot:polyglot:24.0.2")
-  implementation("org.graalvm.polyglot:js:24.0.2")
-  implementation("org.graalvm.js:js-scriptengine:24.0.2")
+  implementation("org.graalvm.polyglot:polyglot:25.1.3")
+  implementation("org.graalvm.polyglot:js:25.1.3")
+  implementation("org.graalvm.js:js-scriptengine:25.1.3")
   
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
@@ -69,11 +79,11 @@ dependencies {
   // slf4j-jdk14 removed — a library must not ship an SLF4J *binding* (forces JUL on
   // consumers); no slf4j usage in main (Ktor uses its own Logger).
   implementation("com.google.code.gson:gson:2.14.0")
-  implementation("com.graphql-java:graphql-java:22.3")
+  implementation("com.graphql-java:graphql-java:26.0")
   
   // Testing dependencies
   testImplementation(kotlin("test"))
-  testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+  testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
   testImplementation("io.mockk:mockk:1.14.3")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
   testImplementation("io.strikt:strikt-core:0.35.1")
