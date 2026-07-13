@@ -1445,7 +1445,7 @@ class KotlinSelfTest {
         
         val results = SelfTestResults(
             sdk = "Kotlin",
-            version = "0.9.1",
+            version = "0.9.2",
             timestamp = Instant.now().toString(),
             tests = testResults,
             molecules = moleculeStorage,
@@ -1477,7 +1477,7 @@ class KotlinSelfTest {
         }
         val failedTests = totalTests - passedTests
         
-        log("\nSDK: Kotlin v0.9.1")
+        log("\nSDK: Kotlin v0.9.2")
         log("Timestamp: ${Instant.now()}")
         
         val summaryColor = if (passedTests == totalTests) Colors.GREEN else Colors.RED

@@ -25,7 +25,7 @@ plugins {
 }
 
 group = "io.knish"
-version = "0.9.1"
+version = "0.9.2"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
 
 // SBOM for dependency auditing: scope to the SHIPPED graph (runtimeClasspath) so the
