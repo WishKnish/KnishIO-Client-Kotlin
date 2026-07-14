@@ -4,7 +4,7 @@ import com.vanniktech.maven.publish.KotlinJvm
 import org.gradle.api.component.AdhocComponentWithVariants
 
 plugins {
-  val kotlinVersion = "2.2.0"
+  val kotlinVersion = "2.2.21"
 
   kotlin("jvm") version kotlinVersion
   kotlin("plugin.serialization") version kotlinVersion
@@ -43,8 +43,8 @@ repositories {
 
 dependencies {
   val ktorVersion = "3.5.1"
-  val coroutinesVersion = "1.10.2"
-  val serializationVersion = "1.9.0"
+  val coroutinesVersion = "1.11.0"
+  val serializationVersion = "1.11.0"
   val bouncyCastleVersion = "1.85"
 
   // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
