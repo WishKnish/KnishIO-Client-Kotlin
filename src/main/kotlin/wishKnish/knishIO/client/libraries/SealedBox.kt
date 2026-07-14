@@ -1,13 +1,12 @@
 package wishKnish.knishIO.client.libraries
 
-import com.iwebpp.crypto.TweetNaclFast
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import java.security.GeneralSecurityException
 
 
 private const val NONCEBYTES = 24
 private const val PUBLICKEYBYTES = 32
-private const val MACBYTES = 10
+private const val MACBYTES = 16 // Poly1305 tag; was 10 (a too-loose min-length guard)
 private const val SEALBYTES = PUBLICKEYBYTES + MACBYTES
 
 @kotlin.jvm.Throws(IllegalArgumentException::class)
@@ -23,9 +22,8 @@ internal fun ByteArray.sealOpen(
   val pkSender = copyOfRange(0, PUBLICKEYBYTES)
   val cipherTextWitHmac = copyOfRange(PUBLICKEYBYTES, size)
   val nonce = pkSender.sealNonce(pk)
-  val box = TweetNaclFast.Box(pkSender, sk)
 
-  return box.open(cipherTextWitHmac, nonce) ?: byteArrayOf()
+  return NaClBox.boxOpen(cipherTextWitHmac, nonce, pkSender, sk) ?: byteArrayOf()
 }
 
 
@@ -33,11 +31,9 @@ internal fun ByteArray.sealOpen(
   GeneralSecurityException::class, IllegalArgumentException::class
 )
 internal fun ByteArray.seal(pubKey: ByteArray): ByteArray {
-  val ephKeyPair = TweetNaclFast.Box.keyPair()
-  val ephPubKey = ephKeyPair.publicKey
+  val (ephSecretKey, ephPubKey) = NaClBox.keyPair()
   val nonce = ephPubKey.sealNonce(pubKey)
-  val box = TweetNaclFast.Box(pubKey, ephKeyPair.secretKey)
-  val boxed = box.box(this, nonce) ?: byteArrayOf()
+  val boxed = NaClBox.box(this, nonce, pubKey, ephSecretKey)
 
   if (boxed.isEmpty()) {
     throw GeneralSecurityException("encryption error")

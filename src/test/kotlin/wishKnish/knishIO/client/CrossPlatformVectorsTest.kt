@@ -20,6 +20,10 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Assertions.*
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.libraries.Shake256
+import wishKnish.knishIO.client.libraries.NaClBox
+import wishKnish.knishIO.client.libraries.Soda
+import wishKnish.knishIO.client.libraries.sealOpen
+import java.util.Base64
 
 @DisplayName("Cross-Platform Vectors (shared cross-platform-test-vectors.json)")
 class CrossPlatformVectorsTest {
@@ -125,5 +129,49 @@ class CrossPlatformVectorsTest {
             mapOf("cipherText" to cipherText, "encryptedMessage" to encryptedMessage)
         )
         assertEquals(expectedPlaintext, plaintext, "ML-KEM768 decrypt plaintext mismatch")
+    }
+
+    // Classical NaCl (X25519 scalarmult_base + crypto_box/secretbox) — byte-frozen
+    // against the reference tweetnacl. Guards the BouncyCastle NaClBox reimplementation
+    // that replaced the JitPack tweetnacl-java dependency.
+    @Test
+    @DisplayName("Classical NaCl (X25519 + crypto_box) vectors")
+    fun naclVectors() {
+        val v = vectors["nacl"]!!.jsonObject
+        fun b64d(s: String): ByteArray = Base64.getDecoder().decode(s)
+        fun b64e(b: ByteArray): String = Base64.getEncoder().encodeToString(b)
+        fun hexd(s: String): ByteArray = ByteArray(s.length / 2) {
+            ((s[it * 2].digitToInt(16) shl 4) or s[it * 2 + 1].digitToInt(16)).toByte()
+        }
+
+        // X25519 scalarmult_base: private → public, byte-frozen (both NaClBox + the public Soda path).
+        v["scalarMultBase"]!!.jsonArray.forEach { el ->
+            val o = el.jsonObject
+            val sk = hexd(o["secretKeyHex"]!!.jsonPrimitive.content)
+            val expected = o["expectedPublicKey"]!!.jsonPrimitive.content
+            assertEquals(expected, b64e(NaClBox.scalarMultBase(sk)), "NaClBox.scalarMultBase mismatch")
+            assertEquals(expected, Soda("BASE64").generatePublicKey(b64e(sk)), "Soda.generatePublicKey mismatch")
+        }
+
+        // crypto_box: deterministic ciphertext (encrypt) + open (decrypt), byte-frozen.
+        val cb = v["cryptoBox"]!!.jsonObject
+        val senderSk = hexd(cb["senderSecretKeyHex"]!!.jsonPrimitive.content)
+        val recipSk = hexd(cb["recipientSecretKeyHex"]!!.jsonPrimitive.content)
+        val recipPk = b64d(cb["recipientPublicKey"]!!.jsonPrimitive.content)
+        val nonce = b64d(cb["nonce"]!!.jsonPrimitive.content)
+        val plaintext = cb["plaintext"]!!.jsonPrimitive.content
+        val expectedBox = cb["expectedBox"]!!.jsonPrimitive.content
+        assertEquals(expectedBox, b64e(NaClBox.box(plaintext.toByteArray(), nonce, recipPk, senderSk)), "crypto_box ciphertext mismatch")
+        val opened = NaClBox.boxOpen(b64d(expectedBox), nonce, NaClBox.scalarMultBase(senderSk), recipSk)
+        assertNotNull(opened, "crypto_box open returned null")
+        assertEquals(plaintext, String(opened!!), "crypto_box open mismatch")
+
+        // sealed_box: open a frozen sealed blob (cross-impl decrypt oracle).
+        val sb = v["sealedBox"]!!.jsonObject
+        val sealed = b64d(sb["sealed"]!!.jsonPrimitive.content)
+        val sealRecipPk = b64d(sb["recipientPublicKey"]!!.jsonPrimitive.content)
+        val sealRecipSk = hexd(sb["recipientSecretKeyHex"]!!.jsonPrimitive.content)
+        val expectedPlain = sb["expectedPlaintext"]!!.jsonPrimitive.content
+        assertEquals(expectedPlain, String(sealed.sealOpen(sealRecipPk, sealRecipSk)), "sealed-box open mismatch")
     }
 }

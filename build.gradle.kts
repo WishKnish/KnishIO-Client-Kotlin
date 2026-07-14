@@ -36,9 +36,9 @@ tasks.cyclonedxDirectBom {
 }
 
 repositories {
+  // Maven Central only. tweetnacl-java (the sole JitPack artifact) was replaced by
+  // the BouncyCastle-backed NaClBox, so jitpack.io + m2.dv8tion.net are gone.
   mavenCentral()
-  maven("https://jitpack.io")
-  maven("https://m2.dv8tion.net/releases")
 }
 
 dependencies {
@@ -47,7 +47,9 @@ dependencies {
   val serializationVersion = "1.9.0"
   val bouncyCastleVersion = "1.85"
 
-  implementation("io.github.instantwebp2p:tweetnacl-java:1.1.2")
+  // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
+  // the former JitPack `tweetnacl-java`; byte-parity is pinned by the `nacl`
+  // cross-platform vectors (CrossPlatformVectorsTest.naclVectors).
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   

@@ -3,7 +3,6 @@
 package wishKnish.knishIO.client.libraries
 
 import kotlinx.serialization.json.Json
-import com.iwebpp.crypto.TweetNaclFast
 import kotlinx.serialization.SerializationException
 import java.security.GeneralSecurityException
 import com.google.gson.Gson
@@ -64,14 +63,14 @@ class Soda(private val base: String = "BASE64") {
   fun generatePrivateKey(key: String): String {
     val sponge = Shake256.create()
     sponge.absorb(key)
-    return encode(sponge.squeeze(TweetNaclFast.Box.secretKeyLength))
+    return encode(sponge.squeeze(NaClBox.SECRET_KEY_LENGTH))
   }
 
   @Throws(
     NumberFormatException::class, IllegalArgumentException::class
   )
   fun generatePublicKey(privateKey: String): String {
-    return encode(TweetNaclFast.Box.keyPair_fromSecretKey(decode(privateKey)).publicKey)
+    return encode(NaClBox.scalarMultBase(decode(privateKey)))
   }
 
   @Throws(IllegalArgumentException::class)
