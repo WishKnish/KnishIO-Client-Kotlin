@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.net.URI
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 import org.gradle.api.component.AdhocComponentWithVariants
@@ -10,12 +9,12 @@ plugins {
   kotlin("jvm") version kotlinVersion
   kotlin("plugin.serialization") version kotlinVersion
   id("com.gradleup.shadow") version "8.3.6"
-  id("org.jetbrains.dokka") version "1.9.20"
+  id("org.jetbrains.dokka") version "2.0.0"
   // Maven Central publishing via the Central Portal (replaces the decommissioned
   // OSSRH s01 endpoint). Applies + manages maven-publish and signing internally.
-  // Pinned to 0.34.0: the last line that supports this repo's Gradle 8.11.1
-  // (0.35.0+ require Gradle 8.13) AND Dokka v1 / 1.9.20 (0.36.0 dropped Dokka v1).
-  id("com.vanniktech.maven.publish") version "0.34.0"
+  // 0.36.0+ requires Dokka v2 (it dropped Dokka v1) and Gradle >= 8.13 — both
+  // satisfied here (wrapper bumped to 8.13, Dokka on 2.x).
+  id("com.vanniktech.maven.publish") version "0.36.0"
   id("jacoco")
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
   // CycloneDX SBOM for dependency auditing (CI runs osv-scanner against the BOM;
@@ -29,8 +28,9 @@ version = "0.9.2"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
 
 // SBOM for dependency auditing: scope to the SHIPPED graph (runtimeClasspath) so the
-// osv-scanner CI gate reflects what consumers install, not build-plugin classpaths
-// (Dokka 1.9.x drags jackson 2.12 into the plugin classpath — build-time only).
+// osv-scanner CI gate reflects what consumers install, not build-plugin classpaths.
+// (Dokka is on v2 now, which no longer drags the old jackson 2.12 into the plugin
+// classpath; the runtimeClasspath scoping remains correct regardless.)
 tasks.cyclonedxDirectBom {
   includeConfigs = listOf("runtimeClasspath")
 }
@@ -151,20 +151,22 @@ tasks.withType<KotlinCompile> {
   }
 }
 
-tasks.dokkaHtml {
-  outputDirectory.set(layout.buildDirectory.dir("dokka"))
-  dokkaSourceSets {
-    configureEach {
-      moduleName.set("KnishIO Client Kotlin")
-      // NOTE: do NOT `includes.from("README.md")` — Dokka `includes` expects a
-      // module/package-doc file (must start with "# Module"/"# Package"); the
-      // README starts with an HTML <div> logo and makes dokkaHtml fail
-      // ("Unexpected classifier: <div"). API docs are generated without it.
-      sourceLink {
-        localDirectory.set(file("src/main/kotlin"))
-        remoteUrl.set(URI("https://github.com/WishKnish/KnishIO-Client-Kotlin/tree/main/src/main/kotlin").toURL())
-        remoteLineSuffix.set("#L")
-      }
+// Dokka Gradle plugin v2 (DGP v2) — the `dokka {}` extension replaces the v1
+// `tasks.dokkaHtml { … }`; the generation task is now `dokkaGenerate`.
+dokka {
+  dokkaPublications.html {
+    moduleName.set("KnishIO Client Kotlin")
+    outputDirectory.set(layout.buildDirectory.dir("dokka"))
+    // NOTE: do NOT `includes.from("README.md")` — Dokka `includes` expects a
+    // module/package-doc file (must start with "# Module"/"# Package"); the
+    // README starts with an HTML <div> logo and makes generation fail
+    // ("Unexpected classifier: <div"). API docs are generated without it.
+  }
+  dokkaSourceSets.configureEach {
+    sourceLink {
+      localDirectory.set(file("src/main/kotlin"))
+      remoteUrl("https://github.com/WishKnish/KnishIO-Client-Kotlin/tree/main/src/main/kotlin")
+      remoteLineSuffix.set("#L")
     }
   }
 }
@@ -192,7 +194,8 @@ mavenPublishing {
   // "KnishIO-Client-Kotlin"); matches the README coords io.knish:knishio-client-kotlin.
   coordinates("io.knish", "knishio-client-kotlin", version.toString())
 
-  configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaHtml")))  // sourcesJar defaults to true
+  // Dokka v2 generation task (was "dokkaHtml" under DGP v1).
+  configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml")))  // sourcesJar defaults to true
 
   pom {
     name.set("KnishIO Client Kotlin")
