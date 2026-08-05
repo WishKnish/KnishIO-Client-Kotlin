@@ -318,7 +318,11 @@ import kotlin.math.ceil
         molecule
       ) && CheckMolecule.continuId(molecule) && CheckMolecule.isotopeM(molecule) && CheckMolecule.isotopeT(molecule) && CheckMolecule.isotopeC(
         molecule
-      ) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeR(molecule) && CheckMolecule.isotopeV(
+      ) && CheckMolecule.isotopeU(molecule) && CheckMolecule.isotopeI(molecule) && CheckMolecule.isotopeR(
+        molecule
+      ) && CheckMolecule.isotopeP(molecule) && CheckMolecule.isotopeA(molecule) && CheckMolecule.isotopeB(
+        molecule
+      ) && CheckMolecule.isotopeF(molecule) && CheckMolecule.isotopeV(
         molecule, sourceWallet
       )
     }

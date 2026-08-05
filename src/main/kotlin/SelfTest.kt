@@ -65,6 +65,16 @@ import java.lang.reflect.Type
 import java.time.Instant
 import kotlin.system.exitProcess
 
+/**
+ * The version this self-test reports.
+ *
+ * Must equal `version` in build.gradle.kts: the gauntlet's snapshot coherence gate fails an
+ * SDK whose reported version disagrees with its manifest. It lived in two separate string
+ * literals — the results file and the summary banner — which is two chances to bump one and
+ * forget the other.
+ */
+const val SDK_VERSION = "0.9.3"
+
 // ANSI Color codes for console output
 object Colors {
     const val RESET = "\u001B[0m"
@@ -114,9 +124,23 @@ data class SelfTestResults(
     val sdk: String,
     val version: String,
     val timestamp: String,
+    /** Run identity. shared-test-results/ holds one mutable file per SDK with no record of
+     * which run wrote it, so a later standalone run silently replaces the evidence an
+     * already-published report was built from. */
+    val runId: String?,
     val tests: Map<String, Any>,
     val molecules: Map<String, String>,
-    val crossSdkCompatible: Boolean
+    val crossSdkCompatible: Boolean,
+    /** Coverage behind the verdict. crossSdkCompatible alone cannot distinguish
+     * "validated seven peers, all passed" from "validated nothing and so found no
+     * failures" — both used to serialise as true. */
+    val crossValidation: CrossValidationCoverage
+)
+
+data class CrossValidationCoverage(
+    val ran: Boolean,
+    val targetsExpected: Int,
+    val targetsValidated: Int
 )
 
 /**
@@ -246,8 +270,23 @@ class KotlinSelfTest {
         .create()
     private val testResults = mutableMapOf<String, Any>()
     private val moleculeStorage = mutableMapOf<String, String>()
-    private var crossSdkCompatible = true
-    
+
+    // Starts false. This was `true`, making "fully cross-SDK compatible" the default state
+    // before a single peer molecule had been examined — so every early return out of
+    // testCrossSdkValidation published a pass. A verdict must be earned; the safe default
+    // for a check that has not run is "failed".
+    private var crossSdkCompatible = false
+    private var crossValidationRan = false
+    private var crossTargetsExpected = 0
+    private var crossTargetsValidated = 0
+
+    // Canonical set mirrors requiredMoleculeKeys in sdks/canonical-test-keys.json.
+    private val requiredMoleculeTypes = listOf(
+        "metadata", "simpleTransfer", "complexTransfer", "tokenCreation",
+        "walletCreation", "shadowWalletClaim", "mlkem768"
+    )
+
+
     /**
      * Set deterministic per-atom timestamps before signing (mirrors JS setFixedTimestamps).
      * createdAt is hashed as the raw ms string, so atom[i] = base + i*1000 yields the same
@@ -331,6 +370,61 @@ class KotlinSelfTest {
         }
     }
     
+    /**
+     * Loads the shared canonical-patent-vectors.json fixture used by testBufferFamily(). Absence
+     * is NOT an error by itself — testBufferFamily() decides whether that's a skip or a hard
+     * failure based on KNISHIO_REQUIRE_VECTORS.
+     *
+     * SelfTest.kt lives under src/main/kotlin and runs via the Gradle `selftest` task with
+     * classpath = sourceSets["main"].runtimeClasspath — it cannot resolve the fixture off the
+     * *test* classpath the way PatentVectorValidationTest.kt does (classLoader
+     * .getResourceAsStream), so this reads the vendored copy directly off disk instead.
+     */
+    private fun loadCanonicalVectors(): JsonObject? {
+        val sharedResultsDir = System.getenv("KNISHIO_SHARED_RESULTS") ?: "../shared-test-results"
+        val candidates = listOfNotNull(
+            System.getenv("KNISHIO_CANONICAL_VECTORS"),
+            "src/test/resources/canonical-patent-vectors.json",
+            "$sharedResultsDir/canonical-patent-vectors.json"
+        )
+        for (candidate in candidates) {
+            val file = File(candidate)
+            if (file.exists()) {
+                return try {
+                    JsonParser.parseString(file.readText()).asJsonObject
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Is this test entry a pass, a skip, or does it carry an error/validationError message?
+     * Centralized so printSummary()/run() treat every skip-capable test (currently only
+     * bufferFamily) the same way: a skip is neither a pass nor a failure. None of the typed
+     * result data classes (CryptoTestResult/TransferTestResult) carry a "skipped" field, so
+     * isSkipped() is false for them by construction.
+     */
+    private fun isPassed(result: Any?): Boolean = when (result) {
+        is Map<*, *> -> result["passed"] as? Boolean ?: false
+        is CryptoTestResult -> result.passed
+        is TransferTestResult -> result.passed
+        else -> false
+    }
+
+    private fun isSkipped(result: Any?): Boolean = when (result) {
+        is Map<*, *> -> result["skipped"] as? Boolean ?: false
+        else -> false
+    }
+
+    private fun errorOf(result: Any?): String? = when (result) {
+        is Map<*, *> -> (result["error"] as? String) ?: (result["validationError"] as? String)
+        is TransferTestResult -> result.validationError
+        else -> null
+    }
+
     fun loadTestConfig(): JsonObject? {
         return try {
             // Embedded test configuration for SDK self-containment (Kotlin best practices)
@@ -1041,6 +1135,270 @@ class KotlinSelfTest {
     }
 
     /**
+     * Build a VALID buffer molecule (deposit or withdraw) via the SDK's own
+     * initDepositBuffer/initWithdrawBuffer builders, apply a single `tamper`
+     * mutation from a buffer_conservation_negative vector, re-sign, and report
+     * whether verification rejected it.
+     *
+     * Mirrors the vector's `recipe` exactly: hand-assembling atoms gets refused
+     * by unrelated checks (atom index, self-transfer) before conservation is
+     * ever evaluated, so only builder + tamper + re-sign actually exercises
+     * isotopeB()/isotopeF(). Returns (rejected, reason) where reason is the
+     * actual exception message (or "ACCEPTED ..." if verification wrongly
+     * passed) — callers must confirm the reason implicates conservation or
+     * metaType, not an unrelated check, or the case is passing for the wrong
+     * reason (this is exactly what bit Kotlin's earlier hand-assembled attempt:
+     * AtomIndexException / TransferToSelfException instead of the real gate).
+     */
+    private fun runNegativeBufferCase(secret: String, token: String, tv: JsonObject): Pair<Boolean, String> {
+        val buildFrom = tv.get("buildFrom").asString
+        val sourceBalance = tv.get("sourceBalance").asDouble
+        val amount = tv.get("amount").asInt
+        val tamper = tv.getAsJsonObject("tamper")
+        val target = tamper.get("target").asString
+        val field = tamper.get("field").asString
+        val to = tamper.get("to").asString
+
+        val source = Wallet.create(secret, token)
+        source.balance = sourceBalance
+
+        val molecule = Molecule(
+            secret = secret,
+            sourceWallet = source,
+            remainderWallet = Wallet.create(secret, token) // fresh remainder position
+        )
+        when (buildFrom) {
+            "deposit" -> molecule.initDepositBuffer(amount)
+            "withdraw" -> molecule.initWithdrawBuffer(mapOf(source.bundle !! to amount))
+            else -> throw IllegalArgumentException("unknown buildFrom '$buildFrom'")
+        }
+        setFixedTimestamps(molecule)
+
+        // Select the first/last atom of the target isotope, in emission order —
+        // exactly as the vector's `recipe` field specifies.
+        val isotope = when (target) {
+            "firstV", "lastV" -> 'V'
+            "firstB", "lastB" -> 'B'
+            else -> throw IllegalArgumentException("unknown tamper target '$target'")
+        }
+        val matching = molecule.atoms.withIndex().filter { it.value.isotope == isotope }.map { it.index }
+        if (matching.isEmpty()) {
+            throw IllegalStateException("no $isotope atoms in molecule to tamper (target $target)")
+        }
+        val idx = if (target.startsWith("first")) matching.first() else matching.last()
+        when (field) {
+            "value" -> molecule.atoms[idx].value = to
+            "metaType" -> molecule.atoms[idx].metaType = to
+            else -> throw IllegalArgumentException("unknown tamper field '$field'")
+        }
+
+        // Re-sign over the tampered atoms: recomputes molecularHash + OTS fragments
+        // so the molecule is internally consistent and only the tampered conservation
+        // invariant (or metaType) is wrong — not the hash/signature.
+        molecule.sign()
+
+        // Call the companion Molecule.verify() directly rather than molecule.check() —
+        // check() swallows every exception into a bare `false` (see Molecule.kt), which
+        // would hide WHETHER rejection came from the conservation/metaType gate this
+        // vector targets or from something unrelated. verify() propagates the real
+        // exception so the reason can be inspected.
+        return try {
+            val verified = Molecule.verify(molecule, source)
+            if (verified) Pair(false, "ACCEPTED (expected rejection)") else Pair(true, "verify() returned false")
+        } catch (e: Exception) {
+            Pair(true, "${e::class.simpleName}: ${e.message}")
+        }
+    }
+
+    /**
+     * Test B1: Buffer Family Test (deposit + withdraw, vector-driven)
+     *
+     * The buffer family (B-isotope) builders were never exercised by the self-test gauntlet at
+     * all prior to this — a full isotope family with zero parity coverage. For each
+     * buffer_deposit_conservation / buffer_withdraw_conservation vector we build + sign the
+     * molecule and assert: atom shape/values match the vector, the V+B sum == expectedSum
+     * (full-balance debit conserves even for a PARTIAL op), AND molecule.check() accepts the
+     * molecule (the isotopeV cross-isotope bypass in CheckMolecule.kt — V-only atoms would not
+     * otherwise sum to zero). Molecular hashes are NOT frozen (random wallet positions).
+     *
+     * Reads the shared canonical-patent-vectors.json fixture; SKIPS if absent (standalone CI).
+     * If KNISHIO_REQUIRE_VECTORS=true, an absent fixture is a hard FAILURE instead — an
+     * orchestrated cross-SDK run cannot silently drop parity coverage for an entire isotope
+     * family.
+     */
+    fun testBufferFamily(): Boolean {
+        log("\nB1. Buffer Family Test (deposit + withdraw, vector-driven)", Colors.BLUE)
+
+        val vectorsJson = loadCanonicalVectors()
+        if (vectorsJson == null) {
+            val mustHave = System.getenv("KNISHIO_REQUIRE_VECTORS") == "true"
+            testResults["bufferFamily"] = mapOf(
+                "passed" to false,
+                "skipped" to !mustHave,
+                "molecularHash" to null,
+                "atomCount" to 0,
+                "validationError" to "canonical-patent-vectors.json absent"
+            )
+            if (mustHave) {
+                log("  FAILED: canonical-patent-vectors.json absent (KNISHIO_REQUIRE_VECTORS=true)", Colors.RED)
+                return false
+            }
+            log("  SKIPPED: canonical-patent-vectors.json absent (standalone CI)", Colors.YELLOW)
+            return true // skip, not fail — recorded as skipped, never counted as a pass
+        }
+
+        return try {
+            val v = vectorsJson.getAsJsonObject("vectors")
+            val secret = Crypto.generateSecret("buffer-family-self-test-seed", 2048)
+            val token = "BUFTOK"
+
+            var allPass = true
+            var lastHash: String? = null
+            var atomTotal = 0
+
+            // ---- DEPOSIT: V(source -balance) -> B(buffer +amount) -> V(remainder +(balance-amount)) ----
+            for (element in v.getAsJsonObject("buffer_deposit_conservation").getAsJsonArray("tests")) {
+                val tv = element.asJsonObject
+                val name = tv.get("name").asString
+                val sourceBalance = tv.get("sourceBalance").asDouble
+                val amount = tv.get("amount").asInt
+
+                val source = Wallet.create(secret, token) // fresh position -> valid OTS key
+                source.balance = sourceBalance
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = source,
+                    remainderWallet = Wallet.create(secret, token)
+                )
+                molecule.initDepositBuffer(amount)
+                setFixedTimestamps(molecule)
+                molecule.sign()
+
+                var sum = 0L
+                for (atom in molecule.atoms) {
+                    if (atom.isotope == 'V' || atom.isotope == 'B') {
+                        sum += (atom.value ?: "0").toLong()
+                    }
+                }
+
+                val shape = molecule.atoms.size == 3 &&
+                    molecule.atoms[0].isotope == 'V' && molecule.atoms[0].value == tv.get("expectedSourceValue").asString &&
+                    molecule.atoms[1].isotope == 'B' && molecule.atoms[1].value == tv.get("expectedBufferValue").asString &&
+                    molecule.atoms[2].isotope == 'V' && molecule.atoms[2].value == tv.get("expectedRemainderValue").asString
+
+                var checkOk = false
+                var checkError: String? = null
+                try {
+                    checkOk = molecule.check(source)
+                    if (!checkOk) checkError = "Validation returned false"
+                } catch (e: Exception) {
+                    checkOk = false
+                    checkError = e.message
+                }
+
+                val ok = shape && sum.toString() == tv.get("expectedSum").asString && checkOk
+                logTest("deposit $name conserves (V+B sum 0; cross-isotope bypass)", ok, if (!ok) checkError else null)
+                allPass = allPass && ok
+                lastHash = molecule.molecularHash
+                atomTotal += molecule.atoms.size
+            }
+
+            // ---- WITHDRAW: B(source -balance) -> V(recipient +amount) -> B(remainder +(balance-amount)) ----
+            for (element in v.getAsJsonObject("buffer_withdraw_conservation").getAsJsonArray("tests")) {
+                val tv = element.asJsonObject
+                val name = tv.get("name").asString
+                val sourceBalance = tv.get("sourceBalance").asDouble
+                val amount = tv.get("amount").asInt
+
+                val source = Wallet.create(secret, token) // the buffer wallet: B-isotope source
+                source.balance = sourceBalance
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = source,
+                    remainderWallet = Wallet.create(secret, token) // fresh remainder position
+                )
+                // Withdraw to the caller's own bundle (single recipient), mirroring the client wrapper.
+                molecule.initWithdrawBuffer(mapOf(source.bundle !! to amount))
+                setFixedTimestamps(molecule)
+                molecule.sign()
+
+                var sum = 0L
+                for (atom in molecule.atoms) {
+                    if (atom.isotope == 'V' || atom.isotope == 'B') {
+                        sum += (atom.value ?: "0").toLong()
+                    }
+                }
+
+                val shape = molecule.atoms.size == 3 &&
+                    molecule.atoms[0].isotope == 'B' && molecule.atoms[0].value == tv.get("expectedSourceValue").asString &&
+                    molecule.atoms[1].isotope == 'V' && molecule.atoms[1].value == tv.get("expectedRecipientValue").asString &&
+                    molecule.atoms[2].isotope == 'B' && molecule.atoms[2].value == tv.get("expectedRemainderValue").asString
+
+                var checkOk = false
+                var checkError: String? = null
+                try {
+                    checkOk = molecule.check(source)
+                    if (!checkOk) checkError = "Validation returned false"
+                } catch (e: Exception) {
+                    checkOk = false
+                    checkError = e.message
+                }
+
+                val ok = shape && sum.toString() == tv.get("expectedSum").asString && checkOk
+                logTest("withdraw $name conserves (B+V sum 0; cross-isotope bypass)", ok, if (!ok) checkError else null)
+                allPass = allPass && ok
+                lastHash = molecule.molecularHash
+                atomTotal += molecule.atoms.size
+            }
+
+            // ---- NEGATIVE: tampered buffer molecules the validator MUST reject. This
+            // vector set exists to close a coverage hole: a positive-only suite never
+            // observes rejection, so it can't tell a real conservation check apart from
+            // an absent one (see buffer_conservation_negative.description). ----
+            if (v.has("buffer_conservation_negative")) {
+                for (element in v.getAsJsonObject("buffer_conservation_negative").getAsJsonArray("tests")) {
+                    val tv = element.asJsonObject
+                    val name = tv.get("name").asString
+                    val (rejected, reason) = try {
+                        runNegativeBufferCase(secret, token, tv)
+                    } catch (e: Exception) {
+                        Pair(false, "builder/tamper setup failed: ${e.message}")
+                    }
+                    log("    reason: $reason", Colors.YELLOW)
+                    logTest("negative $name rejected", rejected, if (!rejected) reason else null)
+                    allPass = allPass && rejected
+                }
+            } else {
+                val mustHave = System.getenv("KNISHIO_REQUIRE_VECTORS") == "true"
+                if (mustHave) {
+                    log("  FAILED: buffer_conservation_negative absent (KNISHIO_REQUIRE_VECTORS=true)", Colors.RED)
+                    allPass = false
+                } else {
+                    log("  SKIPPED: buffer_conservation_negative absent (vector not yet vendored)", Colors.YELLOW)
+                }
+            }
+
+            testResults["bufferFamily"] = mapOf(
+                "passed" to allPass,
+                "skipped" to false,
+                "molecularHash" to lastHash,
+                "atomCount" to atomTotal,
+                "validationError" to if (allPass) null else "buffer family vector validation failed"
+            )
+
+            allPass
+        } catch (error: Exception) {
+            log("  ❌ ERROR: ${error.message}", Colors.RED)
+            testResults["bufferFamily"] = mapOf(
+                "passed" to false,
+                "skipped" to false,
+                "error" to error.message
+            )
+            false
+        }
+    }
+
+    /**
      * Test 5: ML-KEM768 Encryption Test
      * Tests post-quantum encryption/decryption compatibility
      */
@@ -1274,39 +1632,74 @@ class KotlinSelfTest {
     fun testCrossSdkValidation(config: JsonObject? = null): Boolean {
         log("\n7. Cross-SDK Validation", Colors.BLUE)
         
-        // Check if cross-validation is disabled (Round 1 molecule generation only)
+        // Round 1 generates molecules and does not cross-validate, so it holds no opinion
+        // here and must not leave a verdict behind.
         if (System.getenv("KNISHIO_DISABLE_CROSS_VALIDATION") == "true") {
             log("  ⏭️  Cross-validation disabled for Round 1 (molecule generation only)", Colors.YELLOW)
+            crossValidationRan = false
+            crossTargetsExpected = 0
+            crossTargetsValidated = 0
             return true
         }
-        
+
         // Configurable shared results directory for cross-platform testing
         val sharedResultsDir = System.getenv("KNISHIO_SHARED_RESULTS") ?: "../shared-test-results"
         val resultsDir = File(sharedResultsDir)
-        
+        crossValidationRan = true
+
+        // A missing shared directory in Round 2 is a HARD FAILURE, not a skip. This
+        // returned true — "compatible" — having found nothing to check. Absence of evidence
+        // must never be reported as evidence of compatibility.
         if (!resultsDir.exists()) {
-            log("  ⏭️  No other SDK results found for cross-validation", Colors.YELLOW)
-            return true
+            log("  ❌ Shared results directory not found — cross-validation CANNOT run", Colors.RED)
+            crossSdkCompatible = false
+            return false
         }
-        
+
+        // Scope to *-results.json. `endsWith(".json")` also matched the canonical vector
+        // MASTERS in this directory (canonical-patent-vectors.json,
+        // cross-platform-test-vectors.json) and fed them into the peer loop as SDK results;
+        // they carry no `molecules` object, so they inflated the apparent peer count while
+        // contributing to neither pass nor fail.
         val resultFiles = resultsDir.listFiles { file ->
-            file.name.endsWith(".json") && !file.name.contains("kotlin")
+            file.name.endsWith("-results.json") && !file.name.contains("kotlin")
         } ?: emptyArray()
-        
+
+        // Zero peers in Round 2 means Round 2 did not happen.
         if (resultFiles.isEmpty()) {
-            log("  ⏭️  No other SDK results found for cross-validation", Colors.YELLOW)
-            return true
+            log("  ❌ No peer SDK results found — nothing to cross-validate", Colors.RED)
+            crossSdkCompatible = false
+            return false
         }
-        
+
+        crossTargetsExpected = resultFiles.size
+        var peersValidated = 0
         var allValid = true
-        
+
         for (file in resultFiles) {
             val sdkName = file.name.replace("-results.json", "")
-            
+
             try {
                 val otherResults = JsonParser.parseString(file.readText()).asJsonObject
                 val molecules = otherResults.getAsJsonObject("molecules")
-                
+
+                // A peer must publish every molecule type before we can claim to have
+                // validated it. The loop below iterates the keys that are PRESENT, so an
+                // omitted molecule is indistinguishable from a validated one — which is
+                // exactly how this SDK's own Round-2 drop of tokenCreation/walletCreation/
+                // shadowWalletClaim passed every peer on 2026-07-27.
+                val absent = requiredMoleculeTypes.filter { t ->
+                    val v = molecules?.get(t)
+                    v == null || v.isJsonNull || !v.isJsonPrimitive || v.asString.isEmpty()
+                }
+                if (absent.isNotEmpty()) {
+                    log("    ❌ $sdkName published no molecule for: ${absent.joinToString(", ")}", Colors.RED)
+                    logTest("$sdkName publishes all required molecules", false)
+                    allValid = false
+                }
+
+                peersValidated++
+
                 if (molecules != null) {
                     for ((moleculeType, moleculeData) in molecules.entrySet()) {
                         try {
@@ -1427,10 +1820,21 @@ class KotlinSelfTest {
             }
         }
         
-        crossSdkCompatible = allValid
-        return allValid
+        // COVERAGE FLOOR. `allValid` starts true and only becomes false on a DETECTED
+        // failure, so it records "nothing went wrong", not "everything was checked". Those
+        // differ whenever the loop examined fewer peers than it should have. Require both.
+        crossTargetsValidated = peersValidated
+        val fullCoverage = peersValidated == crossTargetsExpected
+
+        if (!fullCoverage) {
+            log("  ❌ Incomplete coverage: validated $peersValidated/$crossTargetsExpected peer SDKs", Colors.RED)
+        }
+        log("  📊 Cross-validation coverage: $peersValidated/$crossTargetsExpected peer SDKs", Colors.BLUE)
+
+        crossSdkCompatible = allValid && fullCoverage
+        return crossSdkCompatible
     }
-    
+
     /**
      * Save test results to file
      */
@@ -1445,11 +1849,17 @@ class KotlinSelfTest {
         
         val results = SelfTestResults(
             sdk = "Kotlin",
-            version = "0.9.2",
+            version = SDK_VERSION,
             timestamp = Instant.now().toString(),
+            runId = System.getenv("KNISHIO_RUN_ID")?.takeIf { it.isNotEmpty() },
             tests = testResults,
             molecules = moleculeStorage,
-            crossSdkCompatible = crossSdkCompatible
+            crossSdkCompatible = crossSdkCompatible,
+            crossValidation = CrossValidationCoverage(
+                ran = crossValidationRan,
+                targetsExpected = crossTargetsExpected,
+                targetsValidated = crossTargetsValidated
+            )
         )
         
         val resultsFile = File(resultsDir, "kotlin-results.json")
@@ -1465,50 +1875,46 @@ class KotlinSelfTest {
         log("\n═══════════════════════════════════════════", Colors.BLUE)
         log("            TEST SUMMARY REPORT", Colors.BLUE)
         log("═══════════════════════════════════════════", Colors.BLUE)
-        
+
         val totalTests = testResults.size
-        val passedTests = testResults.values.count { 
-            when (it) {
-                is Map<*, *> -> it["passed"] as? Boolean ?: false
-                is CryptoTestResult -> it.passed
-                is TransferTestResult -> it.passed
-                else -> false
+        // Skipped tests are reported separately — counting a skip as either a pass or a failure
+        // is what let a skip-capable test (bufferFamily) silently corrupt the pass/fail tally:
+        // either it vanished into "failed" (breaking the exit code on a legitimate skip), or a
+        // genuine failure could misread as a pass.
+        val skippedTests = testResults.values.count { isSkipped(it) }
+        val passedTests = testResults.values.count { isPassed(it) }
+        val failedTests = totalTests - passedTests - skippedTests
+
+        log("\nSDK: Kotlin v$SDK_VERSION")
+        log("Timestamp: ${Instant.now()}")
+
+        val summaryColor = if (failedTests == 0) Colors.GREEN else Colors.RED
+        log("\nTests Passed: $passedTests/$totalTests", summaryColor)
+
+        if (skippedTests > 0) {
+            log("Tests Skipped: $skippedTests/$totalTests", Colors.YELLOW)
+            for ((testName, testResult) in testResults) {
+                if (isSkipped(testResult)) {
+                    log("  - $testName: ${errorOf(testResult) ?: "skipped"}", Colors.YELLOW)
+                }
             }
         }
-        val failedTests = totalTests - passedTests
-        
-        log("\nSDK: Kotlin v0.9.2")
-        log("Timestamp: ${Instant.now()}")
-        
-        val summaryColor = if (passedTests == totalTests) Colors.GREEN else Colors.RED
-        log("\nTests Passed: $passedTests/$totalTests", summaryColor)
-        
+
         if (failedTests > 0) {
             log("\nFailed Tests:", Colors.RED)
             for ((testName, testResult) in testResults) {
-                val passed = when (testResult) {
-                    is Map<*, *> -> testResult["passed"] as? Boolean ?: false
-                    is CryptoTestResult -> testResult.passed
-                    is TransferTestResult -> testResult.passed
-                    else -> false
-                }
-                if (!passed) {
-                    val error = when (testResult) {
-                        is Map<*, *> -> testResult["error"] as? String ?: "Unknown error"
-                        is TransferTestResult -> testResult.validationError ?: "Validation failed"
-                        else -> "Unknown error"
-                    }
-                    log("  - $testName: $error", Colors.RED)
+                if (!isPassed(testResult) && !isSkipped(testResult)) {
+                    log("  - $testName: ${errorOf(testResult) ?: "Validation failed"}", Colors.RED)
                 }
             }
         }
-        
-        log("\nCross-SDK Compatible: ${if (crossSdkCompatible) "✅ YES" else "❌ NO"}", 
+
+        log("\nCross-SDK Compatible: ${if (crossSdkCompatible) "✅ YES" else "❌ NO"}",
             if (crossSdkCompatible) Colors.GREEN else Colors.RED)
-        
+
         log("\n═══════════════════════════════════════════", Colors.BLUE)
     }
-    
+
     /**
      * Main test runner
      */
@@ -1526,7 +1932,10 @@ class KotlinSelfTest {
                 try {
                     val existingData = Gson().fromJson(existingResultsPath.readText(), JsonObject::class.java)
 
-                    // Preserve Round 1 test results
+                    // Preserve Round 1 test results. Generic over every key in
+                    // existingTests (unlike the C++ self-test's itemized per-field
+                    // preserve block) — bufferFamily, and any future skip-capable test,
+                    // is carried through Round 2 with no per-key addition needed here.
                     if (existingData.has("tests") && existingData.get("tests").isJsonObject) {
                         val existingTests = existingData.getAsJsonObject("tests")
                         for ((key, value) in existingTests.entrySet()) {
@@ -1535,22 +1944,31 @@ class KotlinSelfTest {
                         }
                     }
 
-                    // Preserve Round 1 molecules
+                    // Preserve Round 1 molecules. Generic over every key present, for the
+                    // same reason the tests block above is: an itemized list silently drops
+                    // whatever nobody remembered to add to it.
+                    //
+                    // This block named exactly four types — metadata, simpleTransfer,
+                    // complexTransfer, mlkem768 — and omitted tokenCreation, walletCreation
+                    // and shadowWalletClaim. Round 2 therefore republished those three as
+                    // EMPTY STRINGS, destroying molecules that Round 1 had generated
+                    // correctly. Kotlin happened to finish Round 2 last, so every peer had
+                    // already read the intact file and the gauntlet reported 8/8 Perfect
+                    // over a Kotlin artifact that was, by then, three-sevenths empty.
+                    // Whether anyone noticed was decided by process scheduling order.
+                    //
+                    // The lesson had already been learned for `tests` three lines up and not
+                    // carried across to its sibling. Enumerate nothing; copy what is there.
                     if (existingData.has("molecules") && existingData.get("molecules").isJsonObject) {
                         val existingMolecules = existingData.getAsJsonObject("molecules")
-                        if (existingMolecules.has("metadata") && existingMolecules.get("metadata").isJsonPrimitive) {
-                            moleculeStorage["metadata"] = existingMolecules.get("metadata").asString
+                        var preserved = 0
+                        for ((key, value) in existingMolecules.entrySet()) {
+                            if (value.isJsonPrimitive && value.asString.isNotEmpty()) {
+                                moleculeStorage[key] = value.asString
+                                preserved++
+                            }
                         }
-                        if (existingMolecules.has("simpleTransfer") && existingMolecules.get("simpleTransfer").isJsonPrimitive) {
-                            moleculeStorage["simpleTransfer"] = existingMolecules.get("simpleTransfer").asString
-                        }
-                        if (existingMolecules.has("complexTransfer") && existingMolecules.get("complexTransfer").isJsonPrimitive) {
-                            moleculeStorage["complexTransfer"] = existingMolecules.get("complexTransfer").asString
-                        }
-                        if (existingMolecules.has("mlkem768") && existingMolecules.get("mlkem768").isJsonPrimitive) {
-                            moleculeStorage["mlkem768"] = existingMolecules.get("mlkem768").asString
-                        }
-                        log("✅ Preserved Round 1 molecules for cross-validation", Colors.GREEN)
+                        log("✅ Preserved $preserved Round 1 molecules for cross-validation", Colors.GREEN)
                     }
                 } catch (e: Exception) {
                     log("⚠️  Could not load existing results: ${e.message}", Colors.YELLOW)
@@ -1597,6 +2015,7 @@ class KotlinSelfTest {
         testTokenCreation(config)
         testWalletCreation(config)
         testShadowWalletClaim(config)
+        testBufferFamily()
         testMLKEM768(config)
         testNegativeCases(config)
         testCrossSdkValidation(config)
@@ -1606,14 +2025,14 @@ class KotlinSelfTest {
         printSummary()
         
         // Exit with appropriate code
-        val allPassed = testResults.values.all { 
-            when (it) {
-                is Map<*, *> -> it["passed"] as? Boolean ?: false
-                is CryptoTestResult -> it.passed
-                is TransferTestResult -> it.passed
-                else -> false
-            }
-        } && crossSdkCompatible
+        // Round 1 generates molecules and deliberately does not cross-validate, so it has no
+        // crossSdkCompatible verdict to offer and must not be judged on one. Requiring it
+        // here fails every Round-1 run purely because the check was skipped by design —
+        // which is what happened the moment the field stopped defaulting to `true`. Only a
+        // run that actually performed cross-validation is accountable for its result.
+        val crossValidationApplies = System.getenv("KNISHIO_DISABLE_CROSS_VALIDATION") != "true"
+        val allPassed = testResults.values.all { isPassed(it) || isSkipped(it) } &&
+            (!crossValidationApplies || crossSdkCompatible)
         
         return if (allPassed) 0 else 1
     }

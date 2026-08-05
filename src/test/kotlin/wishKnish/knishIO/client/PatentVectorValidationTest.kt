@@ -152,6 +152,133 @@ class PatentVectorValidationTest {
     }
 
     // =========================================================================
+    // 0a-neg. Buffer conservation — NEGATIVE cases.
+    //
+    // The positive buffer tests above only assert that valid molecules are
+    // ACCEPTED. Nothing asserted invalid ones are REJECTED, and that gap hid a
+    // real fail-open defect: isotopeV correctly bypasses V-only conservation
+    // when B/F atoms are present (CheckMolecule.kt:310/361/378/382, commented
+    // "the B/F atoms own the cross-isotope conservation") — but no isotopeB or
+    // isotopeF existed to own it. Kotlin skipped the check and put nothing in
+    // its place, so a buffer molecule that creates or destroys value verified
+    // clean.
+    //
+    // A validator never observed rejecting is indistinguishable from an absent
+    // one. These tests observe the rejection.
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Buffer conservation — negative cases (must be REJECTED)")
+    inner class BufferConservationNegative {
+
+        /**
+         * Build a REAL buffer-deposit molecule with the production builder, then change
+         * exactly one value so V+B sums to -20 instead of 0, and re-sign.
+         *
+         * Constructing the atoms by hand does not work: the molecule is then rejected by
+         * index() (AtomIndexException) and isotopeV() (TransferToSelfException, all atoms
+         * sharing one address) before conservation is ever reached — the test would pass
+         * while proving nothing. Tampering a well-formed molecule isolates conservation
+         * as the only thing wrong with it.
+         */
+        @Test
+        @DisplayName("unbalanced V+B buffer molecule is rejected")
+        fun unbalancedBufferIsRejected() {
+            val secret = Crypto.generateSecret("BUFFER_NEGATIVE_TESTSEED")
+            val source = Wallet.create(secret, "BUFTOK")
+            source.balance = 100.0
+
+            val molecule = Molecule(
+                secret = secret,
+                sourceWallet = source,
+                remainderWallet = Wallet.create(secret, "BUFTOK"),
+                cellSlug = "buftest"
+            )
+            molecule.initDepositBuffer(30)   // V(-100), B(+30), V(+70) — conserves
+
+            // Break conservation only: remainder 70 -> 50, so V+B now sums to -20.
+            val remainderAtom = molecule.atoms.last { it.isotope == 'V' }
+            remainderAtom.value = "50"
+
+            molecule.sign()
+
+            // Capture WHY it was rejected, not merely that it was. A molecule can be
+            // refused for an unrelated reason (bad index, OTS, hash), which would make
+            // this test pass while proving nothing about conservation.
+            var thrown: Exception? = null
+            val accepted = try {
+                molecule.check(source)
+            } catch (e: Exception) {
+                thrown = e
+                false
+            }
+            println("[negative-buffer] unbalanced V+B -> accepted=$accepted thrown=${thrown?.javaClass?.simpleName}: ${thrown?.message}")
+
+            // Isolate WHICH check rejected it. If isotopeV returns true here, then
+            // V-conservation really was bypassed with nothing replacing it, and the
+            // rejection above came from an unrelated check — meaning this test would
+            // be passing for the wrong reason.
+            fun probe(name: String, f: () -> Boolean) = try {
+                "$name=${f()}"
+            } catch (e: Exception) {
+                "$name=threw(${e.javaClass.simpleName})"
+            }
+            println(
+                "[negative-buffer] per-check: " + listOf(
+                    probe("molecularHash") { CheckMolecule.molecularHash(molecule) },
+                    probe("ots") { CheckMolecule.ots(molecule) },
+                    probe("index") { CheckMolecule.index(molecule) },
+                    probe("batchId") { CheckMolecule.batchId(molecule) },
+                    probe("continuId") { CheckMolecule.continuId(molecule) },
+                    probe("isotopeV") { CheckMolecule.isotopeV(molecule, source) }
+                ).joinToString(" ")
+            )
+            assertFalse(
+                accepted,
+                "A buffer molecule whose V+B values sum to -20 must be rejected. " +
+                    "Accepting it means cross-isotope conservation is enforced by nobody."
+            )
+        }
+
+        /**
+         * B atom carrying the wrong metaType. Must not verify.
+         *
+         * Same construction discipline as above — tamper a well-formed molecule so
+         * metaType is the only thing wrong with it.
+         */
+        @Test
+        @DisplayName("B atom with wrong metaType is rejected")
+        fun bAtomWrongMetaTypeIsRejected() {
+            val secret = Crypto.generateSecret("BUFFER_NEGATIVE_TESTSEED")
+            val source = Wallet.create(secret, "BUFTOK")
+            source.balance = 100.0
+
+            val molecule = Molecule(
+                secret = secret,
+                sourceWallet = source,
+                remainderWallet = Wallet.create(secret, "BUFTOK"),
+                cellSlug = "buftest"
+            )
+            molecule.initDepositBuffer(30)   // conserves; only metaType will be wrong
+
+            val bAtom = molecule.atoms.first { it.isotope == 'B' }
+            bAtom.metaType = "notAWalletBundle"
+
+            molecule.sign()
+
+            var thrown: Exception? = null
+            val accepted = try {
+                molecule.check(source)
+            } catch (e: Exception) {
+                thrown = e
+                false
+            }
+            println("[negative-buffer] wrong metaType -> accepted=$accepted thrown=${thrown?.javaClass?.simpleName}")
+            assertFalse(accepted, "A B-isotope atom must carry metaType 'walletBundle'.")
+        }
+    }
+
+    // =========================================================================
     // 0b. Buffer-withdraw conservation — cross-SDK lock (cycle 149)
     //     initWithdrawBuffer debits the FULL source balance so a partial
     //     withdraw still conserves (B+V sum 0). The withdraw analog of the

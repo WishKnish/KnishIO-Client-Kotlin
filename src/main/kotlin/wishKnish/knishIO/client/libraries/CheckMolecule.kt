@@ -278,6 +278,169 @@ class CheckMolecule {
       return true
     }
 
+    /**
+     * Validates P-isotope (Peering) atoms.
+     *
+     * Mirrors CheckMolecule.isotopeP() in the JavaScript reference.
+     */
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class,
+      MetaMissingException::class, WrongTokenTypeException::class
+    )
+    fun isotopeP(molecule: Molecule): Boolean {
+      missing(molecule)
+      molecule.atoms.filter { it.isotope == 'P' }.forEach { atom ->
+        if (atom.token != "USER") {
+          throw WrongTokenTypeException("Check::isotopeP() - \"${atom.token}\" is not a valid Token slug for \"${atom.isotope}\" isotope Atoms!")
+        }
+
+        val peerHost = atom.meta.find { it.key == "peerHost" }?.value
+        if (peerHost.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeP() - Required meta field \"peerHost\" is missing!")
+        }
+      }
+
+      return true
+    }
+
+    /**
+     * Validates A-isotope (Append Request) atoms.
+     *
+     * Mirrors CheckMolecule.isotopeA() in the JavaScript reference.
+     */
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class,
+      MetaMissingException::class, WrongTokenTypeException::class
+    )
+    fun isotopeA(molecule: Molecule): Boolean {
+      missing(molecule)
+      molecule.atoms.filter { it.isotope == 'A' }.forEach { atom ->
+        if (atom.token != "USER") {
+          throw WrongTokenTypeException("Check::isotopeA() - \"${atom.token}\" is not a valid Token slug for \"${atom.isotope}\" isotope Atoms!")
+        }
+
+        if (atom.metaType.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeA() - Required field \"metaType\" is missing!")
+        }
+
+        if (atom.metaId.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeA() - Required field \"metaId\" is missing!")
+        }
+
+        val action = atom.meta.find { it.key == "action" }?.value
+        if (action.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeA() - Required meta field \"action\" is missing!")
+        }
+      }
+
+      return true
+    }
+
+    /**
+     * Validates B-isotope (Buffer/Exchange) atoms.
+     *
+     * Mirrors CheckMolecule.isotopeB() in the JavaScript reference.
+     *
+     * This is the check isotopeV() delegates to. isotopeV() skips its V-only
+     * conservation whenever B/F atoms are present, on the stated basis that "the B/F
+     * atoms own the cross-isotope conservation" — and until this method existed,
+     * nothing did. A buffer molecule that created or destroyed value verified clean.
+     * Conservation over the combined V+B set is enforced here.
+     */
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class,
+      MetaMissingException::class, TransferMalformedException::class,
+      TransferUnbalancedException::class
+    )
+    fun isotopeB(molecule: Molecule): Boolean {
+      missing(molecule)
+      val isotopeB = molecule.atoms.filter { it.isotope == 'B' }
+
+      if (isotopeB.isEmpty()) {
+        return true
+      }
+
+      isotopeB.forEach { atom ->
+        // B atoms must reference a wallet bundle
+        if (atom.metaType != "walletBundle") {
+          throw MetaMissingException("Check::isotopeB() - B-isotope atoms must have metaType \"walletBundle\"!")
+        }
+
+        if (atom.metaId.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeB() - B-isotope atoms must have a metaId!")
+        }
+
+        if (atom.value?.toDoubleOrNull() == null) {
+          throw TransferMalformedException("Check::isotopeB() - B-isotope atom value is not a valid number!")
+        }
+      }
+
+      // V+B balance conservation: sum of all V and B atom values must equal zero
+      val vAtoms = molecule.atoms.filter { it.isotope == 'V' }
+      if (vAtoms.isNotEmpty()) {
+        val sum = (vAtoms + isotopeB).sumOf { it.value?.toDoubleOrNull() ?: 0.0 }
+        if (sum != 0.0) {
+          throw TransferUnbalancedException("Check::isotopeB() - V+B atom values do not balance to zero!")
+        }
+      }
+
+      return true
+    }
+
+    /**
+     * Validates F-isotope (Fusion/NFT) atoms.
+     *
+     * Mirrors CheckMolecule.isotopeF() in the JavaScript reference: identical to
+     * isotopeB() plus a non-negative-value rule. Must stay paired with the
+     * hasCrossIsotope gate in isotopeV(), which is keyed on B *or* F — without this,
+     * an F-isotope molecule skips V-only conservation with nothing validating V+F.
+     */
+    @JvmStatic
+    @Throws(
+      MolecularHashMissingException::class, AtomsMissingException::class,
+      MetaMissingException::class, TransferMalformedException::class,
+      TransferUnbalancedException::class
+    )
+    fun isotopeF(molecule: Molecule): Boolean {
+      missing(molecule)
+      val isotopeF = molecule.atoms.filter { it.isotope == 'F' }
+
+      if (isotopeF.isEmpty()) {
+        return true
+      }
+
+      isotopeF.forEach { atom ->
+        if (atom.metaType != "walletBundle") {
+          throw MetaMissingException("Check::isotopeF() - F-isotope atoms must have metaType \"walletBundle\"!")
+        }
+
+        if (atom.metaId.isNullOrEmpty()) {
+          throw MetaMissingException("Check::isotopeF() - F-isotope atoms must have a metaId!")
+        }
+
+        val value = atom.value?.toDoubleOrNull()
+          ?: throw TransferMalformedException("Check::isotopeF() - F-isotope atom value is not a valid number!")
+
+        if (value < 0.0) {
+          throw TransferMalformedException("Check::isotopeF() - F-isotope atom value must not be negative!")
+        }
+      }
+
+      // V+F balance conservation: sum of all V and F atom values must equal zero
+      val vAtoms = molecule.atoms.filter { it.isotope == 'V' }
+      if (vAtoms.isNotEmpty()) {
+        val sum = (vAtoms + isotopeF).sumOf { it.value?.toDoubleOrNull() ?: 0.0 }
+        if (sum != 0.0) {
+          throw TransferUnbalancedException("Check::isotopeF() - V+F atom values do not balance to zero!")
+        }
+      }
+
+      return true
+    }
+
     @JvmStatic
     @JvmOverloads
     @Throws(
