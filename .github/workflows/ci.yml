@@ -29,7 +29,7 @@ jobs:
     name: version consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Declared versions agree (and match the tag, when there is one)
         # DISPATCH_TAG arrives via env, never interpolated into the shell text
         # (workflow-injection hygiene).
@@ -56,16 +56,16 @@ jobs:
         java: [17, 21]
     
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
     
     - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: ${{ matrix.java }}
         distribution: 'temurin'
     
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -79,21 +79,21 @@ jobs:
       if: success() || failure()
     
     - name: Upload test results
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       if: success() || failure()
       with:
         name: test-results-${{ matrix.os }}-java${{ matrix.java }}
         path: build/reports/tests/test/
     
     - name: Upload coverage reports
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       if: matrix.os == 'ubuntu-latest' && matrix.java == 17
       with:
         name: coverage-report
         path: build/reports/jacoco/test/
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
       if: matrix.os == 'ubuntu-latest' && matrix.java == 17
       with:
         files: ./build/reports/jacoco/test/jacocoTestReport.xml
@@ -106,16 +106,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
     - name: Set up JDK 17
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'temurin'
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -128,16 +128,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
     - name: Set up JDK 17
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'temurin'
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -148,7 +148,7 @@ jobs:
       run: ./gradlew cyclonedxDirectBom --no-daemon
 
     - name: OSV scan (runtime dependency graph)
-      uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2  # v2.3.8
+      uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
       with:
         scan-args: |-
           -L
@@ -161,7 +161,7 @@ jobs:
     steps:
     # fetch-depth: 0 — the gate diffs against the base commit, which a shallow
     # checkout would not have.
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: 0
 
@@ -200,16 +200,16 @@ jobs:
     needs: [test, lint]
     
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
     
     - name: Set up JDK 17
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'temurin'
     
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -221,7 +221,7 @@ jobs:
       run: ./gradlew dokkaGenerate --no-daemon
     
     - name: Upload build artifacts
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: build-artifacts
         path: |
@@ -238,16 +238,16 @@ jobs:
     needs: build
     
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
     
     - name: Set up JDK 17
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'temurin'
     
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -271,16 +271,16 @@ jobs:
     needs: [build, version]
     
     steps:
-    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
     
     - name: Set up JDK 17
-      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5
+      uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
         java-version: '17'
         distribution: 'temurin'
     
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
