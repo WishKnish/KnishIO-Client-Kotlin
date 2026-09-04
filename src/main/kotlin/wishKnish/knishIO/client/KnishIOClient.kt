@@ -64,6 +64,7 @@ import kotlin.reflect.full.primaryConstructor
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.exception.*
 import kotlin.jvm.Throws
+import wishKnish.knishIO.client.storage.*
 
 /**
  * One destination of a multi-recipient stackable transfer (see KnishIOClient.transferTokens).
@@ -86,8 +87,10 @@ class KnishIOClient @JvmOverloads constructor(
   @JvmField val serverSdkVersion: Int = 3,
   @JvmField val logging: Boolean = false,
   encrypt: Boolean = false,
-  insecureTls: Boolean = false
+  insecureTls: Boolean = false,
+  secretStorage: SecretStorageProvider? = null
 ) {
+  @JvmField var secretStorage: SecretStorageProvider? = secretStorage
   @JvmField var authTokenObjects = mutableMapOf<String, AuthToken?>()
   private var authToken: AuthToken? = null
   @JvmField var authInProcess: Boolean = false
@@ -165,6 +168,7 @@ class KnishIOClient @JvmOverloads constructor(
   fun reset() {
     secret = ""
     bundle = ""
+    secretStorage = null
     remainderWallet = null
   }
 
@@ -206,15 +210,63 @@ class KnishIOClient @JvmOverloads constructor(
    * Returns whether or not a secret is being stored for this session
    */
   fun hasSecret(): Boolean {
-    return secret.isNotEmpty()
+    return secret.isNotEmpty() || (secretStorage != null && bundle.isNotEmpty())
+  }
+
+  /**
+   * Returns whether or not a bundle hash is being stored for this session
+   */
+  fun hasBundle(): Boolean {
+    return bundle.isNotEmpty()
   }
 
   /**
    * Set the client's secret
    */
-  fun setSecret(value: String) {
+  fun setSecret(value: String): KnishIOClient {
     secret = value
     bundle = Crypto.generateBundleHash(value)
+    if (secretStorage == null) {
+      val memStorage = MemorySecretStorageProvider()
+      memStorage.storeSecret(bundle, value)
+      secretStorage = memStorage
+    } else {
+      secretStorage?.storeSecret(bundle, value)
+    }
+    return this
+  }
+
+  /**
+   * Sets the secret storage provider and optionally associates an active bundle hash
+   */
+  @JvmOverloads
+  fun setSecretStorage(storage: SecretStorageProvider, bundleHash: String? = null): KnishIOClient {
+    secretStorage = storage
+    if (bundleHash != null) {
+      bundle = bundleHash
+    }
+    return this
+  }
+
+  /**
+   * Returns the current secret storage provider
+   */
+  fun getSecretStorage(): SecretStorageProvider? {
+    return secretStorage
+  }
+
+  /**
+   * Asynchronously or synchronously retrieves the secret from storage or returns in-memory secret
+   */
+  @JvmOverloads
+  fun retrieveSecret(options: StorageOptions = StorageOptions()): String? {
+    if (secret.isNotEmpty()) {
+      return secret
+    }
+    if (secretStorage != null && bundle.isNotEmpty()) {
+      return secretStorage?.retrieveSecret(bundle, options)
+    }
+    return null
   }
 
   /**
@@ -264,7 +316,7 @@ class KnishIOClient @JvmOverloads constructor(
     cellSlug: String? = null,
     encrypt: Boolean = false
   ): AuthToken {
-    val _secret = secret ?: seed?.let { Crypto.generateSecret(it) }
+    val _secret = secret ?: seed?.let { Crypto.generateSecret(it) } ?: retrieveSecret()
     val slug = cellSlug ?: cellSlug()
 
     return authorize(_secret, slug, encrypt)
@@ -373,7 +425,7 @@ class KnishIOClient @JvmOverloads constructor(
     sourceWallet: Wallet? = null,
     remainderWallet: Wallet? = null
   ): Molecule {
-    val currentSecret = secret ?: getSecret()
+    val currentSecret = secret ?: (if (this.secret.isNotEmpty()) this.secret else retrieveSecret()) ?: getSecret()
     var signingWallet = sourceWallet
 
     // Sets the source wallet as the last remainder wallet (to maintain ContinuID)
@@ -391,9 +443,13 @@ class KnishIOClient @JvmOverloads constructor(
       currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters
     )
 
-    return Molecule(
+    val molecule = Molecule(
       currentSecret, signingWallet, remainderWallet(), cellSlug
     )
+    if (hasBundle()) {
+      molecule.bundle = bundle()
+    }
+    return molecule
   }
 
   /**
@@ -403,7 +459,13 @@ class KnishIOClient @JvmOverloads constructor(
     // Resolve the bundle's live USER ContinuID position (mirror C++/Python: ContinuId needs the
     // token arg, else the validator can't resolve the chain head and returns null). Null ->
     // genesis fallback (Wallet(getSecret()) is a USER wallet by default).
-    return queryContinuId(bundle(), "USER").payload() ?: Wallet(getSecret())
+    val fallbackWallet = if (hasSecret()) {
+      val sec = if (secret.isNotEmpty()) secret else retrieveSecret()
+      if (!sec.isNullOrEmpty()) Wallet(sec) else Wallet()
+    } else {
+      Wallet()
+    }
+    return queryContinuId(bundle(), "USER").payload() ?: fallbackWallet
   }
 
   /**
