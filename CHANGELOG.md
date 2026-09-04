@@ -14,6 +14,32 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [Unreleased]
+
+## [0.9.4] — 2026-09-04
+
+### Added
+
+- **Hardware Envelope Encryption & Secure Memory Provider**: Introduced `SecretStorageProvider`,
+  `SecretStorageMetadata`, `EncryptedSecretPayload`, `StorageOptions`, and `StorageBackend` contracts
+  (`wishKnish.knishIO.client.storage`).
+- **AES-GCM Envelope Encryption Provider** (`AesGcmSecretStorageProvider`): Standard JCA
+  `AES/GCM/NoPadding` envelope encryption with PBKDF2WithHmacSHA256 (100,000 iterations) key
+  derivation, 12-byte random IV, 16-byte random salt, pluggable `StorageBackend` (supporting
+  Android `SharedPreferences` / `EncryptedSharedPreferences`), and auto-zeroized byte buffers.
+- **In-Memory Storage Provider** (`MemorySecretStorageProvider`): Thread-safe in-memory fallback
+  using `ConcurrentHashMap` for test harnesses and headless environments.
+- **Memory Hygiene & Zeroization Utilities** (`SecureMemory`): Explicit byte/char array clearing
+  (`zeroize`), scoped execution (`withSecureBytes`, `withSecureChars`), and timing-safe comparison
+  (`constantTimeEquals`).
+- **SecretStorageFactory**: Factory utility for instantiating default storage providers.
+- **KnishIOClient Secret Storage Integration**: `KnishIOClient` accepts `secretStorage` in constructor,
+  provides `setSecretStorage()`, `getSecretStorage()`, and `retrieveSecret()`, and unwraps the master secret
+  just-in-time for molecule construction (`createMolecule()`) without permanently retaining cleartext
+  secrets in client heap memory.
+- **SecretStorageException**: Typed exception extending `BaseException` with companion factory methods
+  `notFound()`, `decryptionFailed()`, and `unavailable()`.
+
 ## [0.9.3] — 2026-08-05
 
 ### Security
@@ -229,7 +255,9 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > SDK version line and are retained as written. The `1.0.0` / `1.1.0` targets in
 > "Upcoming" are stale and do not reflect current plans.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.4
+[0.9.3]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.3
 [0.9.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.2
 [0.9.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.0
 [0.8.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.8.1
