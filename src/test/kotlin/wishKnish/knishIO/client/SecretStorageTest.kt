@@ -213,4 +213,21 @@ class SecretStorageTest {
     expectThat(client.hasSecret()).isFalse()
     expectThat(client.getSecretStorage()).isNull()
   }
+
+  @Test
+  fun `withSecret propagates caller exceptions unwrapped`() {
+    val storage = AesGcmSecretStorageProvider(defaultPassphrase = "client-secure-pass")
+    val bundle = "cafebabe".repeat(8)
+    storage.storeSecret(bundle, "secret-for-boundary-test", StorageOptions())
+
+    // A caller failure is NOT a decryption failure and must not be re-labelled as one.
+    expectThrows<IllegalStateException> {
+      storage.withSecret(bundle, StorageOptions()) { throw IllegalStateException("caller failure") }
+    }
+
+    // The SDK's own failures still surface as SecretStorageException.
+    expectThrows<SecretStorageException> {
+      storage.withSecret(bundle, StorageOptions(passphrase = "wrong-password")) { it }
+    }
+  }
 }

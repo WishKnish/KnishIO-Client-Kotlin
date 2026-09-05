@@ -113,7 +113,6 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
 
       backend.setItem("$KEY_PREFIX$bundleHash", json.encodeToString(payload))
     } catch (e: Exception) {
-      if (e is SecretStorageException) throw e
       throw SecretStorageException("Encryption failed: ${e.message}", e)
     } finally {
       SecureMemory.zeroize(secretBytes)
@@ -196,19 +195,22 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
     val iv = Base64.getDecoder().decode(payload.iv)
     val ciphertext = Base64.getDecoder().decode(payload.ciphertext)
 
-    return try {
+    // Only the SDK's own decryption is wrapped as decryptionFailed. `block` is caller code and
+    // runs OUTSIDE the try: wrapping it mislabelled every caller exception as a decryption
+    // failure, and needed an `is SecretStorageException` guard that detekt's
+    // InstanceOfCheckForException rejects. Rust's with_secret draws the same boundary
+    // (`let res = f(&secret_guard); … res`).
+    val decryptedBytes = try {
       val secretKey = deriveKey(passphrase, salt, payload.iterations)
       val cipher = Cipher.getInstance("AES/GCM/NoPadding")
       cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-
-      val decryptedBytes = cipher.doFinal(ciphertext)
-      SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
-        val secretString = String(bytes, Charsets.UTF_8)
-        block(secretString)
-      }
+      cipher.doFinal(ciphertext)
     } catch (e: Exception) {
-      if (e is SecretStorageException) throw e
       throw SecretStorageException.decryptionFailed(e.message ?: "Authentication failed", e)
+    }
+
+    return SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
+      block(String(bytes, Charsets.UTF_8))
     }
   }
 }
