@@ -1,0 +1,91 @@
+# Kotlin SDK scheduled dependency audit — OSV advisories against a tree nobody pushed to.
+#
+# Why a SCHEDULE: an advisory is published against code that has NOT changed. That is the
+# 2026-07 → 2026-08 lesson — a repo sits green for weeks while a dependency it already ships
+# acquires a CVE, because nothing re-examines a tree with no commits. ci.yml answers "did this
+# change break anything"; this file answers "did the world change underneath us". Only the
+# second question has a clock.
+#
+# WHY A SEPARATE FILE RATHER THAN `schedule:` ADDED TO ci.yml:
+# `on:` is workflow-level, not job-level. Adding a schedule trigger to ci.yml would fire every
+# job in it weekly — version, the 6-way test matrix (3 OS x 2 JDK), lint, changelog and build
+# — to reach the one audit job that matters. The audit job itself has no `if:` guard so it
+# WOULD run, but so would ~10 unrelated jobs plus a Codecov upload, and the changelog job would
+# run with no comparable base commit (a schedule event has neither a PR base nor a `before`).
+# ci.yml's publish jobs are correctly gated on push/tag refs and would stay dormant either way.
+# A dedicated workflow runs exactly the two steps that answer the question.
+#
+# SCOPE CAVEAT: `cyclonedxDirectBom` is scoped to runtimeClasspath (see build.gradle.kts), so
+# this scans what CONSUMERS get, not the Gradle/detekt build toolchain. The npm/pip/composer
+# siblings' scheduled scans do include their dev trees. Widening this one means a different
+# SBOM task, which would change what can fail here — deliberately not bundled into this change.
+#
+# NOTE: scheduled workflows only fire from the DEFAULT BRANCH. This file has no effect until
+# it is merged there — a branch-only copy runs never, silently.
+name: Scheduled audit
+
+on:
+  schedule:
+    # Mondays 06:17 UTC. Deliberately off the hour: GitHub sheds scheduled runs when the
+    # top-of-hour queue saturates, and a weekly job that quietly does not run is worse than
+    # no job at all, because it reads as green.
+    - cron: '17 6 * * 1'
+  # Manual trigger, plus a deliberate-failure switch. A gate nobody has watched FAIL is an
+  # unproven gate: set selftest_fail to make a run exit 1 on purpose and confirm the failure
+  # is actually visible wherever these notifications land.
+  workflow_dispatch:
+    inputs:
+      selftest_fail:
+        description: 'Fail this run on purpose, to prove the alert path works. Audits nothing.'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit (OSV via CycloneDX SBOM)
+    runs-on: ubuntu-latest
+    steps:
+      # `if: inputs.selftest_fail` reads the DECLARED BOOLEAN directly. Do not "fix" this to
+      # `== 'true'`: GitHub coerces mismatched types to number for loose equality, the string
+      # 'true' casts to NaN, and NaN equals nothing — so that form is always false and the
+      # probe would silently never fire. The input is used only inside this expression and is
+      # never interpolated into shell text.
+      - name: Selftest failure probe
+        if: inputs.selftest_fail
+        run: |
+          echo "::error::Selftest failure probe requested — failing this run deliberately."
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # JDK 17 to match ci.yml's lint/audit/build jobs. setup-java sets JAVA_HOME itself —
+      # the pin matters because a newer JDK breaks this repo's Gradle build.
+      - name: Set up JDK 17
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6.3.0
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Gradle has no committed lockfile; the CycloneDX SBOM (scoped to runtimeClasspath
+      # in build.gradle.kts) is the scannable picture of what consumers actually get.
+      - name: Generate runtime-scoped SBOM
+        run: ./gradlew cyclonedxDirectBom --no-daemon
+
+      - name: OSV scan (runtime dependency graph)
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67  # v2.5.1
+        with:
+          scan-args: |-
+            -L
+            build/reports/cyclonedx-direct/bom.json
