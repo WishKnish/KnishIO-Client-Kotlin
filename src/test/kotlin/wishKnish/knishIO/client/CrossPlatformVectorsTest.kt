@@ -174,4 +174,67 @@ class CrossPlatformVectorsTest {
         val expectedPlain = sb["expectedPlaintext"]!!.jsonPrimitive.content
         assertEquals(expectedPlain, String(sealed.sealOpen(sealRecipPk, sealRecipSk)), "sealed-box open mismatch")
     }
+
+    /**
+     * secret_storage_envelope: decrypt an envelope produced by ANOTHER SDK.
+     *
+     * This must decrypt the frozen payload rather than round-trip our own output.
+     * A round-trip passes in every SDK regardless of metadata casing, which is
+     * precisely why Rust 0.9.5 shipped snake_case keys and rejected a TypeScript
+     * envelope with "missing field bundle_hash" before any crypto ran.
+     */
+    @Test
+    @DisplayName("secret_storage_envelope: decrypts an envelope written by a peer SDK")
+    fun secretStorageEnvelopeVectors() {
+        val v = vectors["secret_storage_envelope"]!!.jsonObject
+        for (t in v["tests"]!!.jsonArray) {
+            val test = t.jsonObject
+            val payload = test["payload"]!!.jsonObject
+            val bundleHash = test["bundleHash"]!!.jsonPrimitive.content
+
+            val backend = wishKnish.knishIO.client.storage.MemoryStorageBackend()
+            backend.setItem(test["storageKey"]!!.jsonPrimitive.content, payload.toString())
+            val provider = wishKnish.knishIO.client.storage.AesGcmSecretStorageProvider(backend)
+
+            assertEquals(
+                test["expectedPlaintext"]!!.jsonPrimitive.content,
+                provider.retrieveSecret(
+                    bundleHash,
+                    wishKnish.knishIO.client.storage.StorageOptions(
+                        passphrase = test["passphrase"]!!.jsonPrimitive.content
+                    )
+                ),
+                "failed to decrypt envelope from ${test["producedBy"]!!.jsonPrimitive.content}"
+            )
+
+            // The metadata key set is the half of the format that diverged, so assert what
+            // KOTLIN EMITS - not the fixture's own keys, which would only restate the vector.
+            //
+            // Required-keys + forbidden-keys, NOT set equality: `label` is optional and the
+            // SDKs legitimately differ on it (TS/JS omit the key when unset, Kotlin and Rust
+            // emit it as null via encodeDefaults), so an equality assertion would pass here
+            // and fail in TS/JS for behaviour that is correct in both.
+            val ourBackend = wishKnish.knishIO.client.storage.MemoryStorageBackend()
+            wishKnish.knishIO.client.storage.AesGcmSecretStorageProvider(ourBackend).storeSecret(
+                bundleHash,
+                test["expectedPlaintext"]!!.jsonPrimitive.content,
+                wishKnish.knishIO.client.storage.StorageOptions(
+                    passphrase = test["passphrase"]!!.jsonPrimitive.content
+                )
+            )
+            val emitted = json
+                .parseToJsonElement(ourBackend.getItem(test["storageKey"]!!.jsonPrimitive.content)!!)
+                .jsonObject["metadata"]!!.jsonObject.keys
+
+            for (key in test["requiredMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
+                assertTrue(emitted.contains(key), "Kotlin must emit `$key`; emitted $emitted")
+            }
+            for (key in test["forbiddenMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
+                assertFalse(
+                    emitted.contains(key),
+                    "`$key` is the 0.9.5 snake_case divergence and must never be emitted"
+                )
+            }
+        }
+    }
 }
