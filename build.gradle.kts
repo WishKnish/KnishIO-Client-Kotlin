@@ -4,22 +4,22 @@ import com.vanniktech.maven.publish.KotlinJvm
 import org.gradle.api.component.AdhocComponentWithVariants
 
 plugins {
-  val kotlinVersion = "2.2.21"
+  val kotlinVersion = "2.4.10"
 
   kotlin("jvm") version kotlinVersion
   kotlin("plugin.serialization") version kotlinVersion
-  id("com.gradleup.shadow") version "8.3.6"
-  id("org.jetbrains.dokka") version "2.0.0"
+  id("com.gradleup.shadow") version "9.6.1"
+  id("org.jetbrains.dokka") version "2.2.0"
   // Maven Central publishing via the Central Portal (replaces the decommissioned
   // OSSRH s01 endpoint). Applies + manages maven-publish and signing internally.
   // 0.36.0+ requires Dokka v2 (it dropped Dokka v1) and Gradle >= 8.13 — both
   // satisfied here (wrapper bumped to 8.13, Dokka on 2.x).
-  id("com.vanniktech.maven.publish") version "0.36.0"
+  id("com.vanniktech.maven.publish") version "0.37.0"
   id("jacoco")
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
   // CycloneDX SBOM for dependency auditing (CI runs osv-scanner against the BOM;
   // Gradle has no committed lockfile, so the SBOM is the scannable dependency graph).
-  id("org.cyclonedx.bom") version "3.2.4"
+  id("org.cyclonedx.bom") version "3.4.1"
   `java-library`
 }
 
@@ -42,7 +42,7 @@ repositories {
 }
 
 dependencies {
-  val ktorVersion = "3.5.1"
+  val ktorVersion = "3.5.2"
   val coroutinesVersion = "1.11.0"
   val serializationVersion = "1.11.0"
   val bouncyCastleVersion = "1.85"
@@ -65,9 +65,9 @@ dependencies {
   // GraalJS for JavaScript interop (noble-post-quantum bridge — LOAD-BEARING:
   // Wallet.preparePostQuantumKeys + encrypt/decrypt route ML-KEM through the
   // bundled noble-ml-kem-bundle.js for JS-SDK-identical keys. Do NOT remove.)
-  implementation("org.graalvm.polyglot:polyglot:25.1.3")
-  implementation("org.graalvm.polyglot:js:25.1.3")
-  implementation("org.graalvm.js:js-scriptengine:25.1.3")
+  implementation("org.graalvm.polyglot:polyglot:25.3.4.1")
+  implementation("org.graalvm.polyglot:js:25.3.4.1")
+  implementation("org.graalvm.js:js-scriptengine:25.3.4.1")
   
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
@@ -81,12 +81,12 @@ dependencies {
   // slf4j-jdk14 removed — a library must not ship an SLF4J *binding* (forces JUL on
   // consumers); no slf4j usage in main (Ktor uses its own Logger).
   implementation("com.google.code.gson:gson:2.14.0")
-  implementation("com.graphql-java:graphql-java:26.0")
+  implementation("com.graphql-java:graphql-java:26.1")
   
   // Testing dependencies
   testImplementation(kotlin("test"))
-  testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
-  testImplementation("io.mockk:mockk:1.14.3")
+  testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+  testImplementation("io.mockk:mockk:1.14.11")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
   testImplementation("io.strikt:strikt-core:0.35.1")
 }
