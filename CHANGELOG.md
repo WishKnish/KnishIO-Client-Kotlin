@@ -16,6 +16,21 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Changed
+
+- **Consumer Kotlin floor is now 2.3** — the build moved to Kotlin 2.4.10 (from 2.2.21) with
+  no `languageVersion`/`apiVersion` pin, so compiled classes carry `@Metadata(mv = [2, 4, 0])`.
+  Kotlin compilers older than 2.3 cannot read that metadata and will fail to link against this
+  release. 0.9.4 and earlier emitted `mv = [2, 0]`.
+- **Toolchain and dependency currency**: Gradle wrapper 8.13 → 9.7.1, Shadow 8.3.6 → 9.6.1,
+  Dokka 2.0.0 → 2.2.0, `com.vanniktech.maven.publish` 0.36.0 → 0.37.0, CycloneDX 3.2.4 → 3.4.1,
+  Ktor 3.5.1 → 3.5.2, GraalVM polyglot 25.1.3 → 25.3.4.1, graphql-java 26.0 → 26.1,
+  JUnit Jupiter 5.13.4 → 6.1.3, MockK 1.14.3 → 1.14.11.
+- **`shadowJar` no longer unpacks the GraalVM `pom` metapackages** (`org.graalvm.polyglot:js`,
+  `org.graalvm.js:js`), which Shadow 9 rejects outright (`Cannot expand ZIP …/js-*.pom`). The
+  real engine jars (`js-language`, `truffle-runtime`) are still bundled, so the `-all` artifact
+  is unchanged in behaviour. The unused `js-scriptengine` dependency was dropped.
+
 ## [0.9.4] — 2026-09-04
 
 ### Added
