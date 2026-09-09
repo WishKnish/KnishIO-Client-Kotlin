@@ -29,7 +29,10 @@ jobs:
     name: version consistency
     runs-on: ubuntu-latest
     steps:
+      # persist-credentials: false (2026-08) — nothing here pushes; a kept token is readable from .git/config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - name: Declared versions agree (and match the tag, when there is one)
         # DISPATCH_TAG arrives via env, never interpolated into the shell text
         # (workflow-injection hygiene).
@@ -57,6 +60,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     
     - name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
@@ -107,6 +112,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
@@ -129,6 +136,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
@@ -164,6 +173,7 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       with:
         fetch-depth: 0
+        persist-credentials: false
 
     # If build.gradle.kts's top-level `version = ` changed relative to the base commit,
     # CHANGELOG.md must carry a matching `## [<version>]` heading. No change → no-op.
@@ -201,6 +211,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
@@ -239,6 +251,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
@@ -272,6 +286,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        persist-credentials: false
     
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
