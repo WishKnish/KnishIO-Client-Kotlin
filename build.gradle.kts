@@ -67,7 +67,6 @@ dependencies {
   // bundled noble-ml-kem-bundle.js for JS-SDK-identical keys. Do NOT remove.)
   implementation("org.graalvm.polyglot:polyglot:25.1.3")
   implementation("org.graalvm.polyglot:js:25.1.3")
-  implementation("org.graalvm.js:js-scriptengine:25.1.3")
   
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
@@ -248,6 +247,17 @@ mavenPublishing {
 // standalone/CLI use — this only removes the fat jar from the *published* artifact.
 (components["java"] as AdhocComponentWithVariants)
   .withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
+
+// shadow 9 refuses to unzip pom-only artifacts on runtimeClasspath ("Cannot expand ZIP …
+// js-<v>.pom"). org.graalvm.polyglot:js and org.graalvm.js:js are packaging=pom metapackages
+// whose real jars (js-language, truffle-runtime, …) are still merged; only the two POM stubs
+// are skipped. GradleUp/shadow#1716.
+tasks.shadowJar {
+  dependencies {
+    exclude(dependency("org.graalvm.polyglot:js:.*"))
+    exclude(dependency("org.graalvm.js:js:.*"))
+  }
+}
 
 tasks.javadoc {
   if (JavaVersion.current().isJava9Compatible) {
