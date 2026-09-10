@@ -289,6 +289,36 @@ jobs:
       with:
         persist-credentials: false
     
+    # Release body = this tag's CHANGELOG.md section. Every release page from v0.8.0 through
+    # v1.0.0 carried the same content-free placeholder — "See CHANGELOG.md for details." — so
+    # the page said nothing about what any given release shipped and forced a reader to go
+    # find the right section by hand. The curated CHANGELOG entry is the source of truth;
+    # extract it and use it verbatim.
+    #
+    # This runs BEFORE `./gradlew publishToMavenCentral` on purpose. The empty-section guard
+    # below is only useful if it aborts ahead of the irreversible upload; after it, a missing
+    # CHANGELOG entry would leave artifacts on Maven Central with no release page at all — the
+    # same half-state this step exists to prevent. Extraction needs nothing but the checkout.
+    - name: Extract this tag's CHANGELOG section
+      run: |
+        set -euo pipefail
+        # This repo tags with a `v` prefix (v1.0.0) while CHANGELOG headings are bare
+        # (## [1.0.0]), so strip it before matching. `version` declares no `outputs:`, so
+        # deriving from the ref keeps this self-contained.
+        TAG_VERSION="${GITHUB_REF#refs/tags/}"
+        TAG_VERSION="${TAG_VERSION#v}"
+        awk -v ver="## [$TAG_VERSION]" '
+          index($0, ver) == 1 { inside = 1; print; next }
+          inside && /^## / { exit }
+          inside { print }
+        ' CHANGELOG.md > /tmp/release-notes.md
+        if [ ! -s /tmp/release-notes.md ]; then
+          echo "::error file=CHANGELOG.md::No '## [$TAG_VERSION]' section found — refusing to publish with empty release notes."
+          exit 1
+        fi
+        echo "Release notes for $TAG_VERSION:"
+        cat /tmp/release-notes.md
+
     - name: Set up JDK 17
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c  # v6.0.0
       with:
@@ -316,8 +346,13 @@ jobs:
         files: |
           build/libs/*.jar
           build/libs/*.jar.asc
-        body: |
-          See [CHANGELOG.md](https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/main/CHANGELOG.md) for details.
+        # Was `body:` with a bare link to CHANGELOG.md, which told a reader nothing about the
+        # release they were looking at. `generate_release_notes` stays OFF too — the action
+        # appends the WHOLE generated block (`<body>\n\n<notes>`), which would add the
+        # "bump …(dependabot)" bullets the other SDK pages were reported for. The one part
+        # worth keeping was the "Full Changelog" compare link, and synthesizing that needs the
+        # previous tag — i.e. fetch-depth: 0 here — which is not worth a full-history clone.
+        body_path: /tmp/release-notes.md
         draft: false
         prerelease: ${{ contains(github.ref, '-RC') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
       env:
