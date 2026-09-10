@@ -88,7 +88,8 @@ class KnishIOClient @JvmOverloads constructor(
   @JvmField val logging: Boolean = false,
   encrypt: Boolean = false,
   insecureTls: Boolean = false,
-  secretStorage: SecretStorageProvider? = null
+  secretStorage: SecretStorageProvider? = null,
+  @JvmField val mlkemParameterSet: Int = 1024
 ) {
   @JvmField var secretStorage: SecretStorageProvider? = secretStorage
   @JvmField var authTokenObjects = mutableMapOf<String, AuthToken?>()
@@ -110,6 +111,11 @@ class KnishIOClient @JvmOverloads constructor(
       }
   }
 
+  init {
+    require(mlkemParameterSet in listOf(1024, 768)) {
+      "KnishIO: unsupported ML-KEM parameter set $mlkemParameterSet; expected 1024 or 768."
+    }
+  }
   init {
     uris.forEach {
       authTokenObjects[it.toASCIIString()] = null
@@ -339,7 +345,7 @@ class KnishIOClient @JvmOverloads constructor(
   private fun getGuestAuthToken(cellSlug: String?, encrypt: Boolean = false): AuthToken {
     setCellSlug(cellSlug)
 
-    val wallet = Wallet(Crypto.generateSecret(), "AUTH")
+    val wallet = Wallet(Crypto.generateSecret(), "AUTH", mlkemParameterSet = mlkemParameterSet)
     val query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
     val response = query.execute(AccessTokenMutationVariable(this.cellSlug, wallet.pubkey, encrypt)) as ResponseRequestAuthorizationGuest
 
@@ -349,11 +355,11 @@ class KnishIOClient @JvmOverloads constructor(
   private fun getProfileAuthToken(secret: String, encrypt: Boolean = false): AuthToken {
     setSecret(secret)
 
-    val wallet = Wallet(secret, "AUTH")
+    val wallet = Wallet(secret, "AUTH", mlkemParameterSet = mlkemParameterSet)
     // Explicit USER remainder (mirror JS createMolecule), so the ContinuID I-atom added by
     // initAuthorization is USER-token. Without it, createMolecule auto-derives the remainder from
     // the AUTH source token → a wrong-token I-atom.
-    val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER"))
+    val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER", mlkemParameterSet = mlkemParameterSet))
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
     // PQ-transport (cycle 162): convey the AUTH source wallet's ML-KEM768 public key as a
@@ -440,11 +446,11 @@ class KnishIOClient @JvmOverloads constructor(
 
     // Set the remainder wallet for the next transaction
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters
+      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters, mlkemParameterSet = mlkemParameterSet
     )
 
     val molecule = Molecule(
-      currentSecret, signingWallet, remainderWallet(), cellSlug
+      currentSecret, signingWallet, remainderWallet(), cellSlug, mlkemParameterSet = mlkemParameterSet
     )
     if (hasBundle()) {
       molecule.bundle = bundle()
@@ -461,9 +467,9 @@ class KnishIOClient @JvmOverloads constructor(
     // genesis fallback (Wallet(getSecret()) is a USER wallet by default).
     val fallbackWallet = if (hasSecret()) {
       val sec = if (secret.isNotEmpty()) secret else retrieveSecret()
-      if (!sec.isNullOrEmpty()) Wallet(sec) else Wallet()
+      if (!sec.isNullOrEmpty()) Wallet(sec, mlkemParameterSet = mlkemParameterSet) else Wallet(mlkemParameterSet = mlkemParameterSet)
     } else {
-      Wallet()
+      Wallet(mlkemParameterSet = mlkemParameterSet)
     }
     return queryContinuId(bundle(), "USER").payload() ?: fallbackWallet
   }
@@ -662,7 +668,7 @@ class KnishIOClient @JvmOverloads constructor(
    * Builds and executes a molecule to issue a new Wallet on the ledger
    */
   fun createWallet(token: String): ResponseProposeMolecule {
-    val newWallet = Wallet(getSecret(), token)
+    val newWallet = Wallet(getSecret(), token, mlkemParameterSet = mlkemParameterSet)
     val query = createMoleculeMutation(MutationCreateWallet::class) as MutationCreateWallet
 
     query.fillMolecule(newWallet)
@@ -722,7 +728,7 @@ class KnishIOClient @JvmOverloads constructor(
     }
 
     // Creating the wallet that will receive the new tokens
-    val recipientWallet = Wallet(getSecret(), token, newOrExistingBatchId)
+    val recipientWallet = Wallet(getSecret(), token, newOrExistingBatchId, mlkemParameterSet = mlkemParameterSet)
     val query = createMoleculeMutation(MutationCreateToken::class) as MutationCreateToken
 
     query.fillMolecule(recipientWallet, tokenAmount, meta)
@@ -857,7 +863,7 @@ class KnishIOClient @JvmOverloads constructor(
         if (Wallet.isBundleHash(sender)) {
           mapOf("metaType" to "walletBundle", "metaId" to sender)
         } else {
-          val wallet = Wallet.create(sender, token)
+          val wallet = Wallet.create(sender, token, mlkemParameterSet = mlkemParameterSet)
           mapOf("metaType" to "wallet", "metaId" to wallet.address)
         }
       }
@@ -920,7 +926,7 @@ class KnishIOClient @JvmOverloads constructor(
     } ?: recipient.initBatchId(signingWallet)
 
     remainderWallet = Wallet.create(
-      getSecret(), token, characters = signingWallet.characters
+      getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet
     )
 
     remainderWallet !!.initBatchId(signingWallet, true)
@@ -952,7 +958,7 @@ class KnishIOClient @JvmOverloads constructor(
     var recipientWallet = queryBalance(token, recipient).payload()
 
     if (recipientWallet == null) {
-      recipientWallet = Wallet.create(recipient, token)
+      recipientWallet = Wallet.create(recipient, token, mlkemParameterSet = mlkemParameterSet)
     }
 
     return transferToken(recipientWallet, token, amount, units, batchId, sourceWallet)
@@ -992,13 +998,13 @@ class KnishIOClient @JvmOverloads constructor(
 
     // A shadow recipient wallet per destination + a distinct batch id
     val recipientWallets = recipients.map { recipient ->
-      Wallet.create(recipient.bundleHash, token).also { rw ->
+      Wallet.create(recipient.bundleHash, token, mlkemParameterSet = mlkemParameterSet).also { rw ->
         recipient.batchId?.let { rw.batchId = it } ?: rw.initBatchId(signingWallet)
       }
     }
 
     remainderWallet = Wallet.create(
-      getSecret(), token, characters = signingWallet.characters
+      getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet
     )
     remainderWallet !!.initBatchId(signingWallet, true)
 
@@ -1032,7 +1038,7 @@ class KnishIOClient @JvmOverloads constructor(
     // transferToken's resolve-once pattern.
     val signingWallet = sourceWallet ?: queryBalance(token).payload()
       ?: throw TransferBalanceException()
-    val remainderWallet = Wallet.create(getSecret(), token, characters = signingWallet.characters)
+    val remainderWallet = Wallet.create(getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet)
     var burnAmount = amount
 
     remainderWallet.initBatchId(signingWallet, true)
@@ -1120,7 +1126,7 @@ class KnishIOClient @JvmOverloads constructor(
       ?: throw TransferBalanceException()
 
     // Deposit routes the change to a FRESH remainder (not the source, unlike withdraw).
-    val remainder = Wallet.create(getSecret(), token, characters = source.characters)
+    val remainder = Wallet.create(getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet)
     remainder.initBatchId(source, true)
 
     val molecule = createMolecule(sourceWallet = source, remainderWallet = remainder)

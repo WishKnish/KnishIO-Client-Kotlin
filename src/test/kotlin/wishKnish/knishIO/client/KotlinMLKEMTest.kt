@@ -15,13 +15,28 @@ import kotlin.test.assertTrue
 class KotlinMLKEMTest {
 
     @Test
-    fun encryptMessageRejectsNon1184Key() {
+    fun encryptMessageRejectsNon1568Key() {
         // PQ-transport hardening: a stale/non-PQ validator advertises a ~48-byte `key`; encryptMessage
         // must fail with an actionable error, not a cryptic bridge crash.
         val wallet = Wallet(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "USER",
             "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        )
+        val shortKey = java.util.Base64.getEncoder().encodeToString(ByteArray(48))
+        val ex = assertFailsWith<IllegalArgumentException> {
+            wallet.encryptMessage("{\"q\":1}", shortKey)
+        }
+        assertTrue(ex.message!!.contains("expected 1568 (ML-KEM-1024)"))
+    }
+
+    @Test
+    fun encryptMessageRejectsNon1184KeyWhenSteppedBack() {
+        val wallet = Wallet(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "USER",
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            mlkemParameterSet = 768
         )
         val shortKey = java.util.Base64.getEncoder().encodeToString(ByteArray(48))
         val ex = assertFailsWith<IllegalArgumentException> {

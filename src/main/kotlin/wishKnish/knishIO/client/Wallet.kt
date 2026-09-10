@@ -69,7 +69,8 @@ class Wallet @JvmOverloads constructor(
   @JvmField var token: String = "USER", // slug for the token this wallet is intended for
   @JvmField var position: String? = null, // hexadecimal string used to salt the secret and produce one-time signatures
   @JvmField var batchId: String? = null,
-  @JvmField var characters: String? = null
+  @JvmField var characters: String? = null,
+  @JvmField var mlkemParameterSet: Int = 1024
 ) {
 
   @JvmField var balance: Double = 0.0
@@ -101,6 +102,9 @@ class Wallet @JvmOverloads constructor(
   @JvmField var tokenFungibility: String? = null
 
   init {
+    require(mlkemParameterSet in listOf(1024, 768)) {
+      "KnishIO: unsupported ML-KEM parameter set $mlkemParameterSet; expected 1024 or 768."
+    }
     // Set default characters to BASE64 to match JS SDK
     characters = characters ?: "BASE64"
     
@@ -128,7 +132,8 @@ class Wallet @JvmOverloads constructor(
       secretOrBundle: String? = null,
       token: String = "USER",
       batchId: String? = null,
-      characters: String? = null
+      characters: String? = null,
+      mlkemParameterSet: Int = 1024
     ): Wallet {
 
       val secret = secretOrBundle?.let {
@@ -143,7 +148,7 @@ class Wallet @JvmOverloads constructor(
 
       // Wallet initialization
       return Wallet(
-        secret, token, position, batchId, characters
+        secret, token, position, batchId, characters, mlkemParameterSet
       ).apply {
         bundle = secret?.let {
           Crypto.generateBundleHash(it)
@@ -484,7 +489,7 @@ class Wallet @JvmOverloads constructor(
    * the validator reads only its own entry — so no self-recipient is added.
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
-  fun encryptStringML768(message: String, recipientPubkey: String): String {
+  fun encryptStringML(message: String, recipientPubkey: String): String {
     val envelope = encryptMessage(message, recipientPubkey)
     val recipientMap = mapOf(
       Crypto.hashShare(recipientPubkey, characters ?: "BASE64") to envelope
@@ -570,8 +575,7 @@ class Wallet @JvmOverloads constructor(
       val pqSeed = org.bouncycastle.util.encoders.Hex.decode(pqSeedHex)
       
       // Generate using NobleMLKEMBridge for JavaScript compatibility
-      val mlkemKeyPair = NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed)
-      
+      val mlkemKeyPair = NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed, mlkemParameterSet)
       // Store BouncyCastle format for existing hybrid compatibility
       pqPrivateKey = mlkemKeyPair.private
       pqPublicKey = mlkemKeyPair.public
@@ -704,13 +708,12 @@ class Wallet @JvmOverloads constructor(
     // ML-KEM-768 public keys are exactly 1184 bytes. A wrong-length key here almost always means the
     // node did not advertise an ML-KEM public key in its auth `key` field (e.g. a validator predating
     // the PQ-transport build). Fail with an actionable message rather than a cryptic bridge error.
-    val mlKem768PublicKeyBytes = 1184
-    require(recipientPublicKeyBytes.size == mlKem768PublicKeyBytes) {
+    val expectedPkBytes = if (mlkemParameterSet == 1024) 1568 else 1184
+    require(recipientPublicKeyBytes.size == expectedPkBytes) {
       "KnishIO: cannot ML-KEM-encrypt — recipient public key is ${recipientPublicKeyBytes.size} bytes, " +
-        "expected $mlKem768PublicKeyBytes (ML-KEM-768). The node likely did not advertise an ML-KEM " +
-        "public key (upgrade the validator to a PQ-transport build), or authenticate with encrypt=false."
+        "expected $expectedPkBytes (ML-KEM-$mlkemParameterSet). The peer is not running ML-KEM-$mlkemParameterSet; " +
+        "upgrade the peer, or step this client back to the other parameter set."
     }
-
     // Create MLKEMPublicKey from raw bytes (not X509 encoded)
     val recipientPublicKey = NobleMLKEMBridge.Companion.MLKEMPublicKey(recipientPublicKeyBytes)
     val (sharedSecret, cipherText) = NobleMLKEMBridge.encapsulate(recipientPublicKey)
@@ -739,6 +742,10 @@ class Wallet @JvmOverloads constructor(
       // Recover shared secret using NobleMLKEMBridge (JavaScript compatibility)
       val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
       
+      val expectedCtBytes = if (mlkemParameterSet == 1024) 1568 else 1088
+      if (cipherTextBytes.size != expectedCtBytes) {
+        return null
+      }
       // Use raw private key bytes (like JavaScript SDK) 
       val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
       
@@ -771,7 +778,7 @@ class Wallet @JvmOverloads constructor(
    * object `{"data":…}`), NOT a gson-parsed String — [decryptMessage] assumes a string payload and
    * would fail on the validator's object response.
    */
-  fun decryptMyMessageML768(message: Map<String, Map<String, String>>): String? {
+  fun decryptMyMessageML(message: Map<String, Map<String, String>>): String? {
     val myPubkey = pubkey ?: return null
     val envelope = message[Crypto.hashShare(myPubkey, characters ?: "BASE64")] ?: return null
     return mlkemDecryptToString(envelope)
@@ -790,6 +797,10 @@ class Wallet @JvmOverloads constructor(
 
       val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
       val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
+      val expectedCtBytes = if (mlkemParameterSet == 1024) 1568 else 1088
+      if (cipherTextBytes.size != expectedCtBytes) {
+        return null
+      }
       val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
       val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
 

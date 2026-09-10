@@ -1416,7 +1416,7 @@ class KotlinSelfTest {
             val secret = Crypto.generateSecret(seed, 2048)
             val bundle = Crypto.generateBundleHash(secret)
             
-            val encryptionWallet = Wallet(secret, token, position)
+            val encryptionWallet = Wallet(secret, token, position, mlkemParameterSet = 768)
             
             logTest("Encryption wallet creation", true)
             
@@ -1716,7 +1716,8 @@ class KotlinSelfTest {
                                     val ourWallet = Wallet(
                                         secret,
                                         testConfig.get("token").asString,
-                                        testConfig.get("position").asString
+                                        testConfig.get("position").asString,
+                                        mlkemParameterSet = 768
                                     )
                                     
                                     

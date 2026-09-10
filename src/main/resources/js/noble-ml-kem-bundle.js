@@ -1471,6 +1471,7 @@
 
   // entry.js
   globalThis.ml_kem768 = ml_kem768;
+  globalThis.ml_kem1024 = ml_kem1024;
 })();
 /*! Bundled license information:
 
@@ -1502,7 +1503,7 @@
     // Main API object for GraalVM
     const NobleMLKEM = {
         // Generate key pair from seed (deterministic)
-        generateKeyPairFromSeed: function(seedHex) {
+        generateKeyPairFromSeed: function(seedHex, paramSet) {
             // Use the exact same conversion method as JavaScript SDK
             const seed = new Uint8Array(64);
             for (let i = 0; i < 64; i++) {
@@ -1515,7 +1516,8 @@
             }
             
             // Generate deterministic key pair - exact same call as JavaScript SDK
-            const keyPair = globalThis.ml_kem768.keygen(seed);
+            const engine = Number(paramSet) === 768 ? globalThis.ml_kem768 : globalThis.ml_kem1024;
+            const keyPair = engine.keygen(seed);
             
             return {
                 publicKey: Array.from(keyPair.publicKey, byte => byte.toString(16).padStart(2, '0')).join(''),
@@ -1526,7 +1528,8 @@
         // Encapsulate to create shared secret
         encapsulate: function(publicKeyHex) {
             const publicKey = hexToBytes(publicKeyHex);
-            const result = globalThis.ml_kem768.encapsulate(publicKey);
+            const engine = publicKey.length === 1568 ? globalThis.ml_kem1024 : globalThis.ml_kem768;
+            const result = engine.encapsulate(publicKey);
             return {
                 sharedSecret: bytesToHex(result.sharedSecret),
                 cipherText: bytesToHex(result.cipherText)
@@ -1537,7 +1540,8 @@
         decapsulate: function(cipherTextHex, secretKeyHex) {
             const cipherText = hexToBytes(cipherTextHex);
             const secretKey = hexToBytes(secretKeyHex);
-            const sharedSecret = globalThis.ml_kem768.decapsulate(cipherText, secretKey);
+            const engine = (cipherText.length === 1568 && secretKey.length === 3168) ? globalThis.ml_kem1024 : globalThis.ml_kem768;
+            const sharedSecret = engine.decapsulate(cipherText, secretKey);
             return bytesToHex(sharedSecret);
         },
 

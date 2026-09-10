@@ -107,7 +107,7 @@ class CrossPlatformVectorsTest {
         val position = v["position"]!!.jsonPrimitive.content
         val expectedPubkey = v["expectedPubkey"]!!.jsonPrimitive.content
 
-        val wallet = Wallet(secret = secret, token = token, position = position)
+        val wallet = Wallet(secret = secret, token = token, position = position, mlkemParameterSet = 768)
         assertEquals(expectedPubkey, wallet.pubkey, "ML-KEM768 keygen pubkey mismatch")
     }
 
@@ -124,11 +124,41 @@ class CrossPlatformVectorsTest {
         val encryptedMessage = v["encryptedMessage"]!!.jsonPrimitive.content
         val expectedPlaintext = v["expectedPlaintext"]!!.jsonPrimitive.content
 
-        val wallet = Wallet(secret = secret, token = token, position = position)
+        val wallet = Wallet(secret = secret, token = token, position = position, mlkemParameterSet = 768)
         val plaintext = wallet.decryptMessage(
             mapOf("cipherText" to cipherText, "encryptedMessage" to encryptedMessage)
         )
         assertEquals(expectedPlaintext, plaintext, "ML-KEM768 decrypt plaintext mismatch")
+    }
+    @Test
+    @DisplayName("ML-KEM1024 keygen")
+    fun mlkem1024Keygen() {
+        val v = vectors["mlkem1024"]!!.jsonObject["keygen"]!!.jsonObject
+        val secret = v["secret"]!!.jsonPrimitive.content
+        val token = v["token"]!!.jsonPrimitive.content
+        val position = v["position"]!!.jsonPrimitive.content
+        val expectedPubkey = v["expectedPubkey"]!!.jsonPrimitive.content
+
+        val wallet = Wallet(secret = secret, token = token, position = position)
+        assertEquals(expectedPubkey, wallet.pubkey, "ML-KEM1024 keygen pubkey mismatch")
+    }
+
+    @Test
+    @DisplayName("ML-KEM1024 decrypt")
+    fun mlkem1024Decrypt() {
+        val v = vectors["mlkem1024"]!!.jsonObject["decrypt"]!!.jsonObject
+        val secret = v["secret"]!!.jsonPrimitive.content
+        val token = v["token"]!!.jsonPrimitive.content
+        val position = v["position"]!!.jsonPrimitive.content
+        val cipherText = v["cipherText"]!!.jsonPrimitive.content
+        val encryptedMessage = v["encryptedMessage"]!!.jsonPrimitive.content
+        val expectedPlaintext = v["expectedPlaintext"]!!.jsonPrimitive.content
+
+        val wallet = Wallet(secret = secret, token = token, position = position)
+        val plaintext = wallet.decryptMessage(
+            mapOf("cipherText" to cipherText, "encryptedMessage" to encryptedMessage)
+        )
+        assertEquals(expectedPlaintext, plaintext, "ML-KEM1024 decrypt plaintext mismatch")
     }
 
     // Classical NaCl (X25519 scalarmult_base + crypto_box/secretbox) — byte-frozen

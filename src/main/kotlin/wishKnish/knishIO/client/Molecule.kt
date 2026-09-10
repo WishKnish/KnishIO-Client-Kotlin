@@ -68,7 +68,8 @@ import kotlin.math.ceil
   @Transient val secret: String? = null,
   @Transient var sourceWallet: Wallet = Wallet(),
   @Transient var remainderWallet: Wallet? = null,
-  @JvmField var cellSlug: String? = null
+  @JvmField var cellSlug: String? = null,
+  @Transient var mlkemParameterSet: Int = 1024
 ) {
 
   @JvmField var createdAt: String = Strings.currentTimeMillis()
@@ -86,10 +87,11 @@ import kotlin.math.ceil
   init {
     // Preserve the original cellSlug value
     _cellSlugOrigin = cellSlug
+    mlkemParameterSet = if (mlkemParameterSet in listOf(1024, 768)) mlkemParameterSet else sourceWallet.mlkemParameterSet
     
     // If sourceWallet is not properly initialized but we have a secret, create a proper sourceWallet
     if (sourceWallet.position == null && secret != null && molecularHash == null) {
-      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters)
+      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters, mlkemParameterSet = mlkemParameterSet)
     }
     
     if (sourceWallet.position == null && molecularHash == null) {
@@ -102,7 +104,8 @@ import kotlin.math.ceil
         secretOrBundle = secret,
         token = sourceWallet.token,
         batchId = sourceWallet.batchId,
-        characters = sourceWallet.characters
+        characters = sourceWallet.characters,
+        mlkemParameterSet = mlkemParameterSet
       )
 
       clear()
@@ -652,7 +655,8 @@ import kotlin.math.ceil
     // conservation (sum == 0) while permanently destroying the tokens. Mirrors JS burnToken.
     val burnWallet = Wallet.create(
       "0000000000000000000000000000000000000000000000000000000000000000",
-      sourceWallet.token
+      sourceWallet.token,
+      mlkemParameterSet = mlkemParameterSet
     )
 
     // V-atom 1: debit the ENTIRE source balance (UTXO model). Must be -balance (not -amount):
@@ -799,7 +803,8 @@ import kotlin.math.ceil
     val bufferWallet = Wallet.create(
       secretOrBundle = secret,
       token = sourceWallet.token,
-      batchId = sourceWallet.batchId
+      batchId = sourceWallet.batchId,
+      mlkemParameterSet = mlkemParameterSet
     )
 
     // Source V-atom: debit the ENTIRE balance (UTXO drain) so the B + remainder atoms conserve.

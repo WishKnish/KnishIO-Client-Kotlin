@@ -287,7 +287,7 @@ class HttpClient @JvmOverloads constructor(
     // PQ-transport (cycle 161): the live CipherHash transport is post-quantum ML-KEM768
     // (was classical NaCl). encryptStringML768 produces the canonical envelope the Rust
     // validator's CipherHash handler decrypts: { "<hashShare>": {cipherText, encryptedMessage} }.
-    val cipherHash = CipherHash(CipherHashVariable(wallet().encryptStringML768(body, pubkey())))
+    val cipherHash = CipherHash(CipherHashVariable(wallet().encryptStringML(body, pubkey())))
     return cipherHash.toJson()
   }
 
@@ -300,7 +300,7 @@ class HttpClient @JvmOverloads constructor(
       // each value the object {cipherText, encryptedMessage} (not the classical NaCl String).
       // decryptMyMessageML768 returns the RAW decrypted GraphQL response JSON text.
       val message = decryptionJson.decodeFromString<Map<String, Map<String, String>>>(it)
-      return wallet().decryptMyMessageML768(message)
+      return wallet().decryptMyMessageML(message)
     }
     return null
   }

@@ -51,7 +51,8 @@ class CipherHashLiveTest {
         // balance wallet stays fixed. (A fresh second auth would rotate the USER remainder via
         // ContinuID → a different address/position/pubkey, which is correct protocol behaviour, not
         // a transport bug — so it must NOT be the variable under test.)
-        val client = KnishIOClient(listOf(URI(url)), encrypt = true)
+        val param = System.getenv("CIPHERHASH_MLKEM_PARAMETER_SET")?.toIntOrNull() ?: 1024
+        val client = KnishIOClient(listOf(URI(url)), encrypt = true, mlkemParameterSet = param)
         client.requestAuthToken(secret = secret, encrypt = true)
 
         // Encrypted round-trip: the validator ML-KEM-decrypts the request, executes it, and
