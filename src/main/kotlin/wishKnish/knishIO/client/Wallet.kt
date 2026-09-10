@@ -82,7 +82,7 @@ class Wallet @JvmOverloads constructor(
   @JvmField var bundle: String? = null
   @JvmField var molecules: List<Molecule> = listOf()
   
-  // Post-quantum cryptography keys (ML-KEM768)
+  // Post-quantum cryptography keys (ML-KEM)
   @JvmField var pqPrivateKey: PrivateKey? = null
   @JvmField var pqPublicKey: PublicKey? = null
   @JvmField var encryptionMode: EncryptionMode = EncryptionMode.HYBRID
@@ -92,7 +92,7 @@ class Wallet @JvmOverloads constructor(
     EncryptionMethod.POST_QUANTUM
   )
   
-  // Raw ML-KEM768 private key bytes for JavaScript SDK compatibility
+  // Raw ML-KEM private key bytes for JavaScript SDK compatibility
   private var mlkemRawPrivkey: ByteArray? = null
 
   @JvmField var createdAt: String? = null
@@ -280,6 +280,31 @@ class Wallet @JvmOverloads constructor(
 
       // Producing wallet address
       return Shake256.hash(digestSponge.hexString(1024), 32)
+    }
+
+    /**
+     * ML-KEM parameter set implied by a serialized public key's raw byte length. FIPS 203's key
+     * lengths are disjoint (1568 bytes → ML-KEM-1024, 1184 bytes → ML-KEM-768), so a stored peer
+     * key recovers the parameter set of the session it belongs to without a wire-format change.
+     * Used by [AuthToken.resolveMlkemParameterSet] to resolve a snapshot that predates the field.
+     *
+     * @return 1024, 768, or `null` when the length matches neither.
+     */
+    @JvmStatic
+    fun mlkemParameterSetFromPubkey(pubkey: String?): Int? {
+      if (pubkey.isNullOrEmpty()) {
+        return null
+      }
+      val byteLength = try {
+        java.util.Base64.getDecoder().decode(pubkey).size
+      } catch (e: IllegalArgumentException) {
+        return null
+      }
+      return when (byteLength) {
+        1568 -> 1024
+        1184 -> 768
+        else -> null
+      }
     }
   }
 
@@ -480,7 +505,7 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
-   * Post-quantum (ML-KEM768) variant of [encryptString] for the `CipherHash` transport.
+   * Post-quantum (ML-KEM) variant of [encryptString] for the `CipherHash` transport.
    *
    * Builds the canonical cross-SDK multi-recipient envelope keyed by `hashShare(recipientPubkey)`
    * with the **object-valued** ML-KEM message `{cipherText, encryptedMessage}` (via [encryptMessage]),
@@ -562,28 +587,42 @@ class Wallet @JvmOverloads constructor(
   }
   
   /**
+   * Derives an ML-KEM keypair for an ARBITRARY parameter set from this wallet's key seed,
+   * without mutating the wallet.
+   *
+   * The 64-byte `d‖z` seed (`generateSecret(key, 128)`) takes no parameter-set input — only the
+   * final keygen call differs — so a single KnishIO wallet owns both its ML-KEM-768 and its
+   * ML-KEM-1024 identity. That is what lets [decryptMessage] read a record a pre-bump peer
+   * addressed to our 768 identity without a second wallet.
+   *
+   * Returns `null` when this wallet has no key material (a shadow/address-only wallet).
+   */
+  private fun deriveMlKemKeypair(parameterSet: Int): java.security.KeyPair? {
+    require(parameterSet in listOf(1024, 768)) {
+      "KnishIO: unsupported ML-KEM parameter set $parameterSet; expected 1024 or 768."
+    }
+    // JavaScript: generateSecret(key, 256) → 256*2=512 bits = 64 bytes = 128 hex chars
+    // Kotlin: generateSecret(key, 128) → hash(key, 128/2=64) = 64 bytes = 128 hex chars
+    val pqSeedHex = key?.let { Crypto.generateSecret(it, 128) } ?: return null
+    val pqSeed = org.bouncycastle.util.encoders.Hex.decode(pqSeedHex)
+    return NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed, parameterSet)
+  }
+
+  /**
    * Generate post-quantum keys from the wallet secret
    */
   @Throws(Exception::class)
   private fun preparePostQuantumKeys(secret: String) {
-    // Generate post-quantum seed using the same approach as JavaScript:
-    // JavaScript: generateSecret(key, 256) → 256*2=512 bits = 64 bytes = 128 hex chars
-    // Kotlin: generateSecret(key, 128) → hash(key, 128/2=64) = 64 bytes = 128 hex chars
-    val pqSeedHex = key?.let { Crypto.generateSecret(it, 128) } // 128 hex chars = 64 bytes
-    if (pqSeedHex != null) {
-      // Convert hex string to byte array (same as JavaScript conversion)
-      val pqSeed = org.bouncycastle.util.encoders.Hex.decode(pqSeedHex)
-      
-      // Generate using NobleMLKEMBridge for JavaScript compatibility
-      val mlkemKeyPair = NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed, mlkemParameterSet)
+    val mlkemKeyPair = deriveMlKemKeypair(mlkemParameterSet)
+    if (mlkemKeyPair != null) {
       // Store BouncyCastle format for existing hybrid compatibility
       pqPrivateKey = mlkemKeyPair.private
       pqPublicKey = mlkemKeyPair.public
-      
+
       // Store raw bytes for JavaScript SDK compatibility
       mlkemRawPrivkey = mlkemKeyPair.private.encoded
-      
-      // Set pubkey field to raw ML-KEM768 public key (Base64 like JavaScript)
+
+      // Set pubkey field to the raw ML-KEM public key (Base64 like JavaScript)
       pubkey = java.util.Base64.getEncoder().encodeToString(mlkemKeyPair.public.encoded)
     }
   }
@@ -685,13 +724,13 @@ class Wallet @JvmOverloads constructor(
   }
 
   // =============================================================================
-  // DIRECT ML-KEM768 METHODS (JavaScript SDK Compatibility)
+  // DIRECT ML-KEM METHODS (JavaScript SDK Compatibility)
   // =============================================================================
 
   /**
-   * Encrypt a message using ML-KEM768 (mirrors JavaScript SDK encryptMessage exactly).
+   * Encrypt a message using ML-KEM (mirrors JavaScript SDK encryptMessage exactly).
    *
-   * CANONICAL cross-SDK ML-KEM768 envelope: returns `{ cipherText, encryptedMessage }`
+   * CANONICAL cross-SDK ML-KEM envelope: returns `{ cipherText, encryptedMessage }`
    * (b64(KEM ciphertext) + b64(IV‖AES-256-GCM ct‖tag)) — the form every KnishIO SDK
    * interoperates on, asserted by the cross-platform vector layer + strong cross-validation.
    * Prefer this over the non-canonical hex-joined [libraries.PostQuantumCrypto.encryptMessage].
@@ -705,7 +744,8 @@ class Wallet @JvmOverloads constructor(
     // Deserialize public key from Base64 to raw bytes (like JavaScript)
     val recipientPublicKeyBytes = java.util.Base64.getDecoder().decode(recipientPubkey)
 
-    // ML-KEM-768 public keys are exactly 1184 bytes. A wrong-length key here almost always means the
+    // An ML-KEM public key is exactly 1568 bytes (ML-KEM-1024) or 1184 bytes (ML-KEM-768) — the
+    // length expected here is the one this wallet is configured for. A wrong-length key almost always means the
     // node did not advertise an ML-KEM public key in its auth `key` field (e.g. a validator predating
     // the PQ-transport build). Fail with an actionable message rather than a cryptic bridge error.
     val expectedPkBytes = if (mlkemParameterSet == 1024) 1568 else 1184
@@ -728,9 +768,48 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
-   * Decrypt a message using ML-KEM768 (mirrors JavaScript SDK decryptMessage exactly).
+   * ML-KEM ciphertext length for a parameter set (FIPS 203: the two are disjoint, which is what
+   * makes length dispatch unambiguous).
+   */
+  private fun ciphertextBytesFor(parameterSet: Int): Int = if (parameterSet == 1024) 1568 else 1088
+
+  /**
+   * Decapsulates a ciphertext at EITHER of this wallet's ML-KEM identities, returning the shared
+   * secret, or `null` when the ciphertext matches neither parameter set.
    *
-   * CANONICAL cross-SDK ML-KEM768 envelope: consumes `{ cipherText, encryptedMessage }` — the
+   * Inbound is PERMISSIVE: a ciphertext at the other parameter set decapsulates provided it is
+   * addressed to one of THIS wallet's own identities, derived on demand from the shared 64-byte
+   * seed. The derived private key is never cached on the wallet and is zeroized before this
+   * function returns. Outbound encapsulation stays STRICT (see [encryptMessage]) — reading a 768
+   * record we own downgrades nothing, but encapsulating at 768 would.
+   */
+  private fun mlkemDecapsulate(cipherTextBytes: ByteArray): ByteArray? {
+    if (cipherTextBytes.size == ciphertextBytesFor(mlkemParameterSet)) {
+      // Use raw private key bytes (like JavaScript SDK)
+      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
+      return NobleMLKEMBridge.decapsulate(
+        cipherTextBytes, NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
+      )
+    }
+
+    val otherSet = if (mlkemParameterSet == 1024) 768 else 1024
+    if (cipherTextBytes.size != ciphertextBytesFor(otherSet)) {
+      return null
+    }
+    val derivedPrivkey = (deriveMlKemKeypair(otherSet) ?: return null).private.encoded
+    return try {
+      NobleMLKEMBridge.decapsulate(
+        cipherTextBytes, NobleMLKEMBridge.Companion.MLKEMPrivateKey(derivedPrivkey)
+      )
+    } finally {
+      SecureMemory.zeroize(derivedPrivkey)
+    }
+  }
+
+  /**
+   * Decrypt a message using ML-KEM (mirrors JavaScript SDK decryptMessage exactly).
+   *
+   * CANONICAL cross-SDK ML-KEM envelope: consumes `{ cipherText, encryptedMessage }` — the
    * form every KnishIO SDK interoperates on. Prefer this over the non-canonical hex-joined
    * [libraries.PostQuantumCrypto.decryptMessage].
    */
@@ -738,21 +817,12 @@ class Wallet @JvmOverloads constructor(
     return try {
       val cipherText = encryptedData["cipherText"] ?: return null
       val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
-      
+
       // Recover shared secret using NobleMLKEMBridge (JavaScript compatibility)
       val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
-      
-      val expectedCtBytes = if (mlkemParameterSet == 1024) 1568 else 1088
-      if (cipherTextBytes.size != expectedCtBytes) {
-        return null
-      }
-      // Use raw private key bytes (like JavaScript SDK) 
-      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
-      
-      val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
-      
-      val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
-      
+
+      val sharedSecret = mlkemDecapsulate(cipherTextBytes) ?: return null
+
       // Decrypt message using shared secret
       val encryptedMessageBytes = java.util.Base64.getDecoder().decode(encryptedMessage)
       
@@ -770,22 +840,37 @@ class Wallet @JvmOverloads constructor(
   }
 
   /**
-   * Post-quantum (ML-KEM768) variant of [decryptMyMessage] for the `CipherHash` transport.
+   * Post-quantum (ML-KEM) variant of [decryptMyMessage] for the `CipherHash` transport.
    *
    * Selects this wallet's entry by `hashShare(this.pubkey)` — the wallet's **ML-KEM** public key
    * (the one sent at auth, which the validator encrypts the response to) — then decapsulates with
    * `mlkemRawPrivkey` + AES-256-GCM. Returns the **RAW decrypted JSON text** (the GraphQL response
    * object `{"data":…}`), NOT a gson-parsed String — [decryptMessage] assumes a string payload and
    * would fail on the validator's object response.
+   *
+   * The map is addressed by hash share, so a pre-bump peer that encrypted to our ML-KEM-768
+   * identity keyed its entry by `hashShare(our_768_pubkey)` — which a wallet configured at 1024
+   * would never look up. Both identities' shares are therefore tried, configured set first;
+   * without this the length dispatch in [mlkemDecapsulate] is unreachable on the wire path.
    */
   fun decryptMyMessageML(message: Map<String, Map<String, String>>): String? {
     val myPubkey = pubkey ?: return null
-    val envelope = message[Crypto.hashShare(myPubkey, characters ?: "BASE64")] ?: return null
-    return mlkemDecryptToString(envelope)
+    val encoding = characters ?: "BASE64"
+
+    var envelope = message[Crypto.hashShare(myPubkey, encoding)]
+    if (envelope == null) {
+      val otherSet = if (mlkemParameterSet == 1024) 768 else 1024
+      val otherPubkey = deriveMlKemKeypair(otherSet)?.public?.encoded?.let {
+        java.util.Base64.getEncoder().encodeToString(it)
+      }
+      envelope = otherPubkey?.let { message[Crypto.hashShare(it, encoding)] }
+    }
+
+    return envelope?.let { mlkemDecryptToString(it) }
   }
 
   /**
-   * Decapsulate (ML-KEM768) + AES-256-GCM-decrypt a `{cipherText, encryptedMessage}` envelope with
+   * Decapsulate (ML-KEM) + AES-256-GCM-decrypt a `{cipherText, encryptedMessage}` envelope with
    * this wallet's ML-KEM private key, returning the raw UTF-8 plaintext. Shared by the transport
    * decrypt path; kept separate from [decryptMessage] (which is cross-platform-vector-asserted and
    * additionally gson-parses the result as a String).
@@ -796,13 +881,7 @@ class Wallet @JvmOverloads constructor(
       val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
 
       val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
-      val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
-      val expectedCtBytes = if (mlkemParameterSet == 1024) 1568 else 1088
-      if (cipherTextBytes.size != expectedCtBytes) {
-        return null
-      }
-      val mlkemPrivateKey = NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
-      val sharedSecret = NobleMLKEMBridge.decapsulate(cipherTextBytes, mlkemPrivateKey)
+      val sharedSecret = mlkemDecapsulate(cipherTextBytes) ?: return null
 
       val encryptedMessageBytes = java.util.Base64.getDecoder().decode(encryptedMessage)
       val decryptedBytes = decryptWithSharedSecret(encryptedMessageBytes, sharedSecret)

@@ -23,6 +23,7 @@ import wishKnish.knishIO.client.libraries.Shake256
 import wishKnish.knishIO.client.libraries.NaClBox
 import wishKnish.knishIO.client.libraries.Soda
 import wishKnish.knishIO.client.libraries.sealOpen
+import wishKnish.knishIO.client.data.graphql.types.AccessToken
 import java.util.Base64
 
 @DisplayName("Cross-Platform Vectors (shared cross-platform-test-vectors.json)")
@@ -266,5 +267,237 @@ class CrossPlatformVectorsTest {
                 )
             }
         }
+    }
+
+    // =====================================================================================
+    // Backwards compatibility: a build whose default parameter set is ML-KEM-1024 must still
+    // read records a pre-bump (ML-KEM-768-only) peer produced for it.
+    // =====================================================================================
+
+    private val mlkem768Decrypt: JsonObject
+        get() = vectors["mlkem768"]!!.jsonObject["decrypt"]!!.jsonObject
+
+    private fun JsonObject.str(key: String): String = this[key]!!.jsonPrimitive.content
+
+    /** (a) The whole point of dual-identity inbound decryption: no second wallet, no step-back. */
+    @Test
+    @DisplayName("A default (1024) wallet decrypts a frozen 768 envelope addressed to its own 768 identity")
+    fun default1024WalletDecryptsFrozen768Envelope() {
+        val v = mlkem768Decrypt
+        val wallet = Wallet(
+            secret = v.str("secret"),
+            token = v.str("token"),
+            position = v.str("position")
+        )
+        assertEquals(1024, wallet.mlkemParameterSet, "the wallet under test must be at the default")
+
+        val plaintext = wallet.decryptMessage(
+            mapOf(
+                "cipherText" to v.str("cipherText"),
+                "encryptedMessage" to v.str("encryptedMessage")
+            )
+        )
+        assertEquals(v.str("expectedPlaintext"), plaintext, "1024 default must read the pre-bump 768 envelope")
+    }
+
+    /**
+     * (b) Permissive inbound must NOT move what the wallet advertises — that value goes into
+     * signed molecule meta (`walletPubkey`) and into auth, so moving it would change hashed bytes.
+     */
+    @Test
+    @DisplayName("The advertised public key is still ML-KEM-1024 (1568 raw bytes)")
+    fun advertisedPubkeyStays1024() {
+        val v = mlkem768Decrypt
+        val wallet = Wallet(
+            secret = v.str("secret"),
+            token = v.str("token"),
+            position = v.str("position")
+        )
+        assertEquals(1568, Base64.getDecoder().decode(wallet.pubkey!!).size)
+    }
+
+    /** (d) A ciphertext at neither parameter set must still fail on the existing observable. */
+    @Test
+    @DisplayName("A ciphertext matching neither parameter set still returns null")
+    fun ciphertextAtNeitherParameterSetReturnsNull() {
+        val v = mlkem768Decrypt
+        val wallet = Wallet(
+            secret = v.str("secret"),
+            token = v.str("token"),
+            position = v.str("position")
+        )
+        val malformed = Base64.getEncoder().encodeToString(ByteArray(64))
+        assertNull(
+            wallet.decryptMessage(
+                mapOf("cipherText" to malformed, "encryptedMessage" to v.str("encryptedMessage"))
+            )
+        )
+    }
+
+    /**
+     * (e) The transport is map-addressed by `hashShare(recipientPubkey)`. A pre-bump sender
+     * addressed its envelope to our 768 hash share, so without trying both shares the length
+     * dispatch exercised by (a) is never even reached on the wire path.
+     */
+    @Test
+    @DisplayName("The CipherHash map path finds an envelope addressed to the 768 hash share")
+    fun cipherHashMapPathFinds768AddressedEnvelope() {
+        val v = mlkem768Decrypt
+        val wallet = Wallet(
+            secret = v.str("secret"),
+            token = v.str("token"),
+            position = v.str("position")
+        )
+        val wallet768 = Wallet(
+            secret = v.str("secret"),
+            token = v.str("token"),
+            position = v.str("position"),
+            mlkemParameterSet = 768
+        )
+        val map = mapOf(
+            Crypto.hashShare(wallet768.pubkey!!, "BASE64") to mapOf(
+                "cipherText" to v.str("cipherText"),
+                "encryptedMessage" to v.str("encryptedMessage")
+            )
+        )
+
+        // decryptMyMessageML returns the RAW decrypted text (the transport parser consumes it),
+        // and the frozen payload is a JSON-encoded string.
+        val raw = wallet.decryptMyMessageML(map)
+        assertNotNull(raw, "the 768-addressed entry must be found")
+        assertEquals(v.str("expectedPlaintext"), com.google.gson.Gson().fromJson(raw, String::class.java))
+    }
+
+    // =====================================================================================
+    // Session snapshots keep their ML-KEM parameter set across a restore.
+    // =====================================================================================
+
+    private fun authTokenFor(wallet: Wallet): AuthToken = AuthToken.create(
+        AccessToken("T", 9999999, wallet.pubkey!!, wallet.pubkey!!, true, 9999999),
+        wallet,
+        true
+    )
+
+    @Test
+    @DisplayName("A stepped-back 768 session survives a snapshot round trip")
+    fun steppedBack768SessionSurvivesSnapshotRoundTrip() {
+        val v = mlkem768Decrypt
+        val wallet = Wallet(
+            secret = v.str("secret"),
+            token = "AUTH",
+            position = v.str("position"),
+            mlkemParameterSet = 768
+        )
+        val snapshot = authTokenFor(wallet).getSnapshot()
+
+        val restored = AuthToken.restore(snapshot, v.str("secret")).getWallet()!!
+        assertEquals(wallet.pubkey, restored.pubkey)
+    }
+
+    /**
+     * The shape an 0.9.x build persisted: no parameter-set field anywhere, and `pubkey` is the
+     * validator's 768 key because every pre-bump session was 768. Falling back to the
+     * constructor default (now 1024) is precisely the defect.
+     */
+    @Test
+    @DisplayName("A legacy snapshot with no parameter set restores as 768, not the 1024 default")
+    fun legacySnapshotRestoresAs768() {
+        val v = mlkem768Decrypt
+        val wallet768 = Wallet(
+            secret = v.str("secret"),
+            token = "AUTH",
+            position = v.str("position"),
+            mlkemParameterSet = 768
+        )
+        val legacySnapshot = authTokenFor(wallet768).getSnapshot().apply {
+            // Strip the field an 0.9.x snapshot never carried.
+            wallet = AuthToken.Wallet(wallet768.position, wallet768.characters)
+        }
+
+        val restored = AuthToken.restore(legacySnapshot, v.str("secret")).getWallet()!!
+        assertEquals(wallet768.pubkey, restored.pubkey)
+        assertEquals(1184, Base64.getDecoder().decode(restored.pubkey!!).size)
+        assertNotEquals(1568, Base64.getDecoder().decode(restored.pubkey!!).size)
+    }
+
+    // =====================================================================================
+    // A frozen pre-bump ML-KEM-768 auth molecule validates from a 1024 default build.
+    // =====================================================================================
+
+    private val legacyMolecule: JsonObject
+        get() = vectors["legacyMlkem768AuthMolecule"]!!.jsonObject
+
+    /**
+     * Fails loudly if the fixture is ever regenerated at the 1024 default — at which point it
+     * would no longer be evidence about pre-bump records at all.
+     */
+    @Test
+    @DisplayName("legacyMlkem768AuthMolecule: the U-atom walletPubkey meta really is an ML-KEM-768 key")
+    fun legacyMoleculeCarriesA768WalletPubkey() {
+        val legacy = legacyMolecule
+        val walletPubkeys = legacy["molecule"]!!.jsonObject["atoms"]!!.jsonArray
+            .flatMap { it.jsonObject["meta"]?.jsonArray ?: JsonArray(emptyList()) }
+            .filter { it.jsonObject["key"]!!.jsonPrimitive.content == "walletPubkey" }
+            .map { it.jsonObject["value"]!!.jsonPrimitive.content }
+
+        assertEquals(1, walletPubkeys.size)
+        assertEquals(
+            legacy["expectedWalletPubkeyBytes"]!!.jsonPrimitive.int,
+            Base64.getDecoder().decode(walletPubkeys[0]).size
+        )
+    }
+
+    @Test
+    @DisplayName("legacyMlkem768AuthMolecule: its molecular hash still verifies")
+    fun legacyMoleculeHashVerifies() {
+        val legacy = legacyMolecule
+        val atoms = legacy["atoms"]!!.jsonArray.map { Atom.fromJSON(it.toString()) }
+        assertEquals(
+            legacy["expectedMolecularHash"]!!.jsonPrimitive.content,
+            Atom.hashAtoms(atoms)
+        )
+    }
+
+    /**
+     * Reconstructs a molecule from server-data JSON the way the cross-SDK self-test does
+     * (`CrossSdkMoleculeDeserializer` → verbatim field copy, never a "create atom" constructor
+     * that would regenerate `createdAt`), plus the signed molecule's own source wallet as the
+     * validation context. `Molecule.fromJSON` cannot be used here: it builds the instance with
+     * a default `Wallet()` and no secret, which the `Molecule` initialiser rejects outright
+     * ("SourceWallet parameter not initialized by valid wallet").
+     */
+    private fun reconstructMolecule(data: JsonObject): Molecule {
+        val sw = data["sourceWallet"]!!.jsonObject
+        val sourceWallet = Wallet(
+            secret = null,
+            token = sw.str("token"),
+            position = sw.str("position"),
+            characters = sw.str("characters")
+        ).apply {
+            address = sw.str("address")
+            bundle = sw.str("bundle")
+            pubkey = sw.str("pubkey")
+        }
+
+        return Molecule(
+            secret = null,
+            sourceWallet = sourceWallet,
+            cellSlug = data["cellSlug"]!!.jsonPrimitive.content
+        ).apply {
+            molecularHash = data.str("molecularHash")
+            bundle = data.str("bundle")
+            createdAt = data.str("createdAt")
+            atoms.clear()
+            data["atoms"]!!.jsonArray.forEach { atoms.add(Atom.fromJSON(it.toString())) }
+        }
+    }
+
+    @Test
+    @DisplayName("legacyMlkem768AuthMolecule: full check() — hash plus WOTS+ signature — passes")
+    fun legacyMoleculeFullCheckPasses() {
+        val legacy = legacyMolecule
+        val molecule = reconstructMolecule(legacy["molecule"]!!.jsonObject)
+        assertEquals(legacy["expectedMolecularHash"]!!.jsonPrimitive.content, molecule.molecularHash)
+        assertTrue(molecule.check(molecule.sourceWallet), "pre-bump 768 molecule must validate")
     }
 }

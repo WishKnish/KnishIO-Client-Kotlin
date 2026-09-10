@@ -62,7 +62,11 @@ class AuthToken(
  private val pubkey: String
   ) {
   private var wallet: ClientWallet? = null
-  data class Wallet(val position: String?, val characters: String?)
+  data class Wallet(
+    val position: String?,
+    val characters: String?,
+    val mlkemParameterSet: Int? = null
+  )
   inner class Snapshot(
     val token: String,
     val expiresAt: String,
@@ -72,7 +76,11 @@ class AuthToken(
     var wallet: Wallet
     init {
       requireNotNull(getWallet()) { "Wallet not initialised" }
-      wallet = Wallet(getWallet()!!.position, getWallet()!!.characters)
+      wallet = Wallet(
+        getWallet()!!.position,
+        getWallet()!!.characters,
+        getWallet()!!.mlkemParameterSet
+      )
     }
   }
 
@@ -85,9 +93,33 @@ class AuthToken(
       return authToken
     }
 
+    /**
+     * ML-KEM parameter set a restored session must use, resolved in three tiers: an explicit
+     * snapshot field, then the stored validator key's length, then ML-KEM-768.
+     *
+     * The final tier is deliberately NOT the constructor default. A snapshot with neither an
+     * explicit field nor a recognisable key can only have come from a pre-bump build, and every
+     * pre-bump build was ML-KEM-768-only — defaulting to 1024 would make the restored wallet
+     * advertise a public key the validator never recorded for that token, and would throw on the
+     * first outbound encapsulation to the session's stored 1184-byte validator key.
+     */
+    @JvmStatic
+    fun resolveMlkemParameterSet(snapshot: Snapshot): Int {
+      return snapshot.wallet.mlkemParameterSet
+        ?: ClientWallet.mlkemParameterSetFromPubkey(snapshot.pubkey)
+        ?: 768
+    }
+
     @JvmStatic
     fun restore(snapshot: Snapshot, secret: String): AuthToken {
-      val wallet = ClientWallet(secret, "AUTH", snapshot.wallet.position, null, snapshot.wallet.characters)
+      val wallet = ClientWallet(
+        secret,
+        "AUTH",
+        snapshot.wallet.position,
+        null,
+        snapshot.wallet.characters,
+        resolveMlkemParameterSet(snapshot)
+      )
 
       return create(
         AccessToken(

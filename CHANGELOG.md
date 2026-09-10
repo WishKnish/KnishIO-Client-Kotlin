@@ -14,10 +14,33 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
-## [Unreleased]
+## [1.0.0] — 2026-09-10
+
+### Added
+
+- A wallet now decrypts records addressed to **its own ML-KEM-768 identity even when configured at
+  ML-KEM-1024**, by deriving that identity on demand from the same 64-byte wallet seed. The seed is
+  parameter-set-independent, so both identities belong to one wallet; only the final keygen call
+  differs. Reading pre-bump 768 records therefore needs no configuration change and no second
+  wallet. The derived private key is never stored on the wallet and is zeroized before the decrypt
+  call returns.
+- `Wallet.decryptMyMessageML()` tries both identities' `CipherHash` map keys, so an envelope a
+  pre-bump peer addressed to `hashShare(our_768_pubkey)` is found rather than missed.
+- `Wallet.mlkemParameterSetFromPubkey()` recovers a parameter set from a serialized public key's
+  length (FIPS 203's 1568/1184 lengths are disjoint).
+
+  Encapsulation and the advertised public key are unchanged and remain single-set: inbound is
+  permissive, outbound is strict. Reading a 768 record you own downgrades nothing — its
+  confidentiality was fixed at 768 by the sender — whereas permissive outbound would be a real
+  downgrade vector.
 
 ### Changed
 
+- **ML-KEM-1024 is the default parameter set** for the post-quantum transport, replacing
+  ML-KEM-768. `Wallet`, `Molecule` and `KnishIOClient` accept an `mlkemParameterSet` argument
+  (`1024` default, `768` step-back) and reject any other value.
+- `Wallet.encryptMessage()` is strict and **throws** `IllegalArgumentException` on a wrong-length
+  recipient key rather than silently downgrading to whatever the peer advertised.
 - **Consumer Kotlin floor is now 2.3** — the build moved to Kotlin 2.4.10 (from 2.2.21) with
   no `languageVersion`/`apiVersion` pin, so compiled classes carry `@Metadata(mv = [2, 4, 0])`.
   Kotlin compilers older than 2.3 cannot read that metadata and will fail to link against this
@@ -30,6 +53,32 @@ not substantiate a detail, the entry says so instead of guessing.
   `org.graalvm.js:js`), which Shadow 9 rejects outright (`Cannot expand ZIP …/js-*.pom`). The
   real engine jars (`js-language`, `truffle-runtime`) are still bundled, so the `-all` artifact
   is unchanged in behaviour. The unused `js-scriptengine` dependency was dropped.
+
+### Removed
+
+- `Wallet.encryptStringML768()` and `Wallet.decryptMyMessageML768()`. Use `encryptStringML()` and
+  `decryptMyMessageML()`. No aliases are retained.
+
+### Fixed
+
+- The auth-token session snapshot now records the wallet's ML-KEM parameter set
+  (`AuthToken.Wallet.mlkemParameterSet`), and `AuthToken.restore()` honours it. A session
+  persisted by an 0.9.x build restores as ML-KEM-768 instead of silently becoming ML-KEM-1024
+  with a public key the validator never recorded for that token. Resolution is three-tiered: an
+  explicit snapshot field, then the stored validator key's length, then ML-KEM-768 — never the
+  constructor default, which is what produced the defect.
+
+### Notes
+
+- `0.9.5`–`0.9.9` were never published. The ML-KEM-1024 cutover is a breaking API change, so it
+  takes the 1.0.0 line.
+- A frozen pre-bump ML-KEM-768 auth molecule
+  (`vectors.legacyMlkem768AuthMolecule` in `cross-platform-test-vectors.json`) is validated by this
+  SDK from a 1024-default build — molecular hash plus WOTS+ signature — so the compatibility claim
+  rests on a signed artifact rather than on parameter-set-independent hashing.
+- `libraries.PostQuantumCrypto` and `libraries.HybridCrypto` remain pinned to
+  `MLKEMParameterSpec.ml_kem_768`. That deprecated hex-joined envelope is not on the `CipherHash`
+  wire and is unaffected by this release.
 
 ## [0.9.4] — 2026-09-04
 
@@ -268,9 +317,11 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 
 > **Note (2026-07-27):** the two sections above predate the coordinated `0.9.x`
 > SDK version line and are retained as written. The `1.0.0` / `1.1.0` targets in
-> "Upcoming" are stale and do not reflect current plans.
+> "Upcoming" are stale and do not reflect current plans. **Update (2026-09-10):**
+> `1.0.0` has since shipped, dated above; it is the ML-KEM-1024 cutover release
+> and bears no relation to the "Target: 2025-09-01" plan recorded here.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v0.9.4...HEAD
+[1.0.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.0.0
 [0.9.4]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.4
 [0.9.3]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.3
 [0.9.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.2

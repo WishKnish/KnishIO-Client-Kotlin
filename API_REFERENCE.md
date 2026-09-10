@@ -340,13 +340,17 @@ Sign message with WOTS+ quantum-resistant signature.
 
 Verify WOTS+ signature against wallet address.
 
-#### `encryptMLKEM(message: String, publicKey: String): String`
+#### `Wallet.encryptStringML(message: String, recipientPubkey: String): String`
 
-Encrypt with ML-KEM768 post-quantum encryption.
+Encrypt with ML-KEM post-quantum encryption, producing the canonical cross-SDK `CipherHash`
+envelope. The parameter set is the wallet's own — ML-KEM-1024 by default, ML-KEM-768 when the
+wallet is stepped back — and a recipient key of the wrong length is rejected rather than
+downgraded.
 
-#### `decryptMLKEM(ciphertext: String, privateKey: String): String`
+#### `Wallet.decryptMyMessageML(message: Map<String, Map<String, String>>): String?`
 
-Decrypt ML-KEM768 encrypted message.
+Decrypt an ML-KEM `CipherHash` envelope addressed to this wallet, returning the raw decrypted
+text. Envelopes addressed to either of the wallet's ML-KEM identities (1024 or 768) are read.
 
 #### `generateMolecularHash(molecule: Molecule): String`
 

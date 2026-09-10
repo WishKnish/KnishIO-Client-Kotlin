@@ -9,7 +9,7 @@ import java.security.PublicKey
 import org.bouncycastle.util.encoders.Hex
 
 /**
- * JavaScript bridge for ML-KEM768 cryptography using noble-post-quantum
+ * JavaScript bridge for ML-KEM cryptography using noble-post-quantum
  * Provides 100% compatibility with JavaScript implementation
  */
 class NobleMLKEMBridge {
@@ -48,7 +48,8 @@ class NobleMLKEMBridge {
         }
         
         /**
-         * Generate ML-KEM768 key pair from seed using noble JavaScript implementation
+         * Generate an ML-KEM key pair from seed at the given parameter set, using the noble
+         * JavaScript implementation. Defaults to ML-KEM-1024; pass 768 for the step-back.
          */
         fun generateMLKEMKeyPairFromSeed(seed: ByteArray, parameterSet: Int = 1024): KeyPair {
             val seedHex = Hex.toHexString(seed)

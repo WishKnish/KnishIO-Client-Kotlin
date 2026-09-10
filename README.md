@@ -14,7 +14,7 @@ This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its 
 ### Gradle
 ```kotlin
 dependencies {
-    implementation("io.knish:knishio-client-kotlin:0.9.4")
+    implementation("io.knish:knishio-client-kotlin:1.0.0")
 }
 ```
 
@@ -23,15 +23,16 @@ dependencies {
 <dependency>
   <groupId>io.knish</groupId>
   <artifactId>knishio-client-kotlin</artifactId>
-  <version>0.9.4</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
 **Requirements:**
 - JDK 17 or higher — the published jar is Java 17 bytecode (class file major version 61)
 - Gradle 9.x to build from source (the wrapper pins 9.7.1)
-- Kotlin 2.0 or higher to consume 0.9.4 (`@Metadata(mv = [2, 0])`). The next release is
-  built with Kotlin 2.4.10 and emits `mv = [2, 4, 0]`, which requires Kotlin 2.3 or higher.
+- Kotlin 2.3 or higher to consume 1.0.0 — it is built with Kotlin 2.4.10 and emits
+  `@Metadata(mv = [2, 4, 0])`, which Kotlin compilers older than 2.3 cannot read. 0.9.4 and
+  earlier emitted `mv = [2, 0]` and only required Kotlin 2.0.
 
 <details>
 <summary>Alternative Installation Methods</summary>
@@ -56,7 +57,7 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v0.9.4'
+    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v1.0.0'
 }
 ```
 </details>
