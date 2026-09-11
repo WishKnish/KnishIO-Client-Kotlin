@@ -91,6 +91,7 @@ class SecretStorageTest {
     )
 
     expectThat(provider.isAvailable()).isTrue()
+    expectThat(provider.isHardwareBacked()).isFalse()
     expectThat(provider.providerType).isEqualTo("aes-gcm")
 
     provider.storeSecret(canonicalBundle, canonicalSecret, StorageOptions(label = "Prod Seed"))

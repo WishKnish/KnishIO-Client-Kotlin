@@ -12,15 +12,13 @@ object SecretStorageFactory {
   fun createDefault(
     type: String = "aes-gcm",
     defaultPassphrase: String? = null,
-    backend: StorageBackend? = null,
-    hardwareBacked: Boolean = false
+    backend: StorageBackend? = null
   ): SecretStorageProvider {
     return when (type.lowercase()) {
       "memory" -> MemorySecretStorageProvider()
       else -> AesGcmSecretStorageProvider(
         backend = backend ?: MemoryStorageBackend(),
         defaultPassphrase = defaultPassphrase,
-        hardwareBacked = hardwareBacked
       )
     }
   }

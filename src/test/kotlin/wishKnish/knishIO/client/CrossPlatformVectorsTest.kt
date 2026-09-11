@@ -253,9 +253,10 @@ class CrossPlatformVectorsTest {
                     passphrase = test["passphrase"]!!.jsonPrimitive.content
                 )
             )
-            val emitted = json
+            val emittedMetadata = json
                 .parseToJsonElement(ourBackend.getItem(test["storageKey"]!!.jsonPrimitive.content)!!)
-                .jsonObject["metadata"]!!.jsonObject.keys
+                .jsonObject["metadata"]!!.jsonObject
+            val emitted = emittedMetadata.keys
 
             for (key in test["requiredMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
                 assertTrue(emitted.contains(key), "Kotlin must emit `$key`; emitted $emitted")
@@ -266,6 +267,8 @@ class CrossPlatformVectorsTest {
                     "`$key` is the 0.9.5 snake_case divergence and must never be emitted"
                 )
             }
+            assertEquals(false, emittedMetadata["hardwareBacked"]!!.jsonPrimitive.boolean, "a software provider must never emit hardwareBacked=true")
+            assertEquals("aes-gcm", emittedMetadata["providerType"]!!.jsonPrimitive.content)
         }
     }
 

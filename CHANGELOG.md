@@ -14,6 +14,18 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [Unreleased]
+
+### Added
+
+- **`AndroidKeystoreSecretStorageProvider`** (`android/`, separate Gradle build, AGP 9.2, minSdk 31): hardware-backed secret storage. A non-exportable AES-256-GCM KEK in AndroidKeyStore wraps a random device passphrase; the master secret is stored as the standard cross-SDK envelope under that passphrase, so the wire format is unchanged. `hardwareBacked`/`providerType` (`android-keystore-tee` | `android-keystore-strongbox`) come from `KeyInfo.securityLevel`; a software-level key or an unavailable StrongBox fails construction closed — it never reports `true` without the platform saying so. Instrumented tests run against an emulator (`./gradlew -p android connectedDebugAndroidTest`); CI runs the JVM fail-closed test, lint and the AAR build.
+- **`SecretEnvelope`**: the PBKDF2/AES-GCM envelope crypto extracted from `AesGcmSecretStorageProvider` so both providers share one custody-agnostic implementation.
+
+### Fixed
+
+- **`hardwareBacked` is no longer a caller claim.** `AesGcmSecretStorageProvider` and `SecretStorageFactory.createDefault` drop the `hardwareBacked` parameter; `providerType` is always `aes-gcm` — it previously became `android-keystore-strongbox` on the flag alone while running software JCA crypto. Envelopes previously written with a caller-supplied `true` were never attested and remain readable. Source-level break for callers that passed the parameter; the wire format (`metadata.hardwareBacked`, required boolean) is unchanged.
+- **Cross-SDK envelope emitted-key assertion**: `CrossPlatformVectorsTest` now explicitly asserts that the emitted metadata contains `hardwareBacked: false` and `providerType: "aes-gcm"`.
+
 ## [1.0.0] — 2026-09-10
 
 ### Added
@@ -321,6 +333,7 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > `1.0.0` has since shipped, dated above; it is the ML-KEM-1024 cutover release
 > and bears no relation to the "Target: 2025-09-01" plan recorded here.
 
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.0.0
 [0.9.4]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.4
 [0.9.3]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.3
