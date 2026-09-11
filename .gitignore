@@ -3,11 +3,11 @@
 vendor/
 build/
 src/main/kotlin/main.kt
-/local.properties
+local.properties
 
 node_modules
 
 .claude/
 
 # Publishing credentials (DO NOT COMMIT)
-gradle.properties
+/gradle.properties

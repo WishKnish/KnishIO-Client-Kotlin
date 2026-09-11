@@ -137,7 +137,7 @@ jacoco {
 detekt {
   buildUponDefaultConfig = true
   config.setFrom(files("config/detekt/detekt.yml"))
-  source.setFrom(files("src/main/kotlin"))
+  source.setFrom(files("src/main/kotlin", "android/src/main/kotlin"))
   ignoreFailures = false
 }
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
