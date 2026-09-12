@@ -241,10 +241,9 @@ class CrossPlatformVectorsTest {
             // The metadata key set is the half of the format that diverged, so assert what
             // KOTLIN EMITS - not the fixture's own keys, which would only restate the vector.
             //
-            // Required-keys + forbidden-keys, NOT set equality: `label` is optional and the
-            // SDKs legitimately differ on it (TS/JS omit the key when unset, Kotlin and Rust
-            // emit it as null via encodeDefaults), so an equality assertion would pass here
-            // and fail in TS/JS for behaviour that is correct in both.
+            // Required-keys + forbidden-keys: optional metadata keys (like `label`) are
+            // OMITTED when unset (frozen 2026-09-11: explicitNulls = false in SecretEnvelope).
+            // A consumer checking 'label' in metadata reads the same answer across all SDKs.
             val ourBackend = wishKnish.knishIO.client.storage.MemoryStorageBackend()
             wishKnish.knishIO.client.storage.AesGcmSecretStorageProvider(ourBackend).storeSecret(
                 bundleHash,
@@ -266,6 +265,15 @@ class CrossPlatformVectorsTest {
                     emitted.contains(key),
                     "`$key` is the 0.9.5 snake_case divergence and must never be emitted"
                 )
+            }
+            val convention = test["optionalKeyConvention"]?.jsonPrimitive?.content
+            if (convention == "omit-when-absent") {
+                for (key in test["optionalMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
+                    assertFalse(
+                        emittedMetadata.containsKey(key),
+                        "Kotlin must omit unset optional key `$key` under convention $convention"
+                    )
+                }
             }
             assertEquals(false, emittedMetadata["hardwareBacked"]!!.jsonPrimitive.boolean, "a software provider must never emit hardwareBacked=true")
             assertEquals("aes-gcm", emittedMetadata["providerType"]!!.jsonPrimitive.content)

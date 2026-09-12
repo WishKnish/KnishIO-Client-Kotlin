@@ -27,9 +27,11 @@ object SecretEnvelope {
   private const val GCM_IV_LENGTH = 12
   private const val SALT_LENGTH = 16
 
+  @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
   private val json = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
+    explicitNulls = false
   }
 
   private fun deriveKey(passphrase: String, salt: ByteArray, iterations: Int = DEFAULT_ITERATIONS): SecretKeySpec {
