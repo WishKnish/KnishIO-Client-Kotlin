@@ -42,6 +42,8 @@ dependencies {
   api("io.knish:knishio-client-kotlin:1.0.0") {
     exclude(group = "org.graalvm.polyglot")
   }
+  implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+
 
   testImplementation("junit:junit:4.13.2")
   androidTestImplementation("androidx.test.ext:junit:1.2.1")

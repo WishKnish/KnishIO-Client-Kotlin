@@ -147,7 +147,11 @@ class AndroidKeystoreSecretStorageProviderTest {
     val alias = nextAlias()
     val backend = MemoryStorageBackend()
     val result = runCatching {
-      AndroidKeystoreSecretStorageProvider(backend, alias, requireStrongBox = true)
+      AndroidKeystoreSecretStorageProvider(
+        backend = backend,
+        keyAlias = alias,
+        strongBox = StrongBoxPolicy.REQUIRED
+      )
     }
 
     if (result.isSuccess) {
@@ -191,5 +195,123 @@ class AndroidKeystoreSecretStorageProviderTest {
     assertThrows(SecretStorageException::class.java) {
       val unused = provider.withSecret(bundle, StorageOptions(passphrase = "forbidden")) { it }
     }
+  }
+
+  @Test
+  fun preferredPolicyResolvesToTheDeviceBestLevel() {
+    val alias = nextAlias()
+    val backend = MemoryStorageBackend()
+    val provider = createProviderIfHardwareAvailable(backend, alias)
+    if (provider == null) {
+      val ex = assertThrows(SecretStorageException::class.java) {
+        AndroidKeystoreSecretStorageProvider(backend, alias)
+      }
+      assertTrue(ex.message?.contains("not hardware-backed") == true)
+      return
+    }
+
+    val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    val key = keyStore.getKey(alias, null) as? javax.crypto.SecretKey
+    assertNotNull(key)
+    val factory = javax.crypto.SecretKeyFactory.getInstance("AES", "AndroidKeyStore")
+    val keyInfo = factory.getKeySpec(key, android.security.keystore.KeyInfo::class.java) as android.security.keystore.KeyInfo
+
+    assertTrue("requireUnlockedDevice should be true", provider.requireUnlockedDevice)
+    assertTrue("isInsideSecureHardware should be true", keyInfo.isInsideSecureHardware)
+    when (keyInfo.securityLevel) {
+      android.security.keystore.KeyProperties.SECURITY_LEVEL_STRONGBOX -> {
+        assertEquals(AndroidKeystoreSecretStorageProvider.PROVIDER_TYPE_STRONGBOX, provider.providerType)
+      }
+      android.security.keystore.KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+      android.security.keystore.KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> {
+        assertEquals(AndroidKeystoreSecretStorageProvider.PROVIDER_TYPE_TEE, provider.providerType)
+      }
+    }
+  }
+
+  @Test
+  fun disabledPolicyNeverYieldsStrongBox() {
+    val alias = nextAlias()
+    val backend = MemoryStorageBackend()
+    val result = runCatching {
+      AndroidKeystoreSecretStorageProvider(
+        backend = backend,
+        keyAlias = alias,
+        strongBox = StrongBoxPolicy.DISABLED
+      )
+    }
+
+    if (result.isSuccess) {
+      val provider = result.getOrThrow()
+      assertEquals(
+        AndroidKeystoreSecretStorageProvider.PROVIDER_TYPE_TEE,
+        provider.providerType
+      )
+    } else {
+      val ex = result.exceptionOrNull()
+      assertTrue(ex is SecretStorageException)
+      assertTrue(ex?.message?.contains("not hardware-backed") == true)
+    }
+  }
+
+  @Test
+  fun attestationChainMatchesResolvedCustody() {
+    val alias = nextAlias()
+    val backend = MemoryStorageBackend()
+    val provider = createProviderIfHardwareAvailable(backend, alias)
+    if (provider == null) {
+      val ex = assertThrows(SecretStorageException::class.java) {
+        AndroidKeystoreSecretStorageProvider(backend, alias)
+      }
+      assertTrue(ex.message?.contains("not hardware-backed") == true)
+      return
+    }
+
+    val challenge = ByteArray(32)
+    java.security.SecureRandom().nextBytes(challenge)
+    val chain = provider.attestCustody(challenge)
+    assertTrue("attestation chain must have at least 2 certificates", chain.size >= 2)
+
+    val summary = AndroidKeyAttestation.parse(chain[0])
+    assertTrue("attestation challenge must match", challenge.contentEquals(summary.challenge))
+    assertEquals(
+      "attested keyMint security level must match providerType",
+      provider.providerType,
+      AndroidKeyAttestation.providerTypeFor(summary.keyMintSecurityLevel)
+    )
+  }
+
+  @Test
+  fun userAuthenticationRequiredKeyRefusesUnauthenticatedUse() {
+    val alias = nextAlias()
+    val backend = MemoryStorageBackend()
+    val result = runCatching {
+      AndroidKeystoreSecretStorageProvider(
+        backend = backend,
+        keyAlias = alias,
+        userAuthenticationValiditySeconds = 1
+      )
+    }
+
+    if (result.isFailure) {
+      val ex = result.exceptionOrNull()
+      assertTrue(
+        "Expected fail-closed (no lock screen or non-hardware), got: ${ex?.message}",
+        ex?.message?.contains("secure lock screen", ignoreCase = true) == true ||
+          ex?.message?.contains("not hardware-backed", ignoreCase = true) == true
+      )
+      return
+    }
+
+    val provider = result.getOrThrow()
+    val bundle = "3333333333333333333333333333333333333333333333333333333333333333"
+    Thread.sleep(1500)
+    val ex = assertThrows(SecretStorageException::class.java) {
+      provider.storeSecret(bundle, "auth-required-secret")
+    }
+    assertTrue(
+      "Expected message to mention user authentication, got: ${ex.message}",
+      ex.message?.contains("user authentication") == true
+    )
   }
 }

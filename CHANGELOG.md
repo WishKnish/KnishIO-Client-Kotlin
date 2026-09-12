@@ -20,6 +20,12 @@ not substantiate a detail, the entry says so instead of guessing.
 
 - **`AndroidKeystoreSecretStorageProvider`** (`android/`, separate Gradle build, AGP 9.2, minSdk 31): hardware-backed secret storage. A non-exportable AES-256-GCM KEK in AndroidKeyStore wraps a random device passphrase; the master secret is stored as the standard cross-SDK envelope under that passphrase, so the wire format is unchanged. `hardwareBacked`/`providerType` (`android-keystore-tee` | `android-keystore-strongbox`) come from `KeyInfo.securityLevel`; a software-level key or an unavailable StrongBox fails construction closed — it never reports `true` without the platform saying so. Instrumented tests run against an emulator (`./gradlew -p android connectedDebugAndroidTest`); CI runs the JVM fail-closed test, lint and the AAR build.
 - **`SecretEnvelope`**: the PBKDF2/AES-GCM envelope crypto extracted from `AesGcmSecretStorageProvider` so both providers share one custody-agnostic implementation.
+- **`attestCustody(challenge)` and `AndroidKeyAttestation`**: `AndroidKeystoreSecretStorageProvider.attestCustody` generates an EC key pair in KeyStore with an attestation challenge and returns the X.509 certificate chain attesting the device KeyMint level. `AndroidKeyAttestation` parses the ASN.1 extension (OID `1.3.6.1.4.1.11129.2.1.17`).
+
+### Changed
+
+- **Optional metadata keys omitted when unset**: `SecretEnvelope` configures `explicitNulls = false`, omitting unset optional keys such as `label` from emitted envelope JSON instead of emitting `"label": null`, matching the cross-SDK convention.
+- **StrongBox-preferred custody policy and key hardening**: `AndroidKeystoreSecretStorageProvider` replaces `requireStrongBox: Boolean` with `strongBox: StrongBoxPolicy` (`PREFERRED`, `REQUIRED`, `DISABLED`), defaulting to `PREFERRED` (attempts StrongBox and falls back to TEE). Adds `requireUnlockedDevice: Boolean` (default true) and `userAuthenticationValiditySeconds: Int?` hardening options.
 
 ### Fixed
 
