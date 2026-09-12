@@ -37,7 +37,10 @@ class FileStorageBackend(
   }
 
   private fun keyToFilename(key: String): String {
+    require(key.isNotEmpty()) { "Storage key must not be empty" }
     return URLEncoder.encode(key, StandardCharsets.UTF_8.name())
+      .replace("*", "%2A")
+      .replace(".", "%2E")
   }
 
   private fun filenameToKey(filename: String): String {
@@ -98,17 +101,9 @@ class FileStorageBackend(
   }
 
   override fun getItem(key: String): String? {
-    val encodedFile = directory.resolve(keyToFilename(key))
-    val targetFile = when {
-      Files.isRegularFile(encodedFile) -> encodedFile
-      else -> {
-        val rawFile = directory.resolve(key).normalize()
-        if (rawFile.startsWith(directory.normalize()) && Files.isRegularFile(rawFile)) {
-          rawFile
-        } else {
-          return null
-        }
-      }
+    val targetFile = directory.resolve(keyToFilename(key))
+    if (!Files.isRegularFile(targetFile)) {
+      return null
     }
 
     return try {
@@ -119,25 +114,12 @@ class FileStorageBackend(
   }
 
   override fun removeItem(key: String): Boolean {
-    val encodedFile = directory.resolve(keyToFilename(key))
-    var deleted = try {
-      Files.deleteIfExists(encodedFile)
+    val targetFile = directory.resolve(keyToFilename(key))
+    return try {
+      Files.deleteIfExists(targetFile)
     } catch (_: Exception) {
       false
     }
-
-    if (!deleted) {
-      val rawFile = directory.resolve(key).normalize()
-      if (rawFile.startsWith(directory.normalize())) {
-        deleted = try {
-          Files.deleteIfExists(rawFile)
-        } catch (_: Exception) {
-          false
-        }
-      }
-    }
-
-    return deleted
   }
 
   override fun keys(): List<String> {

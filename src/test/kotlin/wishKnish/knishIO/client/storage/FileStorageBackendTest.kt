@@ -3,7 +3,9 @@ package wishKnish.knishIO.client.storage
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import strikt.api.expectThat
+import strikt.api.expectThrows
 import strikt.assertions.*
+import kotlin.streams.toList
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
@@ -164,5 +166,90 @@ class FileStorageBackendTest {
     expectThat(providerReopened.deleteSecret(bundleHash)).isTrue()
     expectThat(providerReopened.hasSecret(bundleHash)).isFalse()
     expectThat(providerReopened.retrieveSecret(bundleHash)).isNull()
+  }
+
+  @Test
+  fun `stores and lists keys with Windows-prohibited characters without producing illegal filenames`(@TempDir tempDir: Path) {
+    val backend = FileStorageBackend(tempDir)
+    val prohibitedChars = listOf(':', '/', '\\', '*', '?', '"', '<', '>', '|')
+    val testKeys = prohibitedChars.mapIndexed { idx, ch -> "test${ch}key$idx" }
+
+    testKeys.forEachIndexed { idx, key ->
+      backend.setItem(key, "payload-$idx")
+    }
+
+    // Verify observable round-trip
+    testKeys.forEachIndexed { idx, key ->
+      expectThat(backend.getItem(key)).isEqualTo("payload-$idx")
+    }
+    expectThat(backend.keys()).containsExactlyInAnyOrder(testKeys)
+
+    // Verify on-disk files contain no prohibited characters
+    val onDiskFilenames = Files.list(tempDir).use { stream ->
+      stream.map { it.fileName.toString() }.toList()
+    }
+    expectThat(onDiskFilenames).hasSize(testKeys.size)
+    onDiskFilenames.forEach { filename ->
+      prohibitedChars.forEach { ch ->
+        expectThat(filename.contains(ch))
+          .describedAs("Filename '$filename' should not contain prohibited character '$ch'")
+          .isFalse()
+      }
+    }
+
+    // Verify absent colon-bearing keys return null / false safely without throwing InvalidPathException
+    val absentColonKey = "knishio:secret:absentnonexistentkey"
+    expectThat(backend.getItem(absentColonKey)).isNull()
+    expectThat(backend.removeItem(absentColonKey)).isFalse()
+  }
+
+  @Test
+  fun `handles dots and traversal-like keys safely without escaping storage directory`(@TempDir tempDir: Path) {
+    val storageDir = tempDir.resolve("storage")
+    val backend = FileStorageBackend(storageDir)
+
+    // Snapshot parent directory entries before storage operations
+    val parentEntriesBefore = Files.list(tempDir).use { it.map { p -> p.fileName.toString() }.toList() }
+
+    val dotKeys = listOf(".", "..", "../x", "x/../y", "abc.", "x.tmp", ".tmp-x")
+    dotKeys.forEachIndexed { idx, key ->
+      backend.setItem(key, "dot-val-$idx")
+    }
+
+    // Verify round-trip via getItem and keys()
+    dotKeys.forEachIndexed { idx, key ->
+      expectThat(backend.getItem(key)).isEqualTo("dot-val-$idx")
+    }
+    expectThat(backend.keys()).containsExactlyInAnyOrder(dotKeys)
+
+    // Verify on-disk filenames: must match ^[A-Za-z0-9_+%-]+$ and live directly inside storage directory
+    val nameRegex = Regex("^[A-Za-z0-9_+%-]+$")
+    val createdFiles = Files.list(storageDir).use { stream ->
+      stream.toList()
+    }
+    expectThat(createdFiles).hasSize(dotKeys.size)
+    createdFiles.forEach { filePath ->
+      expectThat(filePath.parent).isEqualTo(storageDir)
+      val fname = filePath.fileName.toString()
+      expectThat(nameRegex.matches(fname))
+        .describedAs("On-disk filename '$fname' must only contain safe characters")
+        .isTrue()
+    }
+
+    // Verify parent directory entries are untouched (no escaped files)
+    val parentEntriesAfter = Files.list(tempDir).use { it.map { p -> p.fileName.toString() }.toList() }
+    expectThat(parentEntriesAfter).containsExactlyInAnyOrder(parentEntriesBefore)
+
+    // Verify removeItem round-trips
+    dotKeys.forEach { key ->
+      expectThat(backend.removeItem(key)).isTrue()
+      expectThat(backend.getItem(key)).isNull()
+    }
+    expectThat(backend.keys()).isEmpty()
+
+    // Verify empty key throws IllegalArgumentException on setItem, getItem, removeItem
+    expectThrows<IllegalArgumentException> { backend.setItem("", "val") }
+    expectThrows<IllegalArgumentException> { backend.getItem("") }
+    expectThrows<IllegalArgumentException> { backend.removeItem("") }
   }
 }

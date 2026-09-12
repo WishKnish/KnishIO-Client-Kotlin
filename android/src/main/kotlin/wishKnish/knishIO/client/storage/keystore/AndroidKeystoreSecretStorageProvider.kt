@@ -342,12 +342,13 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
       val payload = SecretEnvelope.seal(secret, passphrase, metadata)
       backend.setItem("$KEY_PREFIX$bundleHash", SecretEnvelope.encode(payload))
 
-      if (options.recoveryPassphrase != null) {
+      val recoveryPass = options.recoveryPassphrase
+      if (recoveryPass != null) {
         val recoveryMetadata = metadata.copy(
           providerType = "aes-gcm",
           hardwareBacked = false
         )
-        val recoveryPayload = SecretEnvelope.seal(secret, options.recoveryPassphrase, recoveryMetadata)
+        val recoveryPayload = SecretEnvelope.seal(secret, recoveryPass, recoveryMetadata)
         backend.setItem("$RECOVERY_KEY_PREFIX$bundleHash", SecretEnvelope.encode(recoveryPayload))
       }
     } catch (e: Exception) {
