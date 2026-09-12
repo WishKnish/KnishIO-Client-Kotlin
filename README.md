@@ -522,6 +522,20 @@ The GraphQL transport (Ktor) issues a fresh network request per query — there 
 **no response caching** — so a long-lived client never serves a stale read of
 ledger state. No fresh-read knob (e.g. a request policy) is required.
 
+## Secret storage
+
+Master secrets are stored at rest in the cross-SDK AES-256-GCM envelope (PBKDF2-HMAC-SHA256 ×100000, camelCase metadata; frozen in `sdks/shared-test-results/cross-platform-test-vectors.json`). Every SDK decrypts every other SDK's envelope.
+
+| Provider | `providerType` | Custody (`hardwareBacked`) | Where the key lives | Recovery passphrase |
+|---|---|---|---|---|
+| `MemorySecretStorageProvider` | `memory` | Software (`false`) | Process memory | Optional |
+| `AesGcmSecretStorageProvider` | `aes-gcm` | Software (`false`) | Any `StorageBackend` (`MemoryStorageBackend`, `FileStorageBackend`) | Optional |
+| `AndroidKeystoreSecretStorageProvider` | `android-keystore-tee` \| `android-keystore-strongbox` | Hardware (`true`) | AndroidKeyStore KEK (derived from `KeyInfo.securityLevel`) | Required unless `allowUnrecoverable` |
+
+`hardwareBacked` is derived by the provider from the platform, never accepted from the caller; software providers always report `false`. A hardware provider refuses to store without a recovery passphrase unless `allowUnrecoverable` is set — the recovery envelope (`knishio:recovery:<bundleHash>`, `providerType: "aes-gcm"`) is *software* custody whose strength is bounded by that passphrase: enforce passphrase entropy or keep it on a second device.
+
+Android backup note: place the `FileStorageBackend` directory under `context.noBackupFilesDir` and exclude it in `dataExtractionRules` — a restored blob is undecryptable without the on-device Keystore KEK, so this is hygiene, not a security control.
+
 ## Getting Help
 
 Knish.IO is under active development, and our team is ready to assist with integration questions. The best way to seek help is to stop by our [Telegram Support Channel](https://t.me/wishknish). You can also [send us a contact request](https://knish.io/contact) via our website.
