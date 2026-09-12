@@ -31,5 +31,10 @@ class SecretStorageException : BaseException {
     fun unavailable(provider: String, reason: String): SecretStorageException {
       return SecretStorageException("Secret storage provider '$provider' is unavailable: $reason")
     }
+
+    @JvmStatic
+    fun validationError(message: String): SecretStorageException {
+      return SecretStorageException(message)
+    }
   }
 }

@@ -62,6 +62,15 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
     try {
       val payload = SecretEnvelope.seal(secret, passphrase, metadata)
       backend.setItem("$KEY_PREFIX$bundleHash", SecretEnvelope.encode(payload))
+
+      if (options.recoveryPassphrase != null) {
+        val recoveryMetadata = metadata.copy(
+          providerType = "aes-gcm",
+          hardwareBacked = false
+        )
+        val recoveryPayload = SecretEnvelope.seal(secret, options.recoveryPassphrase, recoveryMetadata)
+        backend.setItem("$RECOVERY_KEY_PREFIX$bundleHash", SecretEnvelope.encode(recoveryPayload))
+      }
     } catch (e: Exception) {
       throw SecretStorageException("Encryption failed: ${e.message}", e)
     }
@@ -94,6 +103,7 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
   }
 
   override fun deleteSecret(bundleHash: String): Boolean {
+    backend.removeItem("$RECOVERY_KEY_PREFIX$bundleHash")
     return backend.removeItem("$KEY_PREFIX$bundleHash")
   }
 
@@ -103,7 +113,7 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
 
   override fun listSecrets(): List<SecretStorageMetadata> {
     return backend.keys()
-      .filter { it.startsWith(KEY_PREFIX) }
+      .filter { it.startsWith(KEY_PREFIX) && !it.startsWith(RECOVERY_KEY_PREFIX) }
       .mapNotNull { key ->
         backend.getItem(key)?.let { raw ->
           try {
@@ -146,5 +156,45 @@ class AesGcmSecretStorageProvider @JvmOverloads constructor(
     return SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
       block(String(bytes, Charsets.UTF_8))
     }
+  }
+
+  override fun recoverSecret(
+    bundleHash: String,
+    recoveryPassphrase: String,
+    options: StorageOptions
+  ) {
+    if (bundleHash.isEmpty()) {
+      throw SecretStorageException("Bundle hash cannot be empty")
+    }
+    if (recoveryPassphrase.isEmpty()) {
+      throw SecretStorageException("Recovery passphrase cannot be empty")
+    }
+
+    val raw = backend.getItem("$RECOVERY_KEY_PREFIX$bundleHash")
+      ?: throw SecretStorageException.notFound(bundleHash)
+
+    val payload = try {
+      SecretEnvelope.decode(raw)
+    } catch (e: Exception) {
+      throw SecretStorageException.decryptionFailed("Corrupted payload format", e)
+    }
+
+    val decryptedBytes = try {
+      SecretEnvelope.open(payload, recoveryPassphrase)
+    } catch (e: Exception) {
+      throw SecretStorageException.decryptionFailed(e.message ?: "Authentication failed", e)
+    }
+
+    val secretStr = SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
+      String(bytes, Charsets.UTF_8)
+    }
+
+    val effectivePassphrase = options.passphrase ?: defaultPassphrase ?: recoveryPassphrase
+    val reEnrollOptions = options.copy(
+      passphrase = effectivePassphrase,
+      recoveryPassphrase = options.recoveryPassphrase ?: recoveryPassphrase
+    )
+
+    storeSecret(bundleHash, secretStr, reEnrollOptions)
   }
 }

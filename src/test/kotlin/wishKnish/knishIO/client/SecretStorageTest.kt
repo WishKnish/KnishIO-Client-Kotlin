@@ -231,4 +231,120 @@ class SecretStorageTest {
       storage.withSecret(bundle, StorageOptions(passphrase = "wrong-password")) { it }
     }
   }
+
+  @Test
+  fun `AesGcmSecretStorageProvider stores recovery envelope and recovers successfully`() {
+    val backend = MemoryStorageBackend()
+    val provider = AesGcmSecretStorageProvider(backend = backend, defaultPassphrase = "primary-pass")
+    val bundle = "deadbeef".repeat(8)
+    val secret = "master-secret-recovery-test"
+
+    provider.storeSecret(
+      bundle,
+      secret,
+      StorageOptions(label = "Primary Label", recoveryPassphrase = "recovery-pass-123")
+    )
+
+    // Primary envelope exists
+    expectThat(backend.getItem("$SECRET_KEY_PREFIX$bundle")).isNotNull()
+    // Recovery envelope exists
+    expectThat(backend.getItem("$RECOVERY_KEY_PREFIX$bundle")).isNotNull()
+
+    // listSecrets only lists primary, not recovery
+    val list = provider.listSecrets()
+    expectThat(list).hasSize(1)
+    expectThat(list.first().bundleHash).isEqualTo(bundle)
+
+    // Simulate primary corruption
+    backend.setItem("$SECRET_KEY_PREFIX$bundle", "corrupted-payload")
+    expectThrows<SecretStorageException> {
+      provider.retrieveSecret(bundle)
+    }
+
+    // Recover secret using recovery passphrase
+    provider.recoverSecret(bundle, "recovery-pass-123")
+
+    // Direct retrieve now succeeds with primary passphrase
+    val retrieved = provider.retrieveSecret(bundle)
+    expectThat(retrieved).isEqualTo(secret)
+
+    // Delete secret removes both primary and recovery records
+    expectThat(provider.deleteSecret(bundle)).isTrue()
+    expectThat(backend.getItem("$SECRET_KEY_PREFIX$bundle")).isNull()
+    expectThat(backend.getItem("$RECOVERY_KEY_PREFIX$bundle")).isNull()
+  }
+
+  @Test
+  fun `MemorySecretStorageProvider stores recovery envelope and recovers successfully`() {
+    val backend = MemoryStorageBackend()
+    val provider = MemorySecretStorageProvider(backend)
+    val bundle = "feedface".repeat(8)
+    val secret = "mem-secret-value-recovery"
+
+    provider.storeSecret(
+      bundle,
+      secret,
+      StorageOptions(recoveryPassphrase = "mem-recovery-pass")
+    )
+
+    // Recovery envelope exists in backend
+    expectThat(backend.getItem("$RECOVERY_KEY_PREFIX$bundle")).isNotNull()
+
+    // listSecrets only lists primary
+    val list = provider.listSecrets()
+    expectThat(list).hasSize(1)
+    expectThat(list.first().bundleHash).isEqualTo(bundle)
+
+    // Corrupt in-memory primary by overwriting with another value
+    provider.storeSecret(bundle, "corrupted-mem-secret")
+    expectThat(provider.retrieveSecret(bundle)).isEqualTo("corrupted-mem-secret")
+
+    // Recover restores original secret
+    provider.recoverSecret(bundle, "mem-recovery-pass")
+    expectThat(provider.retrieveSecret(bundle)).isEqualTo(secret)
+
+    // Delete secret removes both primary and recovery
+    expectThat(provider.deleteSecret(bundle)).isTrue()
+    expectThat(provider.hasSecret(bundle)).isFalse()
+    expectThat(backend.getItem("$RECOVERY_KEY_PREFIX$bundle")).isNull()
+  }
+
+  @Test
+  fun `recoverSecret fails with wrong recovery passphrase or missing bundle`() {
+    val backend = MemoryStorageBackend()
+    val provider = AesGcmSecretStorageProvider(backend = backend, defaultPassphrase = "primary-pass")
+    val bundle = "12345678".repeat(8)
+    val secret = "secret-for-failure-tests"
+
+    provider.storeSecret(
+      bundle,
+      secret,
+      StorageOptions(recoveryPassphrase = "correct-recovery-pass")
+    )
+
+    // Wrong recovery passphrase
+    expectThrows<SecretStorageException> {
+      provider.recoverSecret(bundle, "wrong-recovery-pass")
+    }
+
+    // Missing bundle
+    expectThrows<SecretStorageException> {
+      provider.recoverSecret("nonexistent-bundle".repeat(4), "correct-recovery-pass")
+    }
+
+    // Empty parameters fail validation
+    expectThrows<SecretStorageException> {
+      provider.recoverSecret("", "correct-recovery-pass")
+    }
+    expectThrows<SecretStorageException> {
+      provider.recoverSecret(bundle, "")
+    }
+  }
+
+  @Test
+  fun `SecretStorageException validationError creates expected exception`() {
+    val msg = "Recovery passphrase required for hardware-backed key unless allowUnrecoverable is true"
+    val ex = SecretStorageException.validationError(msg)
+    expectThat(ex.message).isEqualTo(msg)
+  }
 }

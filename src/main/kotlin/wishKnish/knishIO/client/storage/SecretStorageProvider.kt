@@ -1,9 +1,11 @@
-@file:JvmName("SecretStorageProvider")
 
 package wishKnish.knishIO.client.storage
 
 import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
+
+const val SECRET_KEY_PREFIX = "knishio:secret:"
+const val RECOVERY_KEY_PREFIX = "knishio:recovery:"
 
 /**
  * Metadata associated with an encrypted secret in storage
@@ -36,7 +38,9 @@ data class EncryptedSecretPayload(
  */
 data class StorageOptions @JvmOverloads constructor(
   val label: String? = null,
-  val passphrase: String? = null
+  val passphrase: String? = null,
+  val recoveryPassphrase: String? = null,
+  val allowUnrecoverable: Boolean = false
 )
 
 /**
@@ -139,4 +143,13 @@ interface SecretStorageProvider {
     options: StorageOptions = StorageOptions(),
     block: (String) -> T
   ): T
+
+  /**
+   * Recover a secret using its recovery envelope and restore it under the active provider key
+   */
+  fun recoverSecret(
+    bundleHash: String,
+    recoveryPassphrase: String,
+    options: StorageOptions = StorageOptions()
+  )
 }

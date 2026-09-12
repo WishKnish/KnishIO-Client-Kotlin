@@ -79,7 +79,7 @@ class AndroidKeystoreSecretStorageProviderTest {
 
       val bundle = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
       val secret = "MASTER-SECRET-ANDROID-PROBE"
-      provider.storeSecret(bundle, secret, StorageOptions(label = "probe"))
+      provider.storeSecret(bundle, secret, StorageOptions(label = "probe", allowUnrecoverable = true))
 
       assertEquals(secret, provider.retrieveSecret(bundle))
       val withResult = provider.withSecret(bundle) { it.substring(0, 13) }
@@ -136,7 +136,7 @@ class AndroidKeystoreSecretStorageProviderTest {
 
     val bundle = "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
     val secret = "PERSISTENT-DEVICE-SECRET-TEST"
-    provider1.storeSecret(bundle, secret)
+    provider1.storeSecret(bundle, secret, StorageOptions(allowUnrecoverable = true))
 
     val provider2 = AndroidKeystoreSecretStorageProvider(backend, alias)
     assertEquals(secret, provider2.retrieveSecret(bundle))
@@ -187,7 +187,7 @@ class AndroidKeystoreSecretStorageProviderTest {
 
     val bundle = "1111222233334444555566667777888811112222333344445555666677778888"
     assertThrows(SecretStorageException::class.java) {
-      provider.storeSecret(bundle, "secret", StorageOptions(passphrase = "forbidden"))
+      provider.storeSecret(bundle, "secret", StorageOptions(passphrase = "forbidden", allowUnrecoverable = true))
     }
     assertThrows(SecretStorageException::class.java) {
       provider.retrieveSecret(bundle, StorageOptions(passphrase = "forbidden"))
@@ -195,6 +195,22 @@ class AndroidKeystoreSecretStorageProviderTest {
     assertThrows(SecretStorageException::class.java) {
       val unused = provider.withSecret(bundle, StorageOptions(passphrase = "forbidden")) { it }
     }
+  }
+
+  @Test
+  fun storeSecretFailsWithoutRecoveryPassphraseUnlessAllowUnrecoverable() {
+    val alias = nextAlias()
+    val backend = MemoryStorageBackend()
+    val provider = createProviderIfHardwareAvailable(backend, alias) ?: return
+
+    val bundle = "1111222233334444555566667777888811112222333344445555666677778888"
+    val ex = assertThrows(SecretStorageException::class.java) {
+      provider.storeSecret(bundle, "secret")
+    }
+    assertTrue(
+      "Expected exception to mention recovery passphrase requirement, got: ${ex.message}",
+      ex.message?.contains("Recovery passphrase required") == true
+    )
   }
 
   @Test

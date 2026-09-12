@@ -12,6 +12,7 @@ import org.json.JSONObject
 import wishKnish.knishIO.client.exception.SecretStorageException
 import wishKnish.knishIO.client.libraries.SecureMemory
 import wishKnish.knishIO.client.storage.SecretEnvelope
+import wishKnish.knishIO.client.storage.RECOVERY_KEY_PREFIX
 import wishKnish.knishIO.client.storage.SecretStorageMetadata
 import wishKnish.knishIO.client.storage.SecretStorageProvider
 import wishKnish.knishIO.client.storage.StorageBackend
@@ -322,6 +323,11 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
         "AndroidKeystoreSecretStorageProvider derives its passphrase from the Keystore-protected device key; StorageOptions.passphrase is not accepted"
       )
     }
+    if (options.recoveryPassphrase == null && !options.allowUnrecoverable) {
+      throw SecretStorageException.validationError(
+        "Recovery passphrase required for hardware-backed key unless allowUnrecoverable is true"
+      )
+    }
 
     val passphrase = devicePassphrase()
     val metadata = SecretStorageMetadata(
@@ -335,6 +341,15 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
     try {
       val payload = SecretEnvelope.seal(secret, passphrase, metadata)
       backend.setItem("$KEY_PREFIX$bundleHash", SecretEnvelope.encode(payload))
+
+      if (options.recoveryPassphrase != null) {
+        val recoveryMetadata = metadata.copy(
+          providerType = "aes-gcm",
+          hardwareBacked = false
+        )
+        val recoveryPayload = SecretEnvelope.seal(secret, options.recoveryPassphrase, recoveryMetadata)
+        backend.setItem("$RECOVERY_KEY_PREFIX$bundleHash", SecretEnvelope.encode(recoveryPayload))
+      }
     } catch (e: Exception) {
       throw SecretStorageException("Encryption failed: ${e.message}", e)
     }
@@ -371,6 +386,7 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
   }
 
   override fun deleteSecret(bundleHash: String): Boolean {
+    backend.removeItem("$RECOVERY_KEY_PREFIX$bundleHash")
     return backend.removeItem("$KEY_PREFIX$bundleHash")
   }
 
@@ -380,7 +396,7 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
 
   override fun listSecrets(): List<SecretStorageMetadata> {
     return backend.keys()
-      .filter { it.startsWith(KEY_PREFIX) }
+      .filter { it.startsWith(KEY_PREFIX) && !it.startsWith(RECOVERY_KEY_PREFIX) }
       .mapNotNull { key ->
         backend.getItem(key)?.let { raw ->
           try {
@@ -422,6 +438,46 @@ class AndroidKeystoreSecretStorageProvider @JvmOverloads constructor(
     return SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
       block(String(bytes, Charsets.UTF_8))
     }
+  }
+
+  override fun recoverSecret(
+    bundleHash: String,
+    recoveryPassphrase: String,
+    options: StorageOptions
+  ) {
+    if (bundleHash.isEmpty()) {
+      throw SecretStorageException("Bundle hash cannot be empty")
+    }
+    if (recoveryPassphrase.isEmpty()) {
+      throw SecretStorageException("Recovery passphrase cannot be empty")
+    }
+
+    val raw = backend.getItem("$RECOVERY_KEY_PREFIX$bundleHash")
+      ?: throw SecretStorageException.notFound(bundleHash)
+
+    val payload = try {
+      SecretEnvelope.decode(raw)
+    } catch (e: Exception) {
+      throw SecretStorageException.decryptionFailed("Corrupted recovery payload format", e)
+    }
+
+    val decryptedBytes = try {
+      SecretEnvelope.open(payload, recoveryPassphrase)
+    } catch (e: Exception) {
+      throw SecretStorageException.decryptionFailed(e.message ?: "Authentication failed", e)
+    }
+
+    val secretStr = SecureMemory.withSecureBytes(decryptedBytes) { bytes ->
+      String(bytes, Charsets.UTF_8)
+    }
+
+    val reEnrollOptions = if (options.recoveryPassphrase == null && !options.allowUnrecoverable) {
+      options.copy(recoveryPassphrase = recoveryPassphrase)
+    } else {
+      options
+    }
+
+    storeSecret(bundleHash, secretStr, reEnrollOptions)
   }
 
   /**
