@@ -234,6 +234,7 @@ class AndroidKeystoreSecretStorageProviderTest {
 
     assertTrue("requireUnlockedDevice should be true", provider.requireUnlockedDevice)
     assertTrue("isInsideSecureHardware should be true", keyInfo.isInsideSecureHardware)
+    android.util.Log.i("KnishIOCustodyEvidence", "securityLevel=${keyInfo.securityLevel} insideSecureHardware=${keyInfo.isInsideSecureHardware} providerType=${provider.providerType}")
     when (keyInfo.securityLevel) {
       android.security.keystore.KeyProperties.SECURITY_LEVEL_STRONGBOX -> {
         assertEquals(AndroidKeystoreSecretStorageProvider.PROVIDER_TYPE_STRONGBOX, provider.providerType)
@@ -289,6 +290,7 @@ class AndroidKeystoreSecretStorageProviderTest {
     assertTrue("attestation chain must have at least 2 certificates", chain.size >= 2)
 
     val summary = AndroidKeyAttestation.parse(chain[0])
+    android.util.Log.i("KnishIOCustodyEvidence", "keyMintSecurityLevel=${summary.keyMintSecurityLevel} chainLength=${chain.size} providerType=${provider.providerType}")
     assertTrue("attestation challenge must match", challenge.contentEquals(summary.challenge))
     assertEquals(
       "attested keyMint security level must match providerType",
@@ -323,7 +325,7 @@ class AndroidKeystoreSecretStorageProviderTest {
     val bundle = "3333333333333333333333333333333333333333333333333333333333333333"
     Thread.sleep(1500)
     val ex = assertThrows(SecretStorageException::class.java) {
-      provider.storeSecret(bundle, "auth-required-secret")
+      provider.storeSecret(bundle, "auth-required-secret", wishKnish.knishIO.client.storage.StorageOptions(allowUnrecoverable = true))
     }
     assertTrue(
       "Expected message to mention user authentication, got: ${ex.message}",
