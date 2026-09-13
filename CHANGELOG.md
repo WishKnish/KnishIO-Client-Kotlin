@@ -14,25 +14,26 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
-## [Unreleased]
+## [1.1.0] — 2026-09-12
 
 ### Added
 
 - **Secret Recovery (`recoverSecret` & `recoveryPassphrase`)**: cross-SDK secret recovery envelope support. When `options.recoveryPassphrase` is provided to `storeSecret`, a secondary software envelope is sealed and stored under `knishio:recovery:<bundleHash>` (`RECOVERY_KEY_PREFIX`). `recoverSecret` opens the recovery record and re-enrolls the master secret under the provider's active key.
 - **Hardware provider recovery requirement**: `AndroidKeystoreSecretStorageProvider` requires `options.recoveryPassphrase` unless `allowUnrecoverable = true` is explicitly passed in `StorageOptions`.
 - **`FileStorageBackend`**: atomic file-based key-value persistence backend implementing `StorageBackend`. Stores items as individual files in a specified directory with atomic temporary-file replacement (`ATOMIC_MOVE`) and restrictive POSIX file permissions (`rw-------` / 0o600) on supported filesystems. Filenames are percent-encoded (including `.` and `*`) so keys are portable to Windows and cannot escape the storage directory, and empty keys throw `IllegalArgumentException`.
-- **`AndroidKeystoreSecretStorageProvider`** (`android/`, separate Gradle build, AGP 9.2, minSdk 31): hardware-backed secret storage. A non-exportable AES-256-GCM KEK in AndroidKeyStore wraps a random device passphrase; the master secret is stored as the standard cross-SDK envelope under that passphrase, so the wire format is unchanged. `hardwareBacked`/`providerType` (`android-keystore-tee` | `android-keystore-strongbox`) come from `KeyInfo.securityLevel`; a software-level key or an unavailable StrongBox fails construction closed — it never reports `true` without the platform saying so. Instrumented tests run against an emulator (`./gradlew -p android connectedDebugAndroidTest`); CI runs the JVM fail-closed test, lint and the AAR build.
+- **`AndroidKeystoreSecretStorageProvider`** (`android/`, separate Gradle build, AGP 9.2, minSdk 31): hardware-backed secret storage. A non-exportable AES-256-GCM KEK in AndroidKeyStore wraps a random device passphrase; the master secret is stored as the standard cross-SDK envelope under that passphrase, so the wire format is unchanged. `hardwareBacked`/`providerType` (`android-keystore-tee` | `android-keystore-strongbox`) come from `KeyInfo.securityLevel`; a software-level key or an unavailable StrongBox fails construction closed — it never reports `true` without the platform saying so. Instrumented tests run against an emulator or device (`./gradlew -p android connectedDebugAndroidTest`; verified on a Pixel 10 at `SECURITY_LEVEL_STRONGBOX` with a 5-certificate attestation chain); CI runs the JVM fail-closed test, lint and the AAR build.
 - **`SecretEnvelope`**: the PBKDF2/AES-GCM envelope crypto extracted from `AesGcmSecretStorageProvider` so both providers share one custody-agnostic implementation.
 - **`attestCustody(challenge)` and `AndroidKeyAttestation`**: `AndroidKeystoreSecretStorageProvider.attestCustody` generates an EC key pair in KeyStore with an attestation challenge and returns the X.509 certificate chain attesting the device KeyMint level. `AndroidKeyAttestation` parses the ASN.1 extension (OID `1.3.6.1.4.1.11129.2.1.17`).
 
 ### Changed
 
+- **BREAKING:** **`hardwareBacked` is no longer a caller claim.** `AesGcmSecretStorageProvider` and `SecretStorageFactory.createDefault` drop the `hardwareBacked` parameter; `providerType` is always `aes-gcm` — it previously became `android-keystore-strongbox` on the flag alone while running software JCA crypto. Envelopes previously written with a caller-supplied `true` were never attested and remain readable. Source-level break for callers that passed the parameter; the wire format (`metadata.hardwareBacked`, required boolean) is unchanged.
 - **Optional metadata keys omitted when unset**: `SecretEnvelope` configures `explicitNulls = false`, omitting unset optional keys such as `label` from emitted envelope JSON instead of emitting `"label": null`, matching the cross-SDK convention.
 - **StrongBox-preferred custody policy and key hardening**: `AndroidKeystoreSecretStorageProvider` replaces `requireStrongBox: Boolean` with `strongBox: StrongBoxPolicy` (`PREFERRED`, `REQUIRED`, `DISABLED`), defaulting to `PREFERRED` (attempts StrongBox and falls back to TEE). Adds `requireUnlockedDevice: Boolean` (default true) and `userAuthenticationValiditySeconds: Int?` hardening options.
+- **BREAKING:** `SecretStorageProvider` gains the abstract method `recoverSecret(bundleHash, recoveryPassphrase, options)` (`SecretStorageProvider.kt:150-154`, no default body); third-party implementations must add it.
 
 ### Fixed
 
-- **`hardwareBacked` is no longer a caller claim.** `AesGcmSecretStorageProvider` and `SecretStorageFactory.createDefault` drop the `hardwareBacked` parameter; `providerType` is always `aes-gcm` — it previously became `android-keystore-strongbox` on the flag alone while running software JCA crypto. Envelopes previously written with a caller-supplied `true` were never attested and remain readable. Source-level break for callers that passed the parameter; the wire format (`metadata.hardwareBacked`, required boolean) is unchanged.
 - **Cross-SDK envelope emitted-key assertion**: `CrossPlatformVectorsTest` now explicitly asserts that the emitted metadata contains `hardwareBacked: false` and `providerType: "aes-gcm"`.
 
 ## [1.0.0] — 2026-09-10
@@ -341,8 +342,15 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > "Upcoming" are stale and do not reflect current plans. **Update (2026-09-10):**
 > `1.0.0` has since shipped, dated above; it is the ML-KEM-1024 cutover release
 > and bears no relation to the "Target: 2025-09-01" plan recorded here.
+> **Update (2026-09-12):** `1.1.0` has now shipped as well, dated above; it is the
+> hardware-custody secret-storage release and delivers none of the "Future" items
+> listed here (cellular architecture, cross-cell protocols, performance monitoring,
+> GraphQL query optimizations). Both stale headings now resolve as links to the
+> real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
+> at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.0.0
 [0.9.4]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.4
 [0.9.3]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.3

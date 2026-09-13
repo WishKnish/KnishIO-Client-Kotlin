@@ -36,6 +36,12 @@ collect "build.gradle.kts version" \
 # against the manifest, so the two must never drift.
 collect "SelfTest.kt SDK_VERSION" \
   "$(sed -n 's/^const val SDK_VERSION *= *"\([^"]*\)".*/\1/p' src/main/kotlin/SelfTest.kt | head -1)"
+# The Android composite module carries its own version and pins the core artifact; both must
+# move with the core, or the module's POM would depend on the previous release.
+collect "android/build.gradle.kts version" \
+  "$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' android/build.gradle.kts | head -1)"
+collect "android/build.gradle.kts core dependency" \
+  "$(sed -n 's/^  api("io\.knish:knishio-client-kotlin:\([^"]*\)").*/\1/p' android/build.gradle.kts | head -1)"
 # -----------------------------------------------------------------------------------------
 
 mismatches=()
