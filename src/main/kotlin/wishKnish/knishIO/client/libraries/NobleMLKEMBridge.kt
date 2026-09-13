@@ -34,18 +34,6 @@ class NobleMLKEMBridge {
             context.eval("js", "NobleMLKEM")
         }
         
-        // Custom key classes for ML-KEM
-        class MLKEMPublicKey(val bytes: ByteArray) : PublicKey {
-            override fun getAlgorithm(): String = if (bytes.size >= 1500) "ML-KEM-1024" else "ML-KEM-768"
-            override fun getFormat(): String = "RAW"
-            override fun getEncoded(): ByteArray = bytes
-        }
-        
-        class MLKEMPrivateKey(val bytes: ByteArray) : PrivateKey {
-            override fun getAlgorithm(): String = if (bytes.size >= 3000) "ML-KEM-1024" else "ML-KEM-768"
-            override fun getFormat(): String = "RAW"
-            override fun getEncoded(): ByteArray = bytes
-        }
         
         /**
          * Generate an ML-KEM key pair from seed at the given parameter set, using the noble
@@ -61,8 +49,8 @@ class NobleMLKEMBridge {
             val publicKeyHex = result.getMember("publicKey").asString()
             val secretKeyHex = result.getMember("secretKey").asString()
             
-            val publicKey = MLKEMPublicKey(Hex.decode(publicKeyHex))
-            val privateKey = MLKEMPrivateKey(Hex.decode(secretKeyHex))
+            val publicKey = MlKemRawPublicKey(Hex.decode(publicKeyHex))
+            val privateKey = MlKemRawPrivateKey(Hex.decode(secretKeyHex))
             
             return KeyPair(publicKey, privateKey)
         }

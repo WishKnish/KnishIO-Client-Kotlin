@@ -605,7 +605,8 @@ class Wallet @JvmOverloads constructor(
     // Kotlin: generateSecret(key, 128) → hash(key, 128/2=64) = 64 bytes = 128 hex chars
     val pqSeedHex = key?.let { Crypto.generateSecret(it, 128) } ?: return null
     val pqSeed = org.bouncycastle.util.encoders.Hex.decode(pqSeedHex)
-    return NobleMLKEMBridge.generateMLKEMKeyPairFromSeed(pqSeed, parameterSet)
+    val (ek, dk) = MlKemBackend.instance.keygenFromSeed(pqSeed, parameterSet)
+    return java.security.KeyPair(MlKemRawPublicKey(ek), MlKemRawPrivateKey(dk))
   }
 
   /**
@@ -754,9 +755,7 @@ class Wallet @JvmOverloads constructor(
         "expected $expectedPkBytes (ML-KEM-$mlkemParameterSet). The peer is not running ML-KEM-$mlkemParameterSet; " +
         "upgrade the peer, or step this client back to the other parameter set."
     }
-    // Create MLKEMPublicKey from raw bytes (not X509 encoded)
-    val recipientPublicKey = NobleMLKEMBridge.Companion.MLKEMPublicKey(recipientPublicKeyBytes)
-    val (sharedSecret, cipherText) = NobleMLKEMBridge.encapsulate(recipientPublicKey)
+    val (sharedSecret, cipherText) = MlKemBackend.instance.encapsulate(recipientPublicKeyBytes)
     
     // Encrypt message using shared secret (AES-GCM like JavaScript)
     val encryptedMessage = encryptWithSharedSecret(messageBytes, sharedSecret)
@@ -787,9 +786,7 @@ class Wallet @JvmOverloads constructor(
     if (cipherTextBytes.size == ciphertextBytesFor(mlkemParameterSet)) {
       // Use raw private key bytes (like JavaScript SDK)
       val rawPrivkeyBytes = mlkemRawPrivkey ?: return null
-      return NobleMLKEMBridge.decapsulate(
-        cipherTextBytes, NobleMLKEMBridge.Companion.MLKEMPrivateKey(rawPrivkeyBytes)
-      )
+      return MlKemBackend.instance.decapsulate(cipherTextBytes, rawPrivkeyBytes)
     }
 
     val otherSet = if (mlkemParameterSet == 1024) 768 else 1024
@@ -798,9 +795,7 @@ class Wallet @JvmOverloads constructor(
     }
     val derivedPrivkey = (deriveMlKemKeypair(otherSet) ?: return null).private.encoded
     return try {
-      NobleMLKEMBridge.decapsulate(
-        cipherTextBytes, NobleMLKEMBridge.Companion.MLKEMPrivateKey(derivedPrivkey)
-      )
+      MlKemBackend.instance.decapsulate(cipherTextBytes, derivedPrivkey)
     } finally {
       SecureMemory.zeroize(derivedPrivkey)
     }

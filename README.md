@@ -14,7 +14,8 @@ This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its 
 ### Gradle
 ```kotlin
 dependencies {
-    implementation("io.knish:knishio-client-kotlin:1.0.0")
+    implementation("io.knish:knishio-client-kotlin:1.1.1")
+    implementation("io.knish:knishio-client-kotlin-android:1.1.1") // Android only: AndroidKeystoreSecretStorageProvider (AAR, minSdk 31)
 }
 ```
 
@@ -23,14 +24,21 @@ dependencies {
 <dependency>
   <groupId>io.knish</groupId>
   <artifactId>knishio-client-kotlin</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.1</version>
+</dependency>
+<!-- Android only: AndroidKeystoreSecretStorageProvider (AAR, minSdk 31) -->
+<dependency>
+  <groupId>io.knish</groupId>
+  <artifactId>knishio-client-kotlin-android</artifactId>
+  <version>1.1.1</version>
+  <type>aar</type>
 </dependency>
 ```
 
 **Requirements:**
 - JDK 17 or higher — the published jar is Java 17 bytecode (class file major version 61)
 - Gradle 9.x to build from source (the wrapper pins 9.7.1)
-- Kotlin 2.3 or higher to consume 1.0.0 — it is built with Kotlin 2.4.10 and emits
+- Kotlin 2.3 or higher to consume 1.1.1 — it is built with Kotlin 2.4.10 and emits
   `@Metadata(mv = [2, 4, 0])`, which Kotlin compilers older than 2.3 cannot read. 0.9.4 and
   earlier emitted `mv = [2, 0]` and only required Kotlin 2.0.
 
@@ -57,7 +65,7 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v1.0.0'
+    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v1.1.1'
 }
 ```
 </details>
@@ -533,6 +541,8 @@ Master secrets are stored at rest in the cross-SDK AES-256-GCM envelope (PBKDF2-
 | `AndroidKeystoreSecretStorageProvider` | `android-keystore-tee` \| `android-keystore-strongbox` | Hardware (`true`) | AndroidKeyStore KEK (derived from `KeyInfo.securityLevel`) | Required unless `allowUnrecoverable` |
 
 `hardwareBacked` is derived by the provider from the platform, never accepted from the caller; software providers always report `false`. A hardware provider refuses to store without a recovery passphrase unless `allowUnrecoverable` is set — the recovery envelope (`knishio:recovery:<bundleHash>`, `providerType: "aes-gcm"`) is *software* custody whose strength is bounded by that passphrase: enforce passphrase entropy or keep it on a second device.
+
+`AndroidKeystoreSecretStorageProvider` ships in the separate AAR `io.knish:knishio-client-kotlin-android` (minSdk 31), which depends on the core artifact with GraalVM excluded. On Android, ML-KEM runs on the BouncyCastle backend (`MlKemBackend`, selected automatically when `org.graalvm.polyglot.Context` is absent; force with `-Dknishio.mlkem.backend=bouncycastle|noble`); its keygen, encapsulation and decapsulation are byte-identical to the noble path and are asserted against the frozen `mlkem768`/`mlkem1024` vectors by the module's JVM tests.
 
 Android backup note: place the `FileStorageBackend` directory under `context.noBackupFilesDir` and exclude it in `dataExtractionRules` — a restored blob is undecryptable without the on-device Keystore KEK, so this is hygiene, not a security control.
 

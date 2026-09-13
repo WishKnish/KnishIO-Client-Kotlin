@@ -24,7 +24,7 @@ plugins {
 }
 
 group = "io.knish"
-version = "1.1.0"
+version = "1.1.1"
 description = "KnishIO Client SDK for Kotlin - Post-blockchain distributed ledger technology with quantum-resistant cryptography"
 
 // SBOM for dependency auditing: scope to the SHIPPED graph (runtimeClasspath) so the
@@ -113,6 +113,18 @@ tasks.test {
     "--add-opens=java.base/java.io=ALL-UNNAMED"      // Fix IO warnings
   )
 }
+
+// The ML-KEM vector suite again, with the BouncyCastle backend forced — the path Android
+// takes because the AAR excludes GraalVM. Same frozen vectors, second implementation.
+val testMlKemBouncyCastle by tasks.registering(Test::class) {
+  group = "verification"
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+  useJUnitPlatform { includeTags("mlkem") }
+  systemProperty("knishio.mlkem.backend", "bouncycastle")
+  jvmArgs("--enable-native-access=ALL-UNNAMED", "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
+}
+tasks.check { dependsOn(testMlKemBouncyCastle) }
 
 tasks.jacocoTestReport {
   dependsOn(tasks.test)

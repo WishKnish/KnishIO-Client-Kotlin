@@ -18,6 +18,7 @@ import org.junit.jupiter.api.TestFactory
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Tag
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.libraries.Shake256
 import wishKnish.knishIO.client.libraries.NaClBox
@@ -98,8 +99,17 @@ class CrossPlatformVectorsTest {
         }
     }
 
+    @Test
+    @Tag("mlkem")
+    @DisplayName("Active ML-KEM backend instance matches system property configuration")
+    fun backendMatchesConfiguration() {
+        val expected = System.getProperty(wishKnish.knishIO.client.libraries.MlKemBackend.BACKEND_PROPERTY) ?: "noble"
+        assertEquals(expected, wishKnish.knishIO.client.libraries.MlKemBackend.instance.name, "MlKemBackend.instance must match configured property")
+    }
+
     // ML-KEM768 keygen-from-seed is deterministic (FIPS-203) → byte-frozen pubkey, like a SHAKE vector.
     @Test
+    @Tag("mlkem")
     @DisplayName("ML-KEM768 keygen")
     fun mlkem768Keygen() {
         val v = vectors["mlkem768"]!!.jsonObject["keygen"]!!.jsonObject
@@ -115,6 +125,7 @@ class CrossPlatformVectorsTest {
     // Encapsulation is non-deterministic, but decapsulation + AES-256-GCM decrypt is deterministic →
     // one frozen {cipherText, encryptedMessage} sample must decrypt to the canonical plaintext.
     @Test
+    @Tag("mlkem")
     @DisplayName("ML-KEM768 decrypt")
     fun mlkem768Decrypt() {
         val v = vectors["mlkem768"]!!.jsonObject["decrypt"]!!.jsonObject
@@ -132,6 +143,7 @@ class CrossPlatformVectorsTest {
         assertEquals(expectedPlaintext, plaintext, "ML-KEM768 decrypt plaintext mismatch")
     }
     @Test
+    @Tag("mlkem")
     @DisplayName("ML-KEM1024 keygen")
     fun mlkem1024Keygen() {
         val v = vectors["mlkem1024"]!!.jsonObject["keygen"]!!.jsonObject
@@ -145,6 +157,7 @@ class CrossPlatformVectorsTest {
     }
 
     @Test
+    @Tag("mlkem")
     @DisplayName("ML-KEM1024 decrypt")
     fun mlkem1024Decrypt() {
         val v = vectors["mlkem1024"]!!.jsonObject["decrypt"]!!.jsonObject
@@ -292,6 +305,7 @@ class CrossPlatformVectorsTest {
 
     /** (a) The whole point of dual-identity inbound decryption: no second wallet, no step-back. */
     @Test
+    @Tag("mlkem")
     @DisplayName("A default (1024) wallet decrypts a frozen 768 envelope addressed to its own 768 identity")
     fun default1024WalletDecryptsFrozen768Envelope() {
         val v = mlkem768Decrypt
@@ -351,6 +365,7 @@ class CrossPlatformVectorsTest {
      * dispatch exercised by (a) is never even reached on the wire path.
      */
     @Test
+    @Tag("mlkem")
     @DisplayName("The CipherHash map path finds an envelope addressed to the 768 hash share")
     fun cipherHashMapPathFinds768AddressedEnvelope() {
         val v = mlkem768Decrypt

@@ -1,6 +1,7 @@
 package wishKnish.knishIO.client
 
 import org.junit.jupiter.api.Assumptions
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
 import strikt.assertions.isEqualTo
@@ -19,6 +20,7 @@ import java.net.URI
  * plaintext baseline. Run live (gated: skips cleanly when no validator is reachable):
  * `CIPHERHASH_TEST_URL=http://localhost:8081/graphql ./gradlew test --tests …CipherHashLiveTest`
  */
+@Tag("mlkem")
 class CipherHashLiveTest {
 
     private fun serverUrl(): String =

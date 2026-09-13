@@ -14,6 +14,25 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [1.1.1] — 2026-09-13
+
+### Added
+
+- The `io.knish:knishio-client-kotlin-android` AAR is now published to Maven Central alongside the core artifact (was buildable from source only in 1.1.0; its POM depends on the core with `org.graalvm.polyglot` excluded).
+- `MlKemBackend` with `BouncyCastleMlKemBackend` (BC 1.85 lightweight API, seed-based `KeyGen_internal(d,z)`, ML-KEM-768 and -1024) selected automatically when `org.graalvm.polyglot.Context` is absent, overridable via `-Dknishio.mlkem.backend`.
+- `MlKemRawPublicKey` and `MlKemRawPrivateKey` raw-bytes ML-KEM key wrappers.
+- The `testMlKemBouncyCastle` Gradle verification task for executing the ML-KEM vector suite against the BouncyCastle backend.
+
+### Changed
+
+- **BREAKING:** Removal of dead BouncyCastle JCA helpers from `PostQuantumCrypto` (`generateMLKEMKeyPair`, `generateMLKEMKeyPairFromSeed`, `extractRawMLKEMPublicKey`, `hasValidMLKEMEntropy`, `rawMLKEMPublicKeyToBase64`, `privateKeyFromHex`, `publicKeyToBase64`, `privateKeyToBase64`, `publicKeyFromBase64`, `privateKeyFromBase64`, `convertJSEncryptedDataToKotlin`) and of `NobleMLKEMBridge.Companion.MLKEMPublicKey`/`MLKEMPrivateKey` (replaced by `MlKemRawPublicKey`/`MlKemRawPrivateKey`).
+- `PostQuantumCrypto.publicKeyFromHex` now returns a raw-bytes key (`MlKemRawPublicKey`) instead of failing on X.509 parsing.
+- The BouncyCastle JCA provider is no longer registered by this library.
+
+### Fixed
+
+- **ML-KEM on Android:** a secret-derived `Wallet` no longer throws `NoClassDefFoundError: org/graalvm/polyglot/Context` on ART; authentication and CipherHash transport work from the AAR.
+
 ## [1.1.0] — 2026-09-12
 
 ### Added
@@ -349,7 +368,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.1
 [1.1.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.0.0
 [0.9.4]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v0.9.4

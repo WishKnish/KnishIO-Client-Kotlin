@@ -308,7 +308,7 @@ jobs:
     runs-on: ubuntu-latest
     # `version` is a hard dependency, not a courtesy: publishing a tag the manifest does not
     # claim is the failure this pipeline exists to prevent.
-    needs: [build, version]
+    needs: [build, version, android]
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -356,9 +356,24 @@ jobs:
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407  # v3
+      with:
+        packages: platforms;android-36 build-tools;36.0.0
+        accept-android-sdk-licenses: true
     
     - name: Publish to Maven Central (Central Portal)
       run: ./gradlew publishToMavenCentral --no-daemon
+      env:
+        ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+        ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+        ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+        ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+
+    - name: Publish Android AAR to Maven Central (Central Portal)
+      run: ./gradlew -p android publishToMavenCentral --no-daemon
       env:
         ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
         ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
