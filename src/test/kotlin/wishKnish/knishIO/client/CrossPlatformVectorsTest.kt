@@ -235,6 +235,11 @@ class CrossPlatformVectorsTest {
             val test = t.jsonObject
             val payload = test["payload"]!!.jsonObject
             val bundleHash = test["bundleHash"]!!.jsonPrimitive.content
+            val storageKey = test["storageKey"]!!.jsonPrimitive.content
+            if (storageKey.startsWith("knishio:recovery:")) {
+                assertRecoveryVector(test, payload, bundleHash, storageKey)
+                continue
+            }
 
             val backend = wishKnish.knishIO.client.storage.MemoryStorageBackend()
             backend.setItem(test["storageKey"]!!.jsonPrimitive.content, payload.toString())
@@ -291,6 +296,62 @@ class CrossPlatformVectorsTest {
             assertEquals(false, emittedMetadata["hardwareBacked"]!!.jsonPrimitive.boolean, "a software provider must never emit hardwareBacked=true")
             assertEquals("aes-gcm", emittedMetadata["providerType"]!!.jsonPrimitive.content)
         }
+    }
+
+    private fun assertRecoveryVector(
+        test: JsonObject,
+        payload: JsonObject,
+        bundleHash: String,
+        storageKey: String
+    ) {
+        val backend = wishKnish.knishIO.client.storage.MemoryStorageBackend()
+        backend.setItem(storageKey, payload.toString())
+        assertNull(backend.getItem("knishio:secret:$bundleHash"))
+
+        val provider = wishKnish.knishIO.client.storage.AesGcmSecretStorageProvider(backend)
+        val recoveryPassphrase = test["recoveryPassphrase"]!!.jsonPrimitive.content
+        val primaryPassphrase = "xsdk-reenrolled-primary-pass"
+
+        provider.recoverSecret(
+            bundleHash,
+            recoveryPassphrase,
+            wishKnish.knishIO.client.storage.StorageOptions(passphrase = primaryPassphrase)
+        )
+
+        val decrypted = provider.retrieveSecret(
+            bundleHash,
+            wishKnish.knishIO.client.storage.StorageOptions(passphrase = primaryPassphrase)
+        )
+        assertEquals(
+            test["expectedPlaintext"]!!.jsonPrimitive.content,
+            decrypted,
+            "failed to recover secret from ${test["producedBy"]!!.jsonPrimitive.content}"
+        )
+
+        val storedSecretRaw = backend.getItem("knishio:secret:$bundleHash")
+        val storedRecoveryRaw = backend.getItem(storageKey)
+        assertNotNull(storedSecretRaw)
+        assertNotNull(storedRecoveryRaw)
+
+        val emittedMetadata = json
+            .parseToJsonElement(storedSecretRaw!!)
+            .jsonObject["metadata"]!!.jsonObject
+        val emitted = emittedMetadata.keys
+
+        for (key in test["requiredMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
+            assertTrue(emitted.contains(key), "Kotlin must emit `$key`; emitted $emitted")
+        }
+        for (key in test["forbiddenMetadataKeys"]!!.jsonArray.map { it.jsonPrimitive.content }) {
+            assertFalse(
+                emitted.contains(key),
+                "`$key` is the 0.9.5 snake_case divergence and must never be emitted"
+            )
+        }
+        assertEquals(
+            false,
+            emittedMetadata["hardwareBacked"]!!.jsonPrimitive.boolean,
+            "a software provider must never emit hardwareBacked=true"
+        )
     }
 
     // =====================================================================================
