@@ -286,6 +286,15 @@ class KotlinSelfTest {
         "walletCreation", "shadowWalletClaim", "mlkem768"
     )
 
+    // the eight SDKs' results files (edge-kit/aggregate.mjs EXPECTED_LANES)
+    private val canonicalResultsSdks = listOf(
+        "javascript", "typescript", "python", "php", "kotlin", "rust", "c", "cpp"
+    )
+
+    // A validator's expected peers are the seven other than itself; any other
+    // *-results.json file in the shared directory is ignored.
+    private val expectedPeerSdks = canonicalResultsSdks - "kotlin"
+
 
     /**
      * Set deterministic per-atom timestamps before signing (mirrors JS setFixedTimestamps).
@@ -1375,6 +1384,12 @@ class KotlinSelfTest {
                     allPass = false
                 } else {
                     log("  SKIPPED: buffer_conservation_negative absent (vector not yet vendored)", Colors.YELLOW)
+                    // A skipped step is reported as skipped, never folded into bufferFamily's pass.
+                    testResults["bufferConservationNegative"] = mapOf(
+                        "passed" to false,
+                        "skipped" to true,
+                        "validationError" to "buffer_conservation_negative absent (vector not yet vendored)"
+                    )
                 }
             }
 
@@ -1496,118 +1511,107 @@ class KotlinSelfTest {
     }
     
     /**
+     * Runs one negative case. Setup (wallets, atoms, signing, the corruption) runs outside the
+     * expected-failure catch, so a setup failure fails the case instead of passing it. The case
+     * passes only when the full verification chain (Molecule.verify, which throws the reason
+     * Molecule.check() swallows) rejects the molecule with [expected]; any other exception, or no
+     * exception, fails it with expected vs got.
+     */
+    private fun runNegativeCase(
+        name: String,
+        expected: Class<out Exception>,
+        setup: () -> Molecule,
+        sourceWallet: Wallet
+    ): Boolean {
+        val molecule = try {
+            setup()
+        } catch (e: Exception) {
+            logTest(name, false, "setup failed before verification ran: ${e.javaClass.simpleName}: ${e.message}")
+            return false
+        }
+
+        val got: Exception? = try {
+            Molecule.verify(molecule, sourceWallet)
+            null
+        } catch (e: Exception) {
+            e
+        }
+
+        val passed = got != null && expected.isInstance(got)
+        val gotText = got?.let { "${it.javaClass.simpleName}: ${it.message}" } ?: "no exception (the molecule verified)"
+        if (passed) {
+            logTest("$name - rejected with ${expected.simpleName}", true)
+        } else {
+            logTest(name, false, "expected ${expected.simpleName}, got $gotText")
+        }
+        return passed
+    }
+
+    /**
      * Test 6: Negative Test Cases - Anti-Cheating Validation
-     * Tests that validation properly fails for invalid molecules
+     * Each case corrupts exactly one property of an otherwise valid molecule and requires the
+     * verifier to reject it with that property's own exception.
      */
     fun testNegativeCases(config: JsonObject): Boolean {
         log("\n6. Negative Test Cases (Anti-Cheating)", Colors.BLUE)
         
         val cryptoConfig = config.getAsJsonObject("tests").getAsJsonObject("crypto")
         val seed = cryptoConfig.get("seed").asString
-        var allNegativeTestsPassed = true
         
         return try {
             val secret = Crypto.generateSecret(seed, 2048)
-            val bundle = Crypto.generateBundleHash(secret)
             
             val sourceWallet = Wallet(secret, "TEST", "0123456789abcdeffedcba9876543210fedcba9876543210fedcba9876543210")
             sourceWallet.balance = 1000.0
-            
-            // Test 1: Missing Molecular Hash (should fail)
-            try {
-                val invalidMolecule = Molecule(secret, sourceWallet)
-                
-                // Add a valid atom but don't sign (no molecular hash)
-                val atom = Atom(
-                    position = sourceWallet.position ?: "",
-                    walletAddress = sourceWallet.address ?: "",
-                    isotope = 'V',
-                    token = "TEST",
-                    value = "-100"
-                )
-                invalidMolecule.atoms.add(atom)
-                
-                // This should fail because there's no molecular hash
-                val shouldFail = invalidMolecule.check(sourceWallet)
-                if (shouldFail) {
-                    log("  ❌ FAIL: Missing molecular hash validation (should FAIL) - Invalid molecule passed validation", Colors.RED)
-                    allNegativeTestsPassed = false
-                } else {
-                    log("  ✅ PASS: Missing molecular hash validation (should FAIL)", Colors.GREEN)
-                }
-            } catch (e: Exception) {
-                // Exception is expected for missing molecular hash
-                log("  ✅ PASS: Missing molecular hash validation (should FAIL)", Colors.GREEN)
+            val recipientWallet = Wallet(secret, "TEST", "fedcba98765432100123456789abcdef0123456789abcdef0123456789abcdef")
+            val remainderWallet = Wallet(secret, "TEST", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+
+            // A 3-atom V transfer (source debit, recipient credit, remainder credit) with distinct
+            // atom indexes and addresses, so index() and the self-transfer rule pass and each
+            // case's corruption is what reaches the check under test. Three atoms, not two: the
+            // 2-atom branch of CheckMolecule.isotopeV has no conservation check (reported, not
+            // fixed here: replenishToken depends on it), so an unbalanced 2-atom molecule would
+            // verify and this case could not exercise conservation at all.
+            fun transfer(debit: String, credit: String, remainder: String): Molecule {
+                val molecule = Molecule(secret, sourceWallet)
+                molecule.addAtom(Atom(sourceWallet.position!!, sourceWallet.address!!, 'V', "TEST", debit, index = 0))
+                molecule.addAtom(Atom(recipientWallet.position!!, recipientWallet.address!!, 'V', "TEST", credit, index = 1))
+                molecule.addAtom(Atom(remainderWallet.position!!, remainderWallet.address!!, 'V', "TEST", remainder, index = 2))
+                return molecule
             }
-            
-            // Test 2: Invalid Molecular Hash (should fail)
-            try {
-                val invalidMolecule = Molecule(secret, sourceWallet)
-                
-                val atom = Atom(
-                    position = sourceWallet.position ?: "",
-                    walletAddress = sourceWallet.address ?: "",
-                    isotope = 'V',
-                    token = "TEST",
-                    value = "-100"
-                )
-                invalidMolecule.atoms.add(atom)
-                
-                // Sign normally
-                invalidMolecule.sign()
-                
-                // Then corrupt the molecular hash
-                invalidMolecule.molecularHash = "invalid_hash_that_should_fail_validation_check_12345678"
-                
-                val shouldFail = invalidMolecule.check(sourceWallet)
-                if (shouldFail) {
-                    log("  ❌ FAIL: Invalid molecular hash validation (should FAIL) - Corrupted molecule passed validation", Colors.RED)
-                    allNegativeTestsPassed = false
-                } else {
-                    log("  ✅ PASS: Invalid molecular hash validation (should FAIL)", Colors.GREEN)
-                }
-            } catch (e: Exception) {
-                // Exception is expected for invalid molecular hash
-                log("  ✅ PASS: Invalid molecular hash validation (should FAIL)", Colors.GREEN)
-            }
-            
-            // Test 3: Unbalanced Transfer (should fail)
-            try {
-                val invalidMolecule = Molecule(secret, sourceWallet)
-                
-                // Create unbalanced atoms (doesn't sum to zero)
-                val debitAtom = Atom(
-                    position = sourceWallet.position ?: "",
-                    walletAddress = sourceWallet.address ?: "",
-                    isotope = 'V',
-                    token = "TEST",
-                    value = "-1000" // Debit full balance
-                )
-                invalidMolecule.atoms.add(debitAtom)
-                
-                val creditAtom = Atom(
-                    position = sourceWallet.position ?: "",
-                    walletAddress = sourceWallet.address ?: "",
-                    isotope = 'V',
-                    token = "TEST",
-                    value = "500"  // Credit only half - unbalanced!
-                )
-                invalidMolecule.atoms.add(creditAtom)
-                
-                invalidMolecule.sign()
-                
-                val shouldFail = invalidMolecule.check(sourceWallet)
-                if (shouldFail) {
-                    log("  ❌ FAIL: Unbalanced transfer validation (should FAIL) - Unbalanced molecule passed validation", Colors.RED)
-                    allNegativeTestsPassed = false
-                } else {
-                    log("  ✅ PASS: Unbalanced transfer validation (should FAIL)", Colors.GREEN)
-                }
-            } catch (e: Exception) {
-                // Exception is expected for unbalanced transfers
-                log("  ✅ PASS: Unbalanced transfer validation (should FAIL)", Colors.GREEN)
-            }
-            
+
+            // Test 1: a molecule that was never signed has no molecular hash. CheckMolecule.missing()
+            // (CheckMolecule.kt, the first step of molecularHash()) throws MolecularHashMissingException.
+            val missingHash = runNegativeCase(
+                "Missing molecular hash validation (should FAIL)",
+                wishKnish.knishIO.client.exception.MolecularHashMissingException::class.java,
+                { transfer("-1000", "500", "500") },
+                sourceWallet
+            )
+
+            // Test 2: a signed, balanced molecule whose molecularHash has one hex character changed.
+            val invalidHash = runNegativeCase(
+                "Invalid molecular hash validation (should FAIL)",
+                wishKnish.knishIO.client.exception.MolecularHashMismatchException::class.java,
+                {
+                    transfer("-1000", "500", "500").also { molecule ->
+                        molecule.sign()
+                        val hash = molecule.molecularHash!!
+                        molecule.molecularHash = (if (hash[0] == '0') "1" else "0") + hash.substring(1)
+                    }
+                },
+                sourceWallet
+            )
+
+            // Test 3: a signed transfer that debits 1000 and credits only 500 + 100.
+            val unbalanced = runNegativeCase(
+                "Unbalanced transfer validation (should FAIL)",
+                wishKnish.knishIO.client.exception.TransferUnbalancedException::class.java,
+                { transfer("-1000", "500", "100").also { it.sign() } },
+                sourceWallet
+            )
+
+            val allNegativeTestsPassed = missingHash && invalidHash && unbalanced
             testResults["negativeCases"] = mapOf(
                 "passed" to allNegativeTestsPassed,
                 "description" to "Anti-cheating validation tests",
@@ -1645,39 +1649,39 @@ class KotlinSelfTest {
         // Configurable shared results directory for cross-platform testing
         val sharedResultsDir = System.getenv("KNISHIO_SHARED_RESULTS") ?: "../shared-test-results"
         val resultsDir = File(sharedResultsDir)
+
+        // The denominator is the seven canonical peers, never the number of files that happen
+        // to be present: a peer that published nothing must count against coverage.
+        crossTargetsExpected = expectedPeerSdks.size
+        crossTargetsValidated = 0
+        val noPeerFiles = expectedPeerSdks.none { File(resultsDir, "$it-results.json").isFile }
+
+        // No shared directory, or not one canonical peer file in it: cross-validation did not
+        // run. This SDK keeps its stricter existing behaviour — the run fails (in standalone
+        // and cross-validation-only mode alike) rather than reporting absence as a skip.
+        // Absence of evidence must never be reported as evidence of compatibility.
+        if (noPeerFiles) {
+            log("  ❌ Cross-validation cannot run: no peer results in $sharedResultsDir", Colors.RED)
+            crossValidationRan = false
+            crossSdkCompatible = false
+            return false
+        }
         crossValidationRan = true
 
-        // A missing shared directory in Round 2 is a HARD FAILURE, not a skip. This
-        // returned true — "compatible" — having found nothing to check. Absence of evidence
-        // must never be reported as evidence of compatibility.
-        if (!resultsDir.exists()) {
-            log("  ❌ Shared results directory not found — cross-validation CANNOT run", Colors.RED)
-            crossSdkCompatible = false
-            return false
-        }
-
-        // Scope to *-results.json. `endsWith(".json")` also matched the canonical vector
-        // MASTERS in this directory (canonical-patent-vectors.json,
-        // cross-platform-test-vectors.json) and fed them into the peer loop as SDK results;
-        // they carry no `molecules` object, so they inflated the apparent peer count while
-        // contributing to neither pass nor fail.
-        val resultFiles = resultsDir.listFiles { file ->
-            file.name.endsWith("-results.json") && !file.name.contains("kotlin")
-        } ?: emptyArray()
-
-        // Zero peers in Round 2 means Round 2 did not happen.
-        if (resultFiles.isEmpty()) {
-            log("  ❌ No peer SDK results found — nothing to cross-validate", Colors.RED)
-            crossSdkCompatible = false
-            return false
-        }
-
-        crossTargetsExpected = resultFiles.size
         var peersValidated = 0
         var allValid = true
 
-        for (file in resultFiles) {
-            val sdkName = file.name.replace("-results.json", "")
+        for (sdkName in expectedPeerSdks) {
+            val file = File(resultsDir, "$sdkName-results.json")
+            if (!file.isFile) {
+                log("  ❌ $sdkName-results.json missing", Colors.RED)
+                continue
+            }
+
+            // A peer counts as validated only when every required type (the six signed
+            // molecules plus the mlkem768 decryption) verified and nothing about it failed.
+            val verifiedTypes = mutableSetOf<String>()
+            var peerFailed = false
 
             try {
                 val otherResults = JsonParser.parseString(file.readText()).asJsonObject
@@ -1696,9 +1700,8 @@ class KotlinSelfTest {
                     log("    ❌ $sdkName published no molecule for: ${absent.joinToString(", ")}", Colors.RED)
                     logTest("$sdkName publishes all required molecules", false)
                     allValid = false
+                    peerFailed = true
                 }
-
-                peersValidated++
 
                 if (molecules != null) {
                     for ((moleculeType, moleculeData) in molecules.entrySet()) {
@@ -1735,7 +1738,7 @@ class KotlinSelfTest {
                                         val originalPlaintext = mlkemData.get("originalPlaintext").asString
                                         
                                         val decryptedFromThem = ourWallet.decryptMessage(encryptedDataMap)
-                                        decryptionCompatible = decryptedFromThem == originalPlaintext
+                                        decryptionCompatible = decryptedFromThem != null && decryptedFromThem == originalPlaintext
                                         
                                         if (decryptionCompatible) {
                                             log("    ✅ Can decrypt $sdkName encrypted message", Colors.GREEN)
@@ -1748,9 +1751,12 @@ class KotlinSelfTest {
                                     }
                                     
                                     logTest("$sdkName $moleculeType decryption compatibility", decryptionCompatible)
-                                    
-                                    if (!decryptionCompatible) {
+
+                                    if (decryptionCompatible) {
+                                        verifiedTypes.add(moleculeType)
+                                    } else {
                                         allValid = false
+                                        peerFailed = true
                                     }
                                 } else {
                                     log("  ⚠️  No config available for ML-KEM768 cross-SDK test", Colors.YELLOW)
@@ -1798,9 +1804,12 @@ class KotlinSelfTest {
                                 }
                                 
                                 logTest("$sdkName $moleculeType molecule validation", isValid)
-                                
-                                if (!isValid) {
+
+                                if (isValid) {
+                                    verifiedTypes.add(moleculeType)
+                                } else {
                                     allValid = false
+                                    peerFailed = true
                                 }
                             }
                         } catch (error: Exception) {
@@ -1813,17 +1822,24 @@ class KotlinSelfTest {
                             log("    Error ($errorType): ${error.message}", Colors.RED)
                             log("    This may indicate ML-KEM768 data being parsed as standard molecule", Colors.YELLOW)
                             allValid = false
+                            peerFailed = true
                         }
                     }
                 }
             } catch (error: Exception) {
                 log("  ❌ Failed to load $sdkName results: ${error.message}", Colors.RED)
+                allValid = false
+                peerFailed = true
+            }
+
+            if (!peerFailed && verifiedTypes.containsAll(requiredMoleculeTypes)) {
+                peersValidated++
             }
         }
-        
+
         // COVERAGE FLOOR. `allValid` starts true and only becomes false on a DETECTED
         // failure, so it records "nothing went wrong", not "everything was checked". Those
-        // differ whenever the loop examined fewer peers than it should have. Require both.
+        // differ whenever fewer than all seven canonical peers verified in full. Require both.
         crossTargetsValidated = peersValidated
         val fullCoverage = peersValidated == crossTargetsExpected
 

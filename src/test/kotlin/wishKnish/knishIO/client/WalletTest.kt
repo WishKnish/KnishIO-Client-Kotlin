@@ -1,9 +1,15 @@
 package wishKnish.knishIO.client
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import strikt.api.*
 import strikt.assertions.*
 import wishKnish.knishIO.client.data.graphql.types.TokenUnit
+import wishKnish.knishIO.client.libraries.Crypto
 
 class WalletTest {
     
@@ -94,15 +100,29 @@ class WalletTest {
     
     @Test
     fun `wallet should fail verification for tampered messages`() {
-        val wallet = Wallet("tamper-test-secret", "TAMPER")
-        val wallet2 = Wallet("tamper-test-secret-2", "TAMPER")
-        
-        // Initialize private keys by calling encryption methods
-        val privkey1 = wallet.getMyEncPrivateKey()
-        val privkey2 = wallet2.getMyEncPrivateKey()
-        
-        // Test that wallets with different secrets have different private keys
-        expectThat(privkey1).isNotEqualTo(privkey2)
+        val senderWallet = Wallet("tamper-test-secret", "TAMPER")
+        val recipientWallet = Wallet("tamper-test-secret-2", "TAMPER")
+        val message = "Message that must not survive tampering"
+
+        val recipientEncPublicKey = recipientWallet.getMyEncPublicKey() ?: ""
+        val encrypted = senderWallet.encryptString(message, recipientEncPublicKey)
+
+        // Untampered: the recipient recovers the message.
+        expectThat(recipientWallet.decryptString(encrypted)).isEqualTo(message)
+
+        // The payload maps hashShare(recipient key) to the recipient's base64 ciphertext. Change
+        // one character in the middle of that ciphertext (every bit of a middle base64 character
+        // is significant), keeping the envelope valid JSON and valid base64.
+        val envelope = Json.parseToJsonElement(encrypted).jsonObject
+        val recipientShare = Crypto.hashShare(recipientEncPublicKey, senderWallet.characters ?: "BASE64")
+        val cipherText = envelope.getValue(recipientShare).jsonPrimitive.content
+        val at = cipherText.length / 2
+        val tamperedCipherText = cipherText.substring(0, at) +
+            (if (cipherText[at] == 'A') 'B' else 'A') + cipherText.substring(at + 1)
+        val tampered = JsonObject(envelope + (recipientShare to JsonPrimitive(tamperedCipherText))).toString()
+
+        // decryptString's failure contract is to return its fallbackValue (null), not to throw.
+        expectThat(recipientWallet.decryptString(tampered)).isNull()
     }
     
     @Test

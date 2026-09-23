@@ -126,6 +126,14 @@ val testMlKemBouncyCastle by tasks.registering(Test::class) {
 }
 tasks.check { dependsOn(testMlKemBouncyCastle) }
 
+// The live CipherHash tests read these env vars directly, which Gradle does not track, so a
+// run with a new URL or parameter set would otherwise be reported UP-TO-DATE from the last
+// (skipped) run. Declaring them as inputs makes every Test task rerun when they change.
+tasks.withType<Test>().configureEach {
+  inputs.property("cipherhashTestUrl", providers.environmentVariable("CIPHERHASH_TEST_URL").orElse(""))
+  inputs.property("cipherhashMlkemParameterSet", providers.environmentVariable("CIPHERHASH_MLKEM_PARAMETER_SET").orElse(""))
+}
+
 tasks.jacocoTestReport {
   dependsOn(tasks.test)
   reports {

@@ -1,5 +1,6 @@
 package wishKnish.knishIO.client
 
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import wishKnish.knishIO.client.data.MetaData
@@ -67,11 +68,7 @@ class CheckMoleculeOTSTest {
             val verificationResult = CheckMolecule.ots(molecule)
             println("   CheckMolecule.ots() Result: $verificationResult")
             
-            if (verificationResult) {
-                println("   ✅ WOTS+ SIGNATURE VERIFICATION SUCCESSFUL!")
-            } else {
-                println("   ❌ WOTS+ SIGNATURE VERIFICATION FAILED!")
-            }
+            assertTrue(verificationResult, "WOTS+ signature verification failed")
         } catch (e: Exception) {
             println("   ❌ WOTS+ SIGNATURE VERIFICATION THREW EXCEPTION: ${e.message}")
             throw e

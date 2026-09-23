@@ -8,8 +8,6 @@ import strikt.assertions.contains
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
 import strikt.assertions.isTrue
-import java.net.InetSocketAddress
-import java.net.Socket
 import java.net.URI
 
 /**
@@ -20,34 +18,22 @@ import java.net.URI
  * pubkey via a signed `walletPubkey` U-atom meta), then issues an encrypted `queryBalance` — the
  * validator ML-KEM-decrypts the request, executes it, and encrypts the response back to the
  * client's ML-KEM pubkey, which the client decrypts. Asserts the encrypted result matches the
- * plaintext baseline. Run live (gated: skips cleanly when no validator is reachable):
+ * plaintext baseline. Run live (gated on the env var alone: skipped when it is unset, and an
+ * unreachable validator at a configured URL FAILS the test):
  * `CIPHERHASH_TEST_URL=http://localhost:8081/graphql ./gradlew test --tests …CipherHashLiveTest`
  */
 @Tag("mlkem")
 class CipherHashLiveTest {
 
-    private fun serverUrl(): String =
-        System.getenv("CIPHERHASH_TEST_URL") ?: "http://localhost:8081/graphql"
-
-    private fun validatorReachable(url: String): Boolean = try {
-        val uri = URI(url)
-        val port = when {
-            uri.port != -1 -> uri.port
-            uri.scheme == "https" -> 443
-            else -> 80
-        }
-        Socket().use { it.connect(InetSocketAddress(uri.host, port), 1500) }
-        true
-    } catch (e: Exception) {
-        false
+    private fun serverUrl(): String {
+        val url = System.getenv("CIPHERHASH_TEST_URL")
+        Assumptions.assumeTrue(url != null) { "set CIPHERHASH_TEST_URL to run the live CipherHash test" }
+        return url!!
     }
 
     @Test
     fun `encrypted CipherHash round-trip matches plaintext`() {
         val url = serverUrl()
-        Assumptions.assumeTrue(validatorReachable(url)) {
-            "No validator reachable at $url (set CIPHERHASH_TEST_URL) — skipping live CipherHash test"
-        }
         val secret = "phase-e-live-kotlin-secret-0123456789ABCDEF"
 
         // ONE session, transport toggled on it — the queried balance wallet stays fixed. (A fresh
@@ -94,9 +80,6 @@ class CipherHashLiveTest {
     @Test
     fun `an encrypt-true session is refused when it drops to plaintext`() {
         val url = serverUrl()
-        Assumptions.assumeTrue(validatorReachable(url)) {
-            "No validator reachable at $url (set CIPHERHASH_TEST_URL) — skipping live CipherHash test"
-        }
         val secret = "phase-e-enforcement-kotlin-secret-0123456789ABCDEF"
 
         val param = System.getenv("CIPHERHASH_MLKEM_PARAMETER_SET")?.toIntOrNull() ?: 1024
