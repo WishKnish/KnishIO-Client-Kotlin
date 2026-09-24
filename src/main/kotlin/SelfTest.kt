@@ -1568,10 +1568,8 @@ class KotlinSelfTest {
 
             // A 3-atom V transfer (source debit, recipient credit, remainder credit) with distinct
             // atom indexes and addresses, so index() and the self-transfer rule pass and each
-            // case's corruption is what reaches the check under test. Three atoms, not two: the
-            // 2-atom branch of CheckMolecule.isotopeV has no conservation check (reported, not
-            // fixed here: replenishToken depends on it), so an unbalanced 2-atom molecule would
-            // verify and this case could not exercise conservation at all.
+            // case's corruption is what reaches the check under test. Three atoms is the pure-V
+            // shape the validator requires (source, recipient(s), remainder).
             fun transfer(debit: String, credit: String, remainder: String): Molecule {
                 val molecule = Molecule(secret, sourceWallet)
                 molecule.addAtom(Atom(sourceWallet.position!!, sourceWallet.address!!, 'V', "TEST", debit, index = 0))

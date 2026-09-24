@@ -451,7 +451,8 @@ class CheckMolecule {
       IllegalArgumentException::class,
       TransferToSelfException::class,
       TransferBalanceException::class,
-      TransferRemainderException::class
+      TransferRemainderException::class,
+      TransferUnbalancedException::class
     )
     fun isotopeV(
       molecule: Molecule,
@@ -481,6 +482,12 @@ class CheckMolecule {
             throw TransferMalformedException()
           }
         } ?: throw TransferMalformedException()
+        // Conservation (JS CheckMolecule.isotopeV): the two V values must sum to zero.
+        val firstValue = firstAtom.value?.toDoubleOrNull() ?: Double.NaN
+        val endValue = endAtom.value?.toDoubleOrNull() ?: Double.NaN
+        if (firstValue + endValue != 0.0) {
+          throw TransferUnbalancedException()
+        }
 
         return true
       }

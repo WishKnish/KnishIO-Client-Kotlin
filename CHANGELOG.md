@@ -14,6 +14,17 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [Unreleased]
+
+### Fixed
+
+- `CheckMolecule.isotopeV()` now rejects a 2-atom V molecule whose two values do not sum to
+  zero (`TransferUnbalancedException`), as the JS reference does (`CheckMolecule.js`). The 2-atom
+  branch checked only the token and the credit's sign, so `-1000 / +500` verified. The validator
+  already rejects any pure-V molecule with fewer than 3 V atoms or a non-zero sum; no Kotlin
+  builder emits an unbalanced 2-atom V molecule (`replenishTokens` uses C atoms). Pinned by
+  `CheckMoleculeIsotopeVTest`.
+
 ## [1.1.1] — 2026-09-13
 
 ### Added
