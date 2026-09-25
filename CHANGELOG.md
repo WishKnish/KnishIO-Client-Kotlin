@@ -14,7 +14,7 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
-## [Unreleased]
+## [1.1.2] — 2026-09-25
 
 ### Fixed
 
@@ -32,6 +32,12 @@ not substantiate a detail, the entry says so instead of guessing.
   with `Wallet not found: bundle=…, position=…`. Querying the pointer is correct against earlier
   validators too. Pinned by `KnishIOClientTest` (`resolves the source wallet through ContinuId
   after a profile auth`).
+
+### Notes
+
+- Needed against validator 0.5.0 and later, which testnet.knish.io has run since 2026-09-24:
+  earlier releases are rejected with `Wallet not found` on the first molecule after the second
+  and later logins of an identity.
 
 ## [1.1.1] — 2026-09-13
 
@@ -387,7 +393,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.2
 [1.1.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.1
 [1.1.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.0
 [1.0.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.0.0

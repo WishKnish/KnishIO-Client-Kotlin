@@ -14,8 +14,8 @@ This is the official Kotlin/Java implementation of the Knish.IO client SDK. Its 
 ### Gradle
 ```kotlin
 dependencies {
-    implementation("io.knish:knishio-client-kotlin:1.1.1")
-    implementation("io.knish:knishio-client-kotlin-android:1.1.1") // Android only: AndroidKeystoreSecretStorageProvider (AAR, minSdk 31)
+    implementation("io.knish:knishio-client-kotlin:1.1.2")
+    implementation("io.knish:knishio-client-kotlin-android:1.1.2") // Android only: AndroidKeystoreSecretStorageProvider (AAR, minSdk 31)
 }
 ```
 
@@ -24,13 +24,13 @@ dependencies {
 <dependency>
   <groupId>io.knish</groupId>
   <artifactId>knishio-client-kotlin</artifactId>
-  <version>1.1.1</version>
+  <version>1.1.2</version>
 </dependency>
 <!-- Android only: AndroidKeystoreSecretStorageProvider (AAR, minSdk 31) -->
 <dependency>
   <groupId>io.knish</groupId>
   <artifactId>knishio-client-kotlin-android</artifactId>
-  <version>1.1.1</version>
+  <version>1.1.2</version>
   <type>aar</type>
 </dependency>
 ```
@@ -38,7 +38,7 @@ dependencies {
 **Requirements:**
 - JDK 17 or higher — the published jar is Java 17 bytecode (class file major version 61)
 - Gradle 9.x to build from source (the wrapper pins 9.7.1)
-- Kotlin 2.3 or higher to consume 1.1.1 — it is built with Kotlin 2.4.10 and emits
+- Kotlin 2.3 or higher to consume 1.1.2 — it is built with Kotlin 2.4.10 and emits
   `@Metadata(mv = [2, 4, 0])`, which Kotlin compilers older than 2.3 cannot read. 0.9.4 and
   earlier emitted `mv = [2, 0]` and only required Kotlin 2.0.
 
@@ -65,7 +65,7 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v1.1.1'
+    implementation 'com.github.WishKnish:KnishIO-Client-Kotlin:v1.1.2'
 }
 ```
 </details>
