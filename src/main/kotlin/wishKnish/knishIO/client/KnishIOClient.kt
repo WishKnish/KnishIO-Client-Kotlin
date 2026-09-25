@@ -373,6 +373,7 @@ class KnishIOClient @JvmOverloads constructor(
     query.fillMolecule(authMeta)
 
     val response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
+    lastMoleculeQuery = null
 
     return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
   }

@@ -1,5 +1,10 @@
 package wishKnish.knishIO.client
 
+import io.mockk.every
+import io.mockk.mockkConstructor
+import io.mockk.spyk
+import io.mockk.unmockkConstructor
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
 import strikt.api.*
@@ -7,6 +12,10 @@ import strikt.assertions.*
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.exception.UnauthenticatedException
 import wishKnish.knishIO.client.exception.BalanceInsufficientException
+import wishKnish.knishIO.client.httpClient.HttpClient
+import wishKnish.knishIO.client.libraries.Crypto
+import wishKnish.knishIO.client.query.QueryContinuId
+import wishKnish.knishIO.client.response.ResponseContinuId
 import java.net.URI
 
 class KnishIOClientTest {
@@ -285,6 +294,40 @@ class KnishIOClientTest {
         expectThat(client) {
             get { hasSecret() }.isTrue()
             get { bundle() }.isNotEmpty()
+        }
+    }
+
+    @Test
+    fun `resolves the source wallet through ContinuId after a profile auth`() {
+        // Validator 0.5.0 no longer executes the I-atom of an unproven re-auth, so the auth
+        // molecule's USER remainder is never registered. The next molecule must be signed from the
+        // server's ContinuID pointer, not from that cached remainder.
+        mockkConstructor(HttpClient::class)
+        try {
+            val authPayload = """{\"token\":\"auth-token\",\"time\":3600,\"key\":\"server-key\",\"pubkey\":\"server-key\",\"encrypt\":false,\"expiresAt\":2000000000}"""
+            every { anyConstructed<HttpClient>().mutate(any()) } returns
+                """{"data":{"ProposeMolecule":{"molecularHash":"auth-hash","status":"accepted","payload":"$authPayload"}}}"""
+
+            val spyClient = spyk(KnishIOClient(listOf(testUri)))
+            val bundle = Crypto.generateBundleHash(testSecret)
+            val continuIdPosition = "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+            val continuIdWallet = Wallet(testSecret, "USER", continuIdPosition)
+            val continuIdResponse = ResponseContinuId(
+                QueryContinuId(HttpClient(testUri)),
+                """{"data":{"ContinuId":{"address":"${continuIdWallet.address}","bundleHash":"$bundle","tokenSlug":"USER","position":"$continuIdPosition","amount":"0"}}}"""
+            )
+            every { spyClient.queryContinuId(any(), "USER") } returns continuIdResponse
+
+            spyClient.requestAuthToken(secret = testSecret, cellSlug = "public", encrypt = false)
+            val cachedQueryAfterAuth = spyClient.lastMoleculeQuery
+
+            val molecule = spyClient.createMolecule()
+
+            verify(exactly = 1) { spyClient.queryContinuId(bundle, "USER") }
+            expectThat(molecule.sourceWallet.position).isEqualTo(continuIdPosition)
+            expectThat(cachedQueryAfterAuth).isNull()
+        } finally {
+            unmockkConstructor(HttpClient::class)
         }
     }
 }

@@ -24,6 +24,14 @@ not substantiate a detail, the entry says so instead of guessing.
   already rejects any pure-V molecule with fewer than 3 V atoms or a non-zero sum; no Kotlin
   builder emits an unbalanced 2-atom V molecule (`replenishTokens` uses C atoms). Pinned by
   `CheckMoleculeIsotopeVTest`.
+- After a profile authorization (`requestAuthToken` with a secret), the next molecule is signed
+  from the ContinuID position the validator reports (`queryContinuId`) instead of from the auth
+  molecule's cached USER remainder wallet. From validator 0.5.0 an unproven re-authorization
+  (every login of an identity after its first) no longer creates a wallet at its I-atom position
+  or moves the ContinuID pointer there, so the first molecule after such a login was rejected
+  with `Wallet not found: bundle=…, position=…`. Querying the pointer is correct against earlier
+  validators too. Pinned by `KnishIOClientTest` (`resolves the source wallet through ContinuId
+  after a profile auth`).
 
 ## [1.1.1] — 2026-09-13
 
