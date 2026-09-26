@@ -349,7 +349,10 @@ class KnishIOClient @JvmOverloads constructor(
     val query = createQuery(MutationRequestAuthorizationGuest::class) as MutationRequestAuthorizationGuest
     val response = query.execute(AccessTokenMutationVariable(this.cellSlug, wallet.pubkey, encrypt)) as ResponseRequestAuthorizationGuest
 
-    return AuthToken.create(response.payload()!!, wallet, encrypt)
+    val payload = response.payload()?.takeIf { response.success() }
+      ?: throw UnauthenticatedException("Authorization attempt rejected by ledger. Reason: ${response.reason()}")
+
+    return AuthToken.create(payload, wallet, encrypt)
   }
 
   private fun getProfileAuthToken(secret: String, encrypt: Boolean = false): AuthToken {
@@ -372,7 +375,10 @@ class KnishIOClient @JvmOverloads constructor(
     val response = proposeAuthorization(secret, Wallet(secret, "AUTH", mlkemParameterSet = mlkemParameterSet), encrypt)
     log("KnishIOClient::getProfileAuthToken() - token signed from a fresh AUTH wallet (${if (pointerWallet == null) "no ContinuID pointer" else "pointer fallback"})")
 
-    return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
+    val payload = response.payload()?.takeIf { response.success() }
+      ?: throw UnauthenticatedException("Authorization attempt rejected by ledger. Reason: ${response.reason()}")
+
+    return AuthToken.create(payload, response.wallet(), encrypt)
   }
 
   /**
@@ -428,17 +434,19 @@ class KnishIOClient @JvmOverloads constructor(
   ): AuthToken {
     authInProcess = true
 
-    val authToken = when (secret) {
-      null -> getGuestAuthToken(cellSlug, encrypt)
-      else -> getProfileAuthToken(secret, encrypt)
+    try {
+      val authToken = when (secret) {
+        null -> getGuestAuthToken(cellSlug, encrypt)
+        else -> getProfileAuthToken(secret, encrypt)
+      }
+
+      setAuthToken(authToken)
+      switchEncryption(encrypt)
+
+      return authToken
+    } finally {
+      authInProcess = false
     }
-
-    setAuthToken(authToken)
-    switchEncryption(encrypt)
-
-    authInProcess = false
-
-    return authToken
   }
 
   /**

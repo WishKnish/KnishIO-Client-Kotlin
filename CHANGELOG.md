@@ -24,6 +24,11 @@ not substantiate a detail, the entry says so instead of guessing.
   `signingWallet` meta it added to the source atom was always rejected by validator 0.5.0 and
   later, on every isotope. The verifier already ignored that meta; the cross-SDK forgery fixture
   in `SigningWalletForgeryTest` now pins it.
+- A rejected login (`requestAuthToken`/`authorize`, guest or with a secret) now throws
+  `UnauthenticatedException` with the ledger's reason (`Authorization attempt rejected by
+  ledger. Reason: …`) instead of a `NullPointerException`. `authorize()` also clears
+  `authInProcess` when a login throws, so `client()` authorizes again on the next call instead
+  of skipping authorization for the rest of the session.
 
 ### Fixed
 

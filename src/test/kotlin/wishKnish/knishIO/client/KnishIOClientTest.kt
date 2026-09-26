@@ -359,7 +359,8 @@ class KnishIOClientTest {
     private fun profileLogin(
         continuIdData: String,
         statuses: List<String>,
-        transport: ProfileAuthTransport
+        transport: ProfileAuthTransport,
+        login: (KnishIOClient) -> Unit = { it.requestAuthToken(secret = testSecret, cellSlug = "public", encrypt = false) }
     ): KnishIOClient {
         val authPayload = """{\"token\":\"auth-token\",\"time\":3600,\"key\":\"server-key\",\"pubkey\":\"server-key\",\"encrypt\":false,\"expiresAt\":2000000000}"""
         mockkConstructor(HttpClient::class)
@@ -378,7 +379,7 @@ class KnishIOClientTest {
                 }
             }
             val client = KnishIOClient(listOf(testUri))
-            client.requestAuthToken(secret = testSecret, cellSlug = "public", encrypt = false)
+            login(client)
             return client
         } finally {
             unmockkConstructor(HttpClient::class)
@@ -446,11 +447,50 @@ class KnishIOClientTest {
         expectThat(transport.continuIdQueries).hasSize(1)
         expectThat(client.getAuthToken()!!.getWallet()!!.token).isEqualTo("AUTH")
 
-        // The fallback's rejection raises as a rejected login always has (payload()!! on a
-        // rejected ProposeMolecule), with no third authorization molecule.
+        // The fallback's rejection raises UnauthenticatedException with the ledger's reason, with
+        // no third authorization molecule.
         val rejectedTransport = ProfileAuthTransport()
-        expectThrows<NullPointerException> { profileLogin(data, listOf("rejected", "rejected"), rejectedTransport) }
+        expectThrows<UnauthenticatedException> { profileLogin(data, listOf("rejected", "rejected"), rejectedTransport) }
+            .get { message }.isEqualTo("Authorization attempt rejected by ledger. Reason: unproven signer")
         expectThat(rejectedTransport.proposals.map { it.atoms[0].token }).containsExactly("USER", "AUTH")
+    }
+
+    @Test
+    fun `a rejected login leaves no authorization in process, so client() logs in again`() {
+        val pointerWallet = Wallet(testSecret, "USER", pointerPosition)
+        val data = continuIdData("USER", pointerPosition, pointerWallet.address)
+        val transport = ProfileAuthTransport()
+
+        val client = profileLogin(data, listOf("rejected", "rejected", "accepted"), transport) {
+            val failure = runCatching { it.requestAuthToken(secret = testSecret, cellSlug = "public", encrypt = false) }
+            expectThat(failure.isFailure).isTrue()
+            expectThat(it.authInProcess).isFalse()
+            expectThat(it.getAuthToken()).isNull()
+
+            // With no stored token for the endpoint, client() authorizes before returning.
+            it.client()
+        }
+
+        expectThat(transport.proposals.map { it.atoms[0].token }).containsExactly("USER", "AUTH", "USER")
+        expectThat(client.getAuthToken()!!.getWallet()!!.token).isEqualTo("USER")
+        expectThat(client.authInProcess).isFalse()
+    }
+
+    @Test
+    fun `a rejected guest login throws UnauthenticatedException`() {
+        mockkConstructor(HttpClient::class)
+        try {
+            every { anyConstructed<HttpClient>().mutate(any()) } returns
+                """{"data":{"AccessToken":null},"errors":[{"message":"Cell not found"}]}"""
+            val client = KnishIOClient(listOf(testUri))
+
+            expectThrows<UnauthenticatedException> { client.authorize(cellSlug = "missing-cell") }
+                .get { message }.isNotNull().startsWith("Authorization attempt rejected by ledger. Reason: ")
+            expectThat(client.authInProcess).isFalse()
+            expectThat(client.getAuthToken()).isNull()
+        } finally {
+            unmockkConstructor(HttpClient::class)
+        }
     }
 
     @Test
