@@ -14,7 +14,7 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
-## [Unreleased]
+## [1.2.0] — 2026-09-26
 
 ### Changed
 
@@ -25,8 +25,10 @@ not substantiate a detail, the entry says so instead of guessing.
   later, on every isotope. The verifier already ignored that meta; the cross-SDK forgery fixture
   in `SigningWalletForgeryTest` now pins it.
 - A rejected login (`requestAuthToken`/`authorize`, guest or with a secret) now throws
-  `UnauthenticatedException` with the ledger's reason (`Authorization attempt rejected by
-  ledger. Reason: …`) instead of a `NullPointerException`. `authorize()` also clears
+  `UnauthenticatedException` (`Authorization attempt rejected by ledger. Reason: …`) instead of
+  a `NullPointerException`. A rejected login with a secret carries the ledger's reason; a
+  rejected guest login always reads `Reason: Invalid response from server`, because the guest
+  response has no ledger reason to report. `authorize()` also clears
   `authInProcess` when a login throws, so `client()` authorizes again on the next call instead
   of skipping authorization for the rest of the session.
 
@@ -422,7 +424,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.0
 [1.1.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.2
 [1.1.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.1
 [1.1.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.0

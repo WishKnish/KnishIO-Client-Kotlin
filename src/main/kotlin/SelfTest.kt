@@ -73,7 +73,7 @@ import kotlin.system.exitProcess
  * literals — the results file and the summary banner — which is two chances to bump one and
  * forget the other.
  */
-const val SDK_VERSION = "1.1.2"
+const val SDK_VERSION = "1.2.0"
 
 // ANSI Color codes for console output
 object Colors {

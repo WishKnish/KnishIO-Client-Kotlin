@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "io.knish"
-version = "1.1.2"
+version = "1.2.0"
 
 android {
   namespace = "wishKnish.knishIO.client.storage.keystore"
@@ -100,7 +100,7 @@ mavenPublishing {
 dependencies {
   // GraalVM polyglot (ML-KEM bridge, lazy) cannot run on ART and cannot be dexed; excluding the direct
   // artifacts drops their whole transitive tree. Everything else in core is plain JVM bytecode <= Java 17.
-  api("io.knish:knishio-client-kotlin:1.1.2") {
+  api("io.knish:knishio-client-kotlin:1.2.0") {
     exclude(group = "org.graalvm.polyglot")
   }
   implementation("org.bouncycastle:bcprov-jdk18on:1.85")
