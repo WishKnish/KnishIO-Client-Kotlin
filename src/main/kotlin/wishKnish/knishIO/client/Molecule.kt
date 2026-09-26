@@ -53,8 +53,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.exception.*
 import wishKnish.knishIO.client.libraries.*
@@ -862,36 +860,14 @@ import kotlin.math.ceil
    * zero (source -balance + Σ recipients + remainder +(balance-Σ) = 0).
    *
    * @param recipients map of recipient bundle-hash -> amount.
-   * @param signingWallet optional signing wallet whose data is attached to the source atom's meta
-   *   (for molecule reconciliation), mirroring JS AtomMeta.setSigningWallet.
    */
-  @JvmOverloads
   @Throws(BalanceInsufficientException::class)
   fun initWithdrawBuffer(
-    recipients: Map<String, Number>,
-    signingWallet: Wallet? = null
+    recipients: Map<String, Number>
   ): Molecule {
     val amount = recipients.values.sumOf { it.toDouble() }
     if (sourceWallet.balance - amount < 0) {
       throw BalanceInsufficientException()
-    }
-
-    // Optional signing-wallet meta on the source atom (JS AtomMeta.setSigningWallet parity).
-    val sourceMetas = mutableListOf<MetaData>()
-    if (signingWallet != null) {
-      sourceMetas.add(
-        MetaData(
-          key = "signingWallet",
-          value = buildJsonObject {
-            put("tokenSlug", signingWallet.token)
-            put("bundleHash", signingWallet.bundle)
-            put("address", signingWallet.address)
-            put("position", signingWallet.position)
-            put("pubkey", signingWallet.pubkey)
-            put("characters", signingWallet.characters)
-          }.toString()
-        )
-      )
     }
 
     // Source B-atom: debit the ENTIRE balance (UTXO drain) so the V + remainder atoms conserve.
@@ -905,7 +881,7 @@ import kotlin.math.ceil
         batchId = sourceWallet.batchId,
         metaType = "walletBundle",
         metaId = sourceWallet.bundle,
-        meta = finalMetas(metas = sourceMetas, wallet = sourceWallet),
+        meta = finalMetas(wallet = sourceWallet),
         index = generateIndex()
       )
     )

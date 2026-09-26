@@ -14,6 +14,17 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** `KnishIOClient.withdrawBufferToken()` no longer takes a `signingWallet`
+  argument, and `MutationWithdrawBufferToken.fillMolecule()` and `Molecule.initWithdrawBuffer()`
+  take only the recipients. Code that passes a signing wallet no longer compiles. The
+  `signingWallet` meta it added to the source atom was always rejected by validator 0.5.0 and
+  later, on every isotope. The verifier already ignored that meta; the cross-SDK forgery fixture
+  in `SigningWalletForgeryTest` now pins it.
+
 ## [1.1.2] — 2026-09-25
 
 ### Fixed

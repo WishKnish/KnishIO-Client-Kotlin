@@ -1078,16 +1078,14 @@ class KnishIOClient @JvmOverloads constructor(
    * Client-level wrapper over [Molecule.initWithdrawBuffer] (BVB/BV..VB), mirroring JS
    * `withdrawBufferToken` / Rust `withdraw_buffer_token`: the buffer wallet is BOTH the source
    * and the remainder (it nets down by [amount]); the withdrawn amount is credited to the
-   * caller's own bundle. Provide [signingWallet] to attach a signing-wallet meta to the source
-   * atom; pass an explicit [sourceWallet] to target a specific buffer wallet (else the on-ledger
-   * balance wallet for [token] is used).
+   * caller's own bundle. Pass an explicit [sourceWallet] to target a specific buffer wallet (else
+   * the on-ledger balance wallet for [token] is used).
    */
   @JvmOverloads
   fun withdrawBufferToken(
     token: String,
     amount: Number,
-    sourceWallet: Wallet? = null,
-    signingWallet: Wallet? = null
+    sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
     // Resolve the buffer/source wallet (the passed source, else the on-ledger balance wallet).
     val source = sourceWallet ?: queryBalance(token).payload()
@@ -1100,7 +1098,7 @@ class KnishIOClient @JvmOverloads constructor(
     val molecule = createMolecule(sourceWallet = source, remainderWallet = source)
     val query = createMoleculeMutation(MutationWithdrawBufferToken::class, molecule) as MutationWithdrawBufferToken
 
-    query.fillMolecule(recipients, signingWallet)
+    query.fillMolecule(recipients)
 
     return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
   }
