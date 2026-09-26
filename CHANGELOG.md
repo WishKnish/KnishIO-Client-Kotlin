@@ -25,6 +25,19 @@ not substantiate a detail, the entry says so instead of guessing.
   later, on every isotope. The verifier already ignored that meta; the cross-SDK forgery fixture
   in `SigningWalletForgeryTest` now pins it.
 
+### Fixed
+
+- A returning user's login (`requestAuthToken` with a secret) is now signed from the ContinuID
+  pointer, with the USER wallet registered at that position, so validator 0.5.0 and later issue
+  a proven token and the user keeps read and subscription access to permissioned and private
+  cells. A login that is not proven counts as a guest there. The first login of an identity is
+  unchanged (fresh `AUTH` wallet), and a rejected pointer-signed login falls back once to that
+  previous, unproven login, so one login sends at most two authorization molecules.
+  `CheckMolecule.isotopeU()` accepts a `USER` token on the U atom as well as `AUTH`, and an
+  `AuthToken` session snapshot records the bound wallet's token (`AuthToken.Wallet.token`), so
+  `AuthToken.restore()` rebuilds a pointer-signed session's USER keys; a snapshot without it
+  restores as `AUTH`, as before.
+
 ## [1.1.2] — 2026-09-25
 
 ### Fixed

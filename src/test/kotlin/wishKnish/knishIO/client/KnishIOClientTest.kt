@@ -10,9 +10,15 @@ import org.junit.jupiter.api.BeforeEach
 import strikt.api.*
 import strikt.assertions.*
 import wishKnish.knishIO.client.data.MetaData
+import wishKnish.knishIO.client.data.graphql.types.AccessToken
+import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
+import wishKnish.knishIO.client.data.json.query.ContinuId
+import wishKnish.knishIO.client.data.json.variables.ContinuIdVariable
 import wishKnish.knishIO.client.exception.UnauthenticatedException
 import wishKnish.knishIO.client.exception.BalanceInsufficientException
+import wishKnish.knishIO.client.exception.WrongTokenTypeException
 import wishKnish.knishIO.client.httpClient.HttpClient
+import wishKnish.knishIO.client.libraries.CheckMolecule
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.query.QueryContinuId
 import wishKnish.knishIO.client.response.ResponseContinuId
@@ -323,11 +329,161 @@ class KnishIOClientTest {
 
             val molecule = spyClient.createMolecule()
 
-            verify(exactly = 1) { spyClient.queryContinuId(bundle, "USER") }
+            // One ContinuID query picks the login's signer, the second resolves this molecule's.
+            verify(exactly = 2) { spyClient.queryContinuId(bundle, "USER") }
             expectThat(molecule.sourceWallet.position).isEqualTo(continuIdPosition)
             expectThat(cachedQueryAfterAuth).isNull()
         } finally {
             unmockkConstructor(HttpClient::class)
+        }
+    }
+
+    private val pointerPosition = "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+
+    private class ProfileAuthTransport {
+        val proposals = mutableListOf<Molecule>()
+        val continuIdQueries = mutableListOf<ContinuIdVariable>()
+    }
+
+    private fun continuIdData(token: String, position: String, address: String?): String {
+        val addressField = address?.let { "\"$it\"" } ?: "null"
+        val bundle = Crypto.generateBundleHash(testSecret)
+        return """{"address":$addressField,"bundleHash":"$bundle","tokenSlug":"$token","position":"$position","amount":"0"}"""
+    }
+
+    /**
+     * Runs one profile login against a stubbed transport: every ContinuId query answers
+     * [continuIdData] (a JSON object or `null`), and the n-th ProposeMolecule answers
+     * accepted/rejected per [statuses]. Requests are recorded in [transport].
+     */
+    private fun profileLogin(
+        continuIdData: String,
+        statuses: List<String>,
+        transport: ProfileAuthTransport
+    ): KnishIOClient {
+        val authPayload = """{\"token\":\"auth-token\",\"time\":3600,\"key\":\"server-key\",\"pubkey\":\"server-key\",\"encrypt\":false,\"expiresAt\":2000000000}"""
+        mockkConstructor(HttpClient::class)
+        try {
+            every { anyConstructed<HttpClient>().query(any()) } answers {
+                val request = firstArg<ContinuId>()
+                transport.continuIdQueries.add(request.variables)
+                """{"data":{"ContinuId":$continuIdData}}"""
+            }
+            every { anyConstructed<HttpClient>().mutate(any()) } answers {
+                val request = firstArg<MoleculeMutation>()
+                transport.proposals.add(request.variables.molecule)
+                when (statuses[transport.proposals.size - 1]) {
+                    "accepted" -> """{"data":{"ProposeMolecule":{"molecularHash":"auth-hash","status":"accepted","payload":"$authPayload"}}}"""
+                    else -> """{"data":{"ProposeMolecule":{"molecularHash":"auth-hash","status":"rejected","reason":"unproven signer","payload":null}}}"""
+                }
+            }
+            val client = KnishIOClient(listOf(testUri))
+            client.requestAuthToken(secret = testSecret, cellSlug = "public", encrypt = false)
+            return client
+        } finally {
+            unmockkConstructor(HttpClient::class)
+        }
+    }
+
+    @Test
+    fun `signs a returning user's login from the ContinuID pointer`() {
+        val pointerWallet = Wallet(testSecret, "USER", pointerPosition)
+        val transport = ProfileAuthTransport()
+        val client = profileLogin(continuIdData("USER", pointerPosition, pointerWallet.address), listOf("accepted"), transport)
+
+        expectThat(transport.continuIdQueries).containsExactly(ContinuIdVariable(Crypto.generateBundleHash(testSecret), "USER"))
+        expectThat(transport.proposals).hasSize(1)
+        val atoms = transport.proposals.single().atoms
+        expectThat(atoms[0]) {
+            get { isotope }.isEqualTo('U')
+            get { token }.isEqualTo("USER")
+            get { position }.isEqualTo(pointerPosition)
+            get { walletAddress }.isEqualTo(pointerWallet.address)
+        }
+        expectThat(atoms[1]) {
+            get { isotope }.isEqualTo('I')
+            get { token }.isEqualTo("USER")
+            get { position }.isNotEqualTo(pointerPosition)
+            get { meta.firstOrNull { it.key == "previousPosition" }?.value }.isEqualTo(pointerPosition)
+        }
+        expectThat(client.getAuthToken()!!.getWallet()!!) {
+            get { token }.isEqualTo("USER")
+            get { position }.isEqualTo(pointerPosition)
+            get { pubkey }.isEqualTo(pointerWallet.pubkey)
+        }
+        expectThat(client.lastMoleculeQuery).isNull()
+    }
+
+    @Test
+    fun `signs from a fresh AUTH wallet when there is no usable ContinuID pointer`() {
+        val pointerAddress = Wallet(testSecret, "USER", pointerPosition).address
+        val cases = mapOf(
+            "no pointer" to "null",
+            "non-USER wallet" to continuIdData("AUTH", pointerPosition, Wallet(testSecret, "AUTH", pointerPosition).address),
+            "empty position" to continuIdData("USER", "", pointerAddress),
+            "different address" to continuIdData("USER", pointerPosition, Wallet("someone-else", "USER", pointerPosition).address)
+        )
+        cases.forEach { (case, data) ->
+            val transport = ProfileAuthTransport()
+            val client = profileLogin(data, listOf("accepted"), transport)
+
+            expectThat(transport.continuIdQueries.map { it.token }).describedAs(case).containsExactly("USER")
+            expectThat(transport.proposals).describedAs(case).hasSize(1)
+            expectThat(transport.proposals.single().atoms[0].token).describedAs(case).isEqualTo("AUTH")
+            expectThat(transport.proposals.single().atoms[0].position).describedAs(case).isNotEqualTo(pointerPosition)
+            expectThat(client.getAuthToken()!!.getWallet()!!.token).describedAs(case).isEqualTo("AUTH")
+        }
+    }
+
+    @Test
+    fun `falls back once to an AUTH login when the pointer-signed login is rejected`() {
+        val pointerWallet = Wallet(testSecret, "USER", pointerPosition)
+        val data = continuIdData("USER", pointerPosition, pointerWallet.address)
+
+        val transport = ProfileAuthTransport()
+        val client = profileLogin(data, listOf("rejected", "accepted"), transport)
+        expectThat(transport.proposals.map { it.atoms[0].token }).containsExactly("USER", "AUTH")
+        expectThat(transport.continuIdQueries).hasSize(1)
+        expectThat(client.getAuthToken()!!.getWallet()!!.token).isEqualTo("AUTH")
+
+        // The fallback's rejection raises as a rejected login always has (payload()!! on a
+        // rejected ProposeMolecule), with no third authorization molecule.
+        val rejectedTransport = ProfileAuthTransport()
+        expectThrows<NullPointerException> { profileLogin(data, listOf("rejected", "rejected"), rejectedTransport) }
+        expectThat(rejectedTransport.proposals.map { it.atoms[0].token }).containsExactly("USER", "AUTH")
+    }
+
+    @Test
+    fun `accepts U atoms signed by an AUTH or USER wallet only`() {
+        val signed = { token: String ->
+            Molecule(testSecret, Wallet(testSecret, token, pointerPosition), Wallet.create(testSecret, "USER")).apply {
+                initAuthorization(mutableListOf(MetaData("encrypt", "false")))
+                sign()
+            }
+        }
+
+        expectThat(CheckMolecule.isotopeU(signed("USER"))).isTrue()
+        expectThat(CheckMolecule.isotopeU(signed("AUTH"))).isTrue()
+        expectThrows<WrongTokenTypeException> { CheckMolecule.isotopeU(signed("TEST")) }
+    }
+
+    @Test
+    fun `restores a USER-bound auth token as a USER wallet`() {
+        val userWallet = Wallet(testSecret, "USER", pointerPosition)
+        val authToken = AuthToken.create(AccessToken("T", 9999999, "server-key", "server-key", false, 9999999), userWallet)
+
+        expectThat(AuthToken.restore(authToken.getSnapshot(), testSecret).getWallet()!!) {
+            get { token }.isEqualTo("USER")
+            get { address }.isEqualTo(userWallet.address)
+            get { pubkey }.isEqualTo(userWallet.pubkey)
+        }
+
+        val legacySnapshot = authToken.getSnapshot().apply {
+            wallet = AuthToken.Wallet(userWallet.position, userWallet.characters, userWallet.mlkemParameterSet)
+        }
+        expectThat(AuthToken.restore(legacySnapshot, testSecret).getWallet()!!) {
+            get { token }.isEqualTo("AUTH")
+            get { address }.isEqualTo(Wallet(testSecret, "AUTH", pointerPosition).address)
         }
     }
 }

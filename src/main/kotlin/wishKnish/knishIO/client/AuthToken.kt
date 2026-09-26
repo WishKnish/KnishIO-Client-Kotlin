@@ -65,7 +65,10 @@ class AuthToken(
   data class Wallet(
     val position: String?,
     val characters: String?,
-    val mlkemParameterSet: Int? = null
+    val mlkemParameterSet: Int? = null,
+    // The bound wallet's token: AUTH, or USER for a login signed from the ContinuID pointer.
+    // Absent in snapshots written before it existed → restored as AUTH.
+    val token: String? = null
   )
   inner class Snapshot(
     val token: String,
@@ -79,7 +82,8 @@ class AuthToken(
       wallet = Wallet(
         getWallet()!!.position,
         getWallet()!!.characters,
-        getWallet()!!.mlkemParameterSet
+        getWallet()!!.mlkemParameterSet,
+        getWallet()!!.token
       )
     }
   }
@@ -114,7 +118,7 @@ class AuthToken(
     fun restore(snapshot: Snapshot, secret: String): AuthToken {
       val wallet = ClientWallet(
         secret,
-        "AUTH",
+        snapshot.wallet.token ?: "AUTH",
         snapshot.wallet.position,
         null,
         snapshot.wallet.characters,

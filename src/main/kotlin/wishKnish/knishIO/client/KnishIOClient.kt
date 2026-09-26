@@ -355,15 +355,51 @@ class KnishIOClient @JvmOverloads constructor(
   private fun getProfileAuthToken(secret: String, encrypt: Boolean = false): AuthToken {
     setSecret(secret)
 
-    val wallet = Wallet(secret, "AUTH", mlkemParameterSet = mlkemParameterSet)
+    // A returning identity signs from its ContinuID pointer with the USER wallet registered there,
+    // so validator 0.5.0+ marks the token proven (unproven tokens are guests on permissioned and
+    // private cells). No usable pointer → genesis/first login from a fresh AUTH wallet.
+    val pointerWallet = continuIdAuthWallet(secret)
+    if (pointerWallet != null) {
+      val response = proposeAuthorization(secret, pointerWallet, encrypt)
+      if (response.success()) {
+        log("KnishIOClient::getProfileAuthToken() - token pointer-signed from ContinuID position ${pointerWallet.position}")
+        return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
+      }
+      // One fallback only: testnet allows 3 auths/min/IP, so a login sends at most two molecules.
+      System.err.println("KnishIOClient::getProfileAuthToken() - WARNING: pointer-signed authorization rejected (${response.reason()}); falling back to an AUTH wallet")
+    }
+
+    val response = proposeAuthorization(secret, Wallet(secret, "AUTH", mlkemParameterSet = mlkemParameterSet), encrypt)
+    log("KnishIOClient::getProfileAuthToken() - token signed from a fresh AUTH wallet (${if (pointerWallet == null) "no ContinuID pointer" else "pointer fallback"})")
+
+    return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
+  }
+
+  /**
+   * The USER wallet registered at the bundle's ContinuID pointer, derived from [secret], or null
+   * when there is no USER pointer or the derived address differs from the one the ledger reports.
+   */
+  private fun continuIdAuthWallet(secret: String): Wallet? {
+    val response = queryContinuId(bundle(), "USER")
+    if (!response.success()) {
+      throw InvalidResponseException("KnishIOClient::getProfileAuthToken() - ContinuId query failed: ${response.status()}")
+    }
+    val pointer = response.payload()?.takeIf { it.token == "USER" } ?: return null
+    val position = pointer.position?.takeIf { it.isNotEmpty() } ?: return null
+    val wallet = Wallet(secret, "USER", position, mlkemParameterSet = mlkemParameterSet)
+    val addressMatches = wallet.position == position && (pointer.address.isNullOrEmpty() || pointer.address == wallet.address)
+    return wallet.takeIf { addressMatches }
+  }
+
+  private fun proposeAuthorization(secret: String, wallet: Wallet, encrypt: Boolean): ResponseRequestAuthorization {
     // Explicit USER remainder (mirror JS createMolecule), so the ContinuID I-atom added by
-    // initAuthorization is USER-token. Without it, createMolecule auto-derives the remainder from
-    // the AUTH source token → a wrong-token I-atom.
+    // initAuthorization is USER-token with previousPosition = the signer's position. Without it,
+    // createMolecule auto-derives the remainder from an AUTH source token → a wrong-token I-atom.
     val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER", mlkemParameterSet = mlkemParameterSet))
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
-    // PQ-transport (cycle 162): convey the AUTH source wallet's ML-KEM public key as a
-    // SIGNED `walletPubkey` meta on the U-atom (initAuthorization → finalMetas → sign), so the
+    // PQ-transport (cycle 162): convey the source wallet's ML-KEM public key as a SIGNED
+    // `walletPubkey` meta on the U-atom (initAuthorization → finalMetas → sign), so the
     // validator can encrypt CipherHash responses back to THIS wallet (the one the client
     // decrypts with). Signed → tamper-proof. Only when present (PQ-capable wallet).
     val authMeta = mutableListOf(MetaData("encrypt", if (encrypt) "true" else "false"))
@@ -375,7 +411,13 @@ class KnishIOClient @JvmOverloads constructor(
     val response = query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseRequestAuthorization
     lastMoleculeQuery = null
 
-    return AuthToken.create(response.payload()!!, response.wallet(), encrypt)
+    return response
+  }
+
+  private fun log(message: String) {
+    if (logging) {
+      println(message)
+    }
   }
 
   @JvmOverloads

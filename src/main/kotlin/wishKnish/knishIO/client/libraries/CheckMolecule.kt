@@ -153,7 +153,8 @@ class CheckMolecule {
     fun isotopeU(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'U' }.forEach {
-        if (it.token.isEmpty() || it.token != "AUTH") {
+        // AUTH (first login) or USER (a returning identity signs from its ContinuID pointer).
+        if (it.token !in listOf("AUTH", "USER")) {
           throw WrongTokenTypeException("Check::isotopeU() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
         if (it.index != 0) {
