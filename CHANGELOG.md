@@ -14,6 +14,51 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [1.2.1] — 2026-09-28
+
+### Fixed
+
+- `KnishIOClient.replenishToken(token, amount, units)` is new, and `Molecule.replenishTokens()`
+  now takes the credited wallet: a C atom with `action` = `add`, signed by the USER wallet, then
+  the ContinuID atom (contract 9.1, validator 0.6.0 and later). Its metas are `action`, then the
+  `address`, `position` and `pubkey` of the identity's wallet for the token (a new wallet when it
+  holds none), its `batchId` when it has one, and `tokenUnits` for a stackable token's new units.
+  The C atom carries that wallet's batch id, as `createToken` does. The old builder required
+  `address`/`position`/`batchId` metas from the caller, and the client had no replenish call.
+- `KnishIOClient.fuseToken()` and `Molecule.fuseToken()` are new: they fuse at least two units of
+  a stackable token into one new unit (contract 9.2) with the atoms `V(source, -B)`,
+  `V(burn, +(M-1))`, `F(recipient, +1)` and `V(remainder, +(B-M))`, and no ContinuID atom. Fewer
+  than two units, a unit the source does not hold, or a new unit id it already holds throw
+  `TransferBalanceException`. When the source has a batch id, the burn and F atoms get fresh
+  ones and the remainder keeps the source's.
+- `claimShadowWallet(token)` without a batch id now claims the first shadow wallet that
+  `queryWallets` lists for the token in the caller's bundle, as the JS SDK does, and throws the
+  new `WalletShadowException` when there is none. It sent no batch id, which the validator
+  rejects with "Shadow wallet claim requires batch_id".
+- `queryWallets()` and `queryShadowWallets()` returned no wallets or threw
+  `InvalidResponseException` ("Response does not match the key") on every call: the query sent
+  `address`/`position` arguments and a `molecules` selection the validator's `Wallet` field does
+  not have (a GraphQL validation error), and the wallet-list response mapped the `Wallet` field
+  to a property named `wallets`.
+- `withdrawBufferToken()` debits the identity's buffer wallet (`queryBalance(token, type =
+  "buffer")`, a new `type` argument) and credits the change to a fresh position (contract 9.6).
+  It used the regular balance wallet and put the change back at the source's consumed signing
+  position, which validator 0.6.1 rejects ("Value may not be credited to a consumed signing
+  position").
+- Every high-level operation (createWallet, createToken, createMeta, createIdentifier,
+  requestTokens, claimShadowWallet, transferToken(s), burnTokens, replenishToken, fuseToken,
+  depositBufferToken, withdrawBufferToken) runs `Molecule.verify()` on the signed molecule before
+  sending it (contract 9.7): a molecule the check refuses throws its exception and is not sent.
+  The mutations' `fillMolecule()` called `check()` and ignored its result. A caller-built
+  molecule sent through `MutationProposeMolecule.execute()` directly is not checked.
+- `burnTokens()` from a wallet with a batch id gives the burn atom a fresh batch id. It had none,
+  which the SDK's own batch-id check rejects.
+- `createMolecule()` continues the ContinuID chain only from a USER remainder, as the JS SDK
+  does. After a transfer, fusion or buffer operation it signed the next C/M molecule with that
+  operation's token remainder wallet.
+- Token units in `tokenUnits` metas are written as `[id, name, {}]` triples, the JS form; a unit
+  without metas was written as `[id, name]`.
+
 ## [1.2.0] — 2026-09-26
 
 ### Changed
@@ -424,7 +469,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.1
 [1.2.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.0
 [1.1.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.2
 [1.1.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.1
