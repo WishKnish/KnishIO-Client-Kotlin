@@ -4,7 +4,7 @@ import com.vanniktech.maven.publish.KotlinJvm
 import org.gradle.api.component.AdhocComponentWithVariants
 
 plugins {
-  val kotlinVersion = "2.4.10"
+  val kotlinVersion = "2.4.20"
 
   kotlin("jvm") version kotlinVersion
   kotlin("plugin.serialization") version kotlinVersion
@@ -42,10 +42,10 @@ repositories {
 }
 
 dependencies {
-  val ktorVersion = "3.5.2"
+  val ktorVersion = "3.6.0"
   val coroutinesVersion = "1.11.0"
   val serializationVersion = "1.11.0"
-  val bouncyCastleVersion = "1.85"
+  val bouncyCastleVersion = "1.86"
 
   // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
   // the former JitPack `tweetnacl-java`; byte-parity is pinned by the `nacl`
