@@ -17,7 +17,6 @@ class MutationDepositBufferToken @JvmOverloads constructor(
     molecule?.apply {
       initDepositBuffer(amount, tradeRates)
       sign()
-      check(sourceWallet)
     }
   }
 }

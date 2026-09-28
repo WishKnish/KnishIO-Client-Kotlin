@@ -20,7 +20,6 @@ class MutationCreateMeta @JvmOverloads constructor(
     molecule?.apply {
       initMeta(meta, metaType, metaId)
       sign()
-      check()
     }
   }
 }

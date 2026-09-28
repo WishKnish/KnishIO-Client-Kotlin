@@ -13,6 +13,9 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
 
@@ -65,6 +68,18 @@ object TokenUnitMetasSerializer : KSerializer<List<String>> {
     fun jsonToObject(json: String): TokenUnit {
       return jsonFormat.decodeFromString(json)
     }
+  }
+
+  /**
+   * The unit as the JS reference writes it into a `tokenUnits` meta (`TokenUnit.toData()`):
+   * `[id, name, metas]`, with [metas] (default `{}`) when the unit has no metas of its own. A unit
+   * carrying the legacy list-form metas keeps its flattened `[id, name, …metas]` shape.
+   */
+  @JvmOverloads
+  fun toTriple(metas: JsonObject = JsonObject(emptyMap())): JsonArray {
+    val head = listOf(JsonPrimitive(id), JsonPrimitive(name))
+    val tail: List<JsonElement> = if (this.metas.isEmpty()) listOf(metas) else this.metas.map { JsonPrimitive(it) }
+    return JsonArray(head + tail)
   }
 
   private fun toJson(): String {

@@ -8,7 +8,11 @@ import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.Wallet
 
 
-@Serializable data class Data @JvmOverloads constructor(@JvmField var wallets: List<Wallet>? = null) {
+// Property MUST be named `Wallet` — it is both the JSON key the validator returns (data.Wallet)
+// and the segment Response.data() navigates by reflection (dataKey "data.Wallet"), as for the
+// Balance response. The former name `wallets` left it null on deserialize, so every
+// queryWallets/queryShadowWallets threw "Response does not match the key".
+@Serializable data class Data @JvmOverloads constructor(@JvmField var Wallet: List<Wallet>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {

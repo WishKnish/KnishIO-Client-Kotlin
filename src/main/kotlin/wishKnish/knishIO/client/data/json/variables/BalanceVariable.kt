@@ -12,5 +12,7 @@ import kotlinx.serialization.Serializable
   @JvmField val token: String? = null,
   @JvmField val tokens: List<String> = listOf(),
   @JvmField val position: String? = null,
-  @JvmField val positions: List<String> = listOf()
+  @JvmField val positions: List<String> = listOf(),
+  // Wallet kind: "buffer" selects buffer rows; null selects regular rows (validator 0.6.1+).
+  @JvmField val type: String? = null
 ) : IVariable

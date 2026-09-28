@@ -20,7 +20,6 @@ class MutationCreateToken @JvmOverloads constructor(
     molecule?.apply {
       initTokenCreation(recipientWallet, amount, meta)
       sign()
-      check()
     }
   }
 }

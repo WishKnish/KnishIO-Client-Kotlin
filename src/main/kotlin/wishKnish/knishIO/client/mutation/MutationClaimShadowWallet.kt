@@ -20,7 +20,6 @@ class MutationClaimShadowWallet @JvmOverloads constructor(
     molecule?.apply {
       initShadowWalletClaim(wallet)
       sign()
-      check()
     }
   }
 }

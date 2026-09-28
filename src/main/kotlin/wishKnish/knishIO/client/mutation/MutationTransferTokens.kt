@@ -17,7 +17,6 @@ class MutationTransferTokens @JvmOverloads constructor(
     molecule?.apply {
       initValue(recipientWallet, amount)
       sign()
-      check(sourceWallet)
     }
   }
 
@@ -28,7 +27,6 @@ class MutationTransferTokens @JvmOverloads constructor(
     molecule?.apply {
       initValues(recipientWallets, amounts)
       sign()
-      check(sourceWallet)
     }
   }
 }

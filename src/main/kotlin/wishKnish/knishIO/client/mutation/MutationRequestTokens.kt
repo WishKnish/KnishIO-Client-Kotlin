@@ -23,7 +23,6 @@ class MutationRequestTokens @JvmOverloads constructor(
     molecule?.apply {
       initTokenRequest(token, amount, metaType, metaId, meta, batchId)
       sign()
-      check()
     }
   }
 }

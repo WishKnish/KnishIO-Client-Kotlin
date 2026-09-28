@@ -12,8 +12,16 @@ import strikt.assertions.*
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.data.graphql.types.AccessToken
 import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
+import wishKnish.knishIO.client.data.json.query.Balance
 import wishKnish.knishIO.client.data.json.query.ContinuId
+import wishKnish.knishIO.client.data.json.query.WalletList
+import wishKnish.knishIO.client.data.json.variables.BalanceVariable
 import wishKnish.knishIO.client.data.json.variables.ContinuIdVariable
+import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
+import wishKnish.knishIO.client.exception.AtomsMissingException
+import wishKnish.knishIO.client.exception.WalletShadowException
+import wishKnish.knishIO.client.mutation.MutationCreateMeta
+import wishKnish.knishIO.client.mutation.MutationProposeMolecule
 import wishKnish.knishIO.client.exception.UnauthenticatedException
 import wishKnish.knishIO.client.exception.BalanceInsufficientException
 import wishKnish.knishIO.client.exception.WrongTokenTypeException
@@ -525,5 +533,209 @@ class KnishIOClientTest {
             get { token }.isEqualTo("AUTH")
             get { address }.isEqualTo(Wallet(testSecret, "AUTH", pointerPosition).address)
         }
+    }
+
+    // Phase B: operations run against a stubbed transport. The client holds an auth token, so no
+    // login is sent; queries answer from [ledger], and every proposal is recorded and accepted.
+
+    private class Ledger(
+        val balance: (BalanceVariable) -> String = { "null" },
+        val wallets: String = "[]"
+    ) {
+        val proposals = mutableListOf<Molecule>()
+        val balanceQueries = mutableListOf<BalanceVariable>()
+    }
+
+    private val bundleHash = Crypto.generateBundleHash(testSecret)
+
+    private fun walletJson(
+        token: String,
+        position: String?,
+        amount: String,
+        batchId: String? = null,
+        units: List<String> = listOf()
+    ): String {
+        val address = position?.let { "\"${Wallet(testSecret, token, it).address}\"" } ?: "null"
+        val pos = position?.let { "\"$it\"" } ?: "null"
+        val batch = batchId?.let { "\"$it\"" } ?: "null"
+        val tokenUnits = units.joinToString(",") { """{"id":"$it","name":"$it","metas":"{}"}""" }
+        return """{"address":$address,"bundleHash":"$bundleHash","tokenSlug":"$token","batchId":$batch,"position":$pos,"amount":"$amount","pubkey":"pk-$token","tokenUnits":[$tokenUnits]}"""
+    }
+
+    private fun <T> withLedger(ledger: Ledger, operation: (KnishIOClient) -> T): T {
+        mockkConstructor(HttpClient::class)
+        try {
+            every { anyConstructed<HttpClient>().query(any()) } answers {
+                when (val request = firstArg<Any>()) {
+                    is ContinuId -> """{"data":{"ContinuId":${continuIdData("USER", pointerPosition, Wallet(testSecret, "USER", pointerPosition).address)}}}"""
+                    is Balance -> {
+                        ledger.balanceQueries.add(request.variables)
+                        """{"data":{"Balance":${ledger.balance(request.variables)}}}"""
+                    }
+                    is WalletList -> """{"data":{"Wallet":${ledger.wallets}}}"""
+                    else -> throw IllegalStateException("unexpected query ${request::class.simpleName}")
+                }
+            }
+            every { anyConstructed<HttpClient>().mutate(any()) } answers {
+                val molecule = firstArg<MoleculeMutation>().variables.molecule
+                ledger.proposals.add(molecule)
+                """{"data":{"ProposeMolecule":{"molecularHash":"${molecule.molecularHash}","status":"accepted"}}}"""
+            }
+            val client = KnishIOClient(listOf(testUri))
+            client.setSecret(testSecret)
+            client.authTokenObjects[testUri.toASCIIString()] =
+                AuthToken.create(AccessToken("T", 9999999, "server-key", "server-key", false, 9999999), Wallet(testSecret, "USER", pointerPosition))
+            return operation(client)
+        } finally {
+            unmockkConstructor(HttpClient::class)
+        }
+    }
+
+    @Test
+    fun `claimShadowWallet without a batch id claims the shadow wallet listed after a regular one`() {
+        val ledger = Ledger(
+            wallets = "[${walletJson("SHDW", pointerPosition, "5")},${walletJson("SHDW", null, "10", "batch-shadow-1")}]"
+        )
+
+        withLedger(ledger) { it.claimShadowWallet("SHDW") }
+
+        val claim = ledger.proposals.single().atoms[0]
+        expectThat(claim) {
+            get { isotope }.isEqualTo('C')
+            get { batchId }.isEqualTo("batch-shadow-1")
+            get { meta.firstOrNull { it.key == "walletBatchId" }?.value }.isEqualTo("batch-shadow-1")
+        }
+    }
+
+    @Test
+    fun `claimShadowWallet without a batch id refuses when the bundle has no shadow wallet`() {
+        val ledger = Ledger(wallets = "[${walletJson("SHDW", pointerPosition, "5")}]")
+
+        expectThrows<WalletShadowException> { withLedger(ledger) { it.claimShadowWallet("SHDW") } }
+        expectThat(ledger.proposals).isEmpty()
+    }
+
+    @Test
+    fun `a built molecule that fails the SDK check is refused and never sent`() {
+        val ledger = Ledger()
+
+        expectThrows<AtomsMissingException> {
+            withLedger(ledger) { client ->
+                // A builder that drops the ContinuID atom from a USER-signed meta molecule: the
+                // validator would reject it after consuming the pointer key.
+                val spyClient = spyk(client)
+                every { spyClient.createMoleculeMutation(MutationCreateMeta::class, any()) } answers {
+                    val mutation = callOriginal() as MutationCreateMeta
+                    spyk(mutation).also { stub ->
+                        every { stub.fillMolecule(any(), any(), any()) } answers {
+                            mutation.molecule()!!.apply {
+                                initMeta(thirdArg(), firstArg(), secondArg())
+                                atoms.removeIf { it.isotope == 'I' }
+                                sign()
+                            }
+                        }
+                    }
+                }
+                spyClient.createMeta("AppRole", "role-1", mutableListOf(MetaData("role", "admin")))
+            }
+        }
+        expectThat(ledger.proposals).isEmpty()
+    }
+
+    @Test
+    fun `burnTokens from a batch-bearing source gives the burn atom a fresh batch id`() {
+        val position = "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+        val ledger = Ledger(balance = { walletJson("BRN", position, "100", "batch-brn") })
+
+        withLedger(ledger) { it.burnTokens("BRN", 30) }
+
+        val (source, burn, remainder) = ledger.proposals.single().atoms
+        expectThat(listOf(source.value, burn.value, remainder.value)).containsExactly("-100", "30", "70")
+        expectThat(remainder.batchId).isEqualTo("batch-brn")
+        expectThat(burn.batchId).isNotNull().isNotEqualTo("batch-brn")
+    }
+
+    @Test
+    fun `the raw propose path sends a caller-built molecule unchecked`() {
+        val ledger = Ledger()
+        val molecule = Molecule(testSecret, Wallet(testSecret, "USER", pointerPosition), Wallet.create(testSecret, "USER")).apply {
+            initMeta(mutableListOf(MetaData("role", "admin")), "AppRole", "role-1")
+            atoms.removeIf { it.isotope == 'I' }
+            sign()
+        }
+
+        withLedger(ledger) { MutationProposeMolecule(it.client(), molecule).execute(MoleculeMutationVariable(molecule)) }
+
+        expectThat(ledger.proposals.single().atoms.map { it.isotope }).containsExactly('M')
+    }
+
+    @Test
+    fun `withdrawBufferToken debits the buffer wallet and credits the change at a fresh position`() {
+        val bufferPosition = "b0ffe200b0ffe200b0ffe200b0ffe200b0ffe200b0ffe200b0ffe200b0ffe200"
+        val ledger = Ledger(balance = { if (it.type == "buffer") walletJson("BUF", bufferPosition, "50") else "null" })
+
+        withLedger(ledger) { it.withdrawBufferToken("BUF", 20) }
+
+        expectThat(ledger.balanceQueries.map { it.type }).containsExactly("buffer")
+        val atoms = ledger.proposals.single().atoms
+        expectThat(atoms.map { it.isotope to it.value }).containsExactly('B' to "-50", 'V' to "20", 'B' to "30")
+        expectThat(atoms[0].position).isEqualTo(bufferPosition)
+        expectThat(atoms[2].position).isNotEqualTo(bufferPosition)
+    }
+
+    @Test
+    fun `fuseToken from a batch-bearing source gives every V atom a batch id and passes the check`() {
+        val stackPosition = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+        val ledger = Ledger(balance = { walletJson("STK", stackPosition, "5", "batch-src", listOf("u1", "u2", "u3", "u4", "u5")) })
+
+        withLedger(ledger) { it.fuseToken("STK", "FUSED", listOf("u2", "u4", "u5")) }
+
+        val (source, burn, fusion, remainder) = ledger.proposals.single().atoms
+        expectThat(listOf(source, burn, fusion, remainder).map { it.isotope }).containsExactly('V', 'V', 'F', 'V')
+        expectThat(source.batchId).isEqualTo("batch-src")
+        expectThat(remainder.batchId).isEqualTo("batch-src")
+        expectThat(listOf(burn.batchId, fusion.batchId)).all { isNotNull().isNotEqualTo("batch-src") }
+        expectThat(fusion.metaId).isEqualTo(bundleHash)
+    }
+
+    @Test
+    fun `a USER molecule after an accepted fusion signs from the ContinuID pointer, not the token remainder`() {
+        val stackPosition = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a"
+        val ledger = Ledger(balance = { walletJson("STK", stackPosition, "2", units = listOf("v1", "v2")) })
+
+        withLedger(ledger) {
+            it.fuseToken("STK", "FUSED2", listOf("v1", "v2"))
+            it.createWallet("STK")
+        }
+
+        expectThat(ledger.proposals[1].atoms[0]) {
+            get { token }.isEqualTo("USER")
+            get { position }.isEqualTo(pointerPosition)
+        }
+    }
+
+    @Test
+    fun `replenishToken credits the identity's existing wallet from a USER-signed C+I molecule`() {
+        val walletPosition = "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        val credited = Wallet(testSecret, "RPL", walletPosition)
+        val ledger = Ledger(balance = { walletJson("RPL", walletPosition, "1000", "batch-rpl") })
+
+        withLedger(ledger) { it.replenishToken("RPL", 500) }
+
+        val (cAtom, iAtom) = ledger.proposals.single().atoms
+        expectThat(cAtom) {
+            get { isotope to token }.isEqualTo('C' to "USER")
+            get { position }.isEqualTo(pointerPosition)
+            get { value }.isEqualTo("500")
+            get { batchId }.isEqualTo("batch-rpl")
+            get { meta.map { it.key to it.value } }.containsExactly(
+                "action" to "add",
+                "address" to credited.address,
+                "position" to walletPosition,
+                "pubkey" to "pk-RPL",
+                "batchId" to "batch-rpl"
+            )
+        }
+        expectThat(iAtom.isotope).isEqualTo('I')
     }
 }

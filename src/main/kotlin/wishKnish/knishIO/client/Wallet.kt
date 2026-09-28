@@ -157,6 +157,14 @@ class Wallet @JvmOverloads constructor(
     }
 
     /**
+     * A unit list as the `tokenUnits` meta value: compact `[[id, name, metas], …]` triples.
+     */
+    @JvmStatic
+    fun tokenUnitsJson(units: List<TokenUnit>): String {
+      return kotlinx.serialization.json.JsonArray(units.map { it.toTriple() }).toString()
+    }
+
+    /**
      * Get formatted token units from the raw data
      */
     @JvmStatic
@@ -315,17 +323,12 @@ class Wallet @JvmOverloads constructor(
     return tokenUnits.isNotEmpty()
   }
 
+  /**
+   * This wallet's units as the `tokenUnits` meta value: compact `[[id, name, metas], …]`, the
+   * JS `JSON.stringify(wallet.getTokenUnitsData())` form. Null when the wallet holds no units.
+   */
   fun tokenUnitsJson(): String? {
-    if (hasTokenUnits()) {
-      val result = arrayListOf<List<String>>()
-      tokenUnits.forEach {
-        result.add(listOf(it.id, it.name) + it.metas)
-      }
-
-      return result.toJsonElement().toString()
-    }
-
-    return null
+    return if (hasTokenUnits()) tokenUnitsJson(tokenUnits) else null
   }
 
   /**

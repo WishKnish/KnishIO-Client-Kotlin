@@ -485,8 +485,10 @@ class KnishIOClient @JvmOverloads constructor(
     val currentSecret = secret ?: (if (this.secret.isNotEmpty()) this.secret else retrieveSecret()) ?: getSecret()
     var signingWallet = sourceWallet
 
-    // Sets the source wallet as the last remainder wallet (to maintain ContinuID)
-    if (sourceWallet == null && remainderWallet()?.token != "AUTH" && lastMoleculeQuery != null && lastMoleculeQuery !!.response != null && lastMoleculeQuery !!.response !!.success()) {
+    // Sets the source wallet as the last remainder wallet (to maintain ContinuID). Only a USER
+    // remainder continues the chain (JS createMolecule): after a transfer, fusion or buffer
+    // operation the remainder is a token wallet, and signing a C/M molecule with it is rejected.
+    if (sourceWallet == null && remainderWallet()?.token == "USER" && lastMoleculeQuery != null && lastMoleculeQuery !!.response != null && lastMoleculeQuery !!.response !!.success()) {
       signingWallet = remainderWallet()
     }
 
@@ -535,12 +537,14 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
-   * Retrieves the balance wallet for a specified Knish.IO identity and token slug
+   * Retrieves the balance wallet for a specified Knish.IO identity and token slug. [type]
+   * `"buffer"` selects the identity's buffer wallet; null selects its regular wallet.
    */
   @JvmOverloads
   fun queryBalance(
     token: String,
-    bundle: String? = null
+    bundle: String? = null,
+    type: String? = null
   ): ResponseBalance {
     // Execute query with either the provided bundle hash or the active client's bundle.
     // Default to the client's own bundle when none is given (the documented contract + cross-SDK
@@ -548,7 +552,7 @@ class KnishIOClient @JvmOverloads constructor(
     // bundleHash:null to the validator -> a token-global query that returns an arbitrary wallet
     // (a stale-read footgun; e.g. a multi-recipient claimant read back another bundle's unit).
     val query = createQuery(QueryBalance::class) as QueryBalance
-    return query.execute(BalanceVariable(token = token, bundleHash = bundle ?: bundle())) as ResponseBalance
+    return query.execute(BalanceVariable(token = token, bundleHash = bundle ?: bundle(), type = type)) as ResponseBalance
   }
 
   /**
@@ -724,7 +728,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(newWallet)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -784,7 +788,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(recipientWallet, tokenAmount, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -802,7 +806,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(metaType, metaId, meta)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -817,7 +821,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(type, contact, code)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -898,7 +902,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(token, requestedAmount, metaType, metaId, meta, batchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   private fun <T> getSpecificationRequestTokens(
@@ -924,19 +928,26 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
-   * Creates and executes a Molecule that assigns keys to an unclaimed shadow wallet
+   * Creates and executes a Molecule that assigns keys to an unclaimed shadow wallet. Without a
+   * [batchId] it claims the first shadow wallet `queryWallets` lists for [token] in this bundle.
+   *
+   * @throws WalletShadowException when no [batchId] is given and the bundle has no shadow wallet
+   *   for [token].
    */
   @JvmOverloads
+  @Throws(WalletShadowException::class)
   fun claimShadowWallet(
     token: String,
     batchId: String? = null,
     molecule: Molecule? = null
   ): ResponseProposeMolecule {
+    val claimBatchId = batchId ?: queryWallets(bundle = bundle(), token = token).firstOrNull { it.isShadow() }?.batchId
+      ?: throw WalletShadowException("KnishIOClient::claimShadowWallet() - No shadow wallets found for token $token")
     val query = createMoleculeMutation(MutationClaimShadowWallet::class, molecule) as MutationClaimShadowWallet
 
-    query.fillMolecule(token, batchId)
+    query.fillMolecule(token, claimBatchId)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -991,7 +1002,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(recipient, transferAmount)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -1070,7 +1081,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMoleculeMulti(recipientWallets, amounts)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -1114,43 +1125,135 @@ class KnishIOClient @JvmOverloads constructor(
 
     molecule.burnToken(burnAmount)
     molecule.sign()
-    molecule.check()
 
-    return MutationProposeMolecule(
-      client(),
-      molecule
-    ).execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
+    return submit(MutationProposeMolecule(client(), molecule))
   }
 
   /**
-   * Withdraws [amount] of [token] from a buffer (B-isotope) wallet back to the caller's own bundle.
+   * Replenishes the supply of [token], a token this identity created with supply `infinite` or
+   * `replenishable` (contract 9.1): a C atom with `action` = `add` plus the ContinuID atom, signed
+   * by the USER wallet. Fungible: [amount] > 0. Stackable: the new [units] (their count is the
+   * amount). The identity's wallet for [token] is credited, or a new one when it holds none.
    *
-   * Client-level wrapper over [Molecule.initWithdrawBuffer] (BVB/BV..VB), mirroring JS
-   * `withdrawBufferToken` / Rust `withdraw_buffer_token`: the buffer wallet is BOTH the source
-   * and the remainder (it nets down by [amount]); the withdrawn amount is credited to the
-   * caller's own bundle. Pass an explicit [sourceWallet] to target a specific buffer wallet (else
-   * the on-ledger balance wallet for [token] is used).
+   * @throws StackableUnitAmountException for a stackable wallet without [units], or [units] with a
+   *   different [amount].
+   * @throws NegativeAmountException when the replenished amount is not positive.
    */
   @JvmOverloads
+  @Throws(StackableUnitAmountException::class, NegativeAmountException::class)
+  fun replenishToken(
+    token: String,
+    amount: Number? = null,
+    units: MutableList<TokenUnit> = mutableListOf()
+  ): ResponseProposeMolecule {
+    val creditedWallet = queryBalance(token).payload()
+      ?: Wallet.create(getSecret(), token, mlkemParameterSet = mlkemParameterSet)
+
+    // A wallet that holds units is stackable: its supply grows by new units, never by a bare amount.
+    if (units.isEmpty() && creditedWallet.hasTokenUnits()) {
+      throw StackableUnitAmountException("KnishIOClient::replenishToken() - Stackable token $token is replenished with new units")
+    }
+
+    val query = createMoleculeMutation(MutationProposeMolecule::class)
+    query.molecule() !!.apply {
+      replenishTokens(amount, token, creditedWallet, units)
+      sign()
+    }
+
+    return submit(query)
+  }
+
+  /**
+   * Fuses the units [fusedTokenUnitIds] (at least two) of the stackable token [tokenSlug] held by
+   * this identity into one new unit [newTokenUnit] (contract 9.2), delivered to [bundleHash]: the
+   * caller's own bundle by default. The fused units leave circulation; the validator records them
+   * in the new unit's `fusedTokenUnits` meta.
+   *
+   * @throws TransferBalanceException for fewer than two units, a unit this identity does not hold,
+   *   a new unit id it already holds, or no wallet for [tokenSlug].
+   */
+  @JvmOverloads
+  @Throws(TransferBalanceException::class)
+  fun fuseToken(
+    tokenSlug: String,
+    newTokenUnit: TokenUnit,
+    fusedTokenUnitIds: List<String>,
+    bundleHash: String? = null,
+    sourceWallet: Wallet? = null
+  ): ResponseProposeMolecule {
+    val signingWallet = sourceWallet ?: queryBalance(tokenSlug).payload()
+      ?: throw TransferBalanceException()
+
+    val recipientBundle = bundleHash ?: bundle()
+    val recipientWallet = if (recipientBundle == bundle()) {
+      Wallet.create(getSecret(), tokenSlug, mlkemParameterSet = mlkemParameterSet)
+    } else {
+      queryBalance(tokenSlug, recipientBundle).payload()
+        ?: Wallet.create(recipientBundle, tokenSlug, mlkemParameterSet = mlkemParameterSet)
+    }
+    recipientWallet.initBatchId(signingWallet)
+
+    remainderWallet = Wallet.create(
+      getSecret(), tokenSlug, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet
+    )
+    remainderWallet !!.initBatchId(signingWallet, true)
+
+    val molecule = createMolecule(sourceWallet = signingWallet, remainderWallet = remainderWallet)
+    val query = createMoleculeMutation(MutationProposeMolecule::class, molecule)
+
+    molecule.fuseToken(fusedTokenUnitIds, newTokenUnit, recipientWallet)
+    molecule.sign()
+
+    return submit(query)
+  }
+
+  /**
+   * Fuses [fusedTokenUnitIds] into a new unit whose id and name are [newTokenUnitId].
+   */
+  @JvmOverloads
+  @Throws(TransferBalanceException::class)
+  fun fuseToken(
+    tokenSlug: String,
+    newTokenUnitId: String,
+    fusedTokenUnitIds: List<String>,
+    bundleHash: String? = null,
+    sourceWallet: Wallet? = null
+  ): ResponseProposeMolecule {
+    return fuseToken(tokenSlug, TokenUnit(newTokenUnitId, newTokenUnitId, listOf()), fusedTokenUnitIds, bundleHash, sourceWallet)
+  }
+
+  /**
+   * Withdraws [amount] of [token] from this identity's buffer (B-isotope) wallet back to its own
+   * bundle (contract 9.6): source B `-balance`, recipient V `+amount`, remainder B `+(balance -
+   * amount)` at a FRESH position (a remainder at the source's consumed signing position would be
+   * stranded). The source is [sourceWallet], else `Balance(token, type: "buffer")`.
+   *
+   * @throws TransferBalanceException when there is no buffer wallet or its balance is below [amount].
+   */
+  @JvmOverloads
+  @Throws(TransferBalanceException::class)
   fun withdrawBufferToken(
     token: String,
     amount: Number,
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    // Resolve the buffer/source wallet (the passed source, else the on-ledger balance wallet).
-    val source = sourceWallet ?: queryBalance(token).payload()
-      ?: throw TransferBalanceException()
+    val source = sourceWallet ?: queryBalance(token, type = "buffer").payload()
+    if (source == null || source.balance < amount.toDouble()) {
+      throw TransferBalanceException()
+    }
 
     // JS parity: withdraw `amount` from the buffer back to the caller's own bundle.
     val recipients = mapOf(bundle() to amount)
 
-    // The buffer wallet is BOTH source and remainder (JS: remainderWallet = sourceWallet).
-    val molecule = createMolecule(sourceWallet = source, remainderWallet = source)
+    val remainder = Wallet.create(getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet)
+    remainder.initBatchId(source, true)
+
+    val molecule = createMolecule(sourceWallet = source, remainderWallet = remainder)
     val query = createMoleculeMutation(MutationWithdrawBufferToken::class, molecule) as MutationWithdrawBufferToken
 
     query.fillMolecule(recipients)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
   }
 
   /**
@@ -1159,8 +1262,7 @@ class KnishIOClient @JvmOverloads constructor(
    *
    * Client-level wrapper over [Molecule.initDepositBuffer] (V-B-V), mirroring JS
    * `depositBufferToken` / Rust `deposit_buffer_token`: the source is the regular balance wallet
-   * and the change routes to a FRESH remainder (unlike `withdrawBufferToken`, where the buffer
-   * wallet is both source and remainder). Pass an explicit [sourceWallet] to override the
+   * and the change routes to a FRESH remainder. Pass an explicit [sourceWallet] to override the
    * resolved balance wallet; [tradeRates] rides for cross-SDK API parity.
    */
   @JvmOverloads
@@ -1183,7 +1285,20 @@ class KnishIOClient @JvmOverloads constructor(
 
     query.fillMolecule(amount, tradeRates)
 
-    return query.execute(MoleculeMutationVariable(query.molecule() !!)) as ResponseProposeMolecule
+    return submit(query)
+  }
+
+  /**
+   * Sends a molecule this client built, after the SDK's own check of the signed molecule
+   * ([Molecule.verify], contract 9.7). A molecule that fails it throws the check's exception and
+   * is never sent: the validator would reject it after consuming the signing key (for example a
+   * USER-signed molecule without its ContinuID atom). A caller-built molecule sent through
+   * [MutationProposeMolecule.execute] directly is not checked.
+   */
+  private fun submit(query: MutationProposeMolecule): ResponseProposeMolecule {
+    val molecule = query.molecule() ?: throw CodeException("KnishIOClient::submit() - the mutation holds no molecule")
+    Molecule.verify(molecule, molecule.sourceWallet)
+    return query.execute(MoleculeMutationVariable(molecule)) as ResponseProposeMolecule
   }
 
   /**

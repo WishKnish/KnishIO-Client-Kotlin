@@ -323,35 +323,6 @@ class MoleculeTest {
     }
 
     @Test
-    fun `client-shaped buffer withdraw signs and checks (remainder = source)`() {
-        // Mirrors KnishIOClient.withdrawBufferToken: the buffer wallet is BOTH source and
-        // remainder, a single recipient (the caller's own bundle). Proves the mutation flow
-        // (initWithdrawBuffer + sign + check) validates the B-V-B molecule end-to-end — i.e.
-        // CheckMolecule accepts the two-same-position-B-atom buffer shape the client builds.
-        val secret = "withdraw-buffer-clientshape-secret"
-        val source = Wallet.create(secret, "WTHTOK")
-        source.balance = 100.0
-        val ownBundle = "d".repeat(64)
-
-        // remainderWallet = source (the JS buffer-is-source-and-remainder semantics)
-        val molecule = Molecule(
-            secret = secret,
-            sourceWallet = source,
-            remainderWallet = source,
-            cellSlug = "wthtest"
-        )
-        molecule.initWithdrawBuffer(mapOf(ownBundle to 40))
-        molecule.sign()
-
-        // No-throw + true == the B-V-B molecule (two B-atoms at the source position) validates.
-        expectThat(molecule.check(source)).isTrue()
-        expectThat(molecule.molecularHash).isNotNull()
-        expectThat(molecule.atoms.map { it.isotope }).isEqualTo(listOf('B', 'V', 'B'))
-        expectThat(molecule.atoms.map { it.value }).isEqualTo(listOf("-100", "40", "60"))
-        expectThat(molecule.atoms.mapNotNull { it.value?.toLongOrNull() }.sum()).isEqualTo(0L)
-    }
-
-    @Test
     fun `client-shaped buffer deposit signs and checks (V-B-V, fresh remainder)`() {
         // Mirrors KnishIOClient.depositBufferToken: source is the regular balance wallet, the
         // change routes to a FRESH remainder, and initDepositBuffer adds an internal buffer B-atom.

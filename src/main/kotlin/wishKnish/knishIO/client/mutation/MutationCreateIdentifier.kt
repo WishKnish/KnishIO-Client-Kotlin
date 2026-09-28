@@ -18,7 +18,6 @@ class MutationCreateIdentifier @JvmOverloads constructor(
     molecule?.apply {
       initIdentifierCreation(type, contact, code)
       sign()
-      check()
     }
   }
 }

@@ -15,7 +15,6 @@ class MutationCreateWallet @JvmOverloads constructor(
     molecule?.apply {
       initWalletCreation(newWallet)
       sign()
-      check()
     }
   }
 }

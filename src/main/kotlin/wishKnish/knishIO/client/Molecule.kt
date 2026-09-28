@@ -54,6 +54,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.MetaData
+import wishKnish.knishIO.client.data.graphql.types.TokenUnit
 import wishKnish.knishIO.client.exception.*
 import wishKnish.knishIO.client.libraries.*
 import kotlin.jvm.Throws
@@ -134,6 +135,9 @@ import kotlin.math.ceil
     get() = "."
 
   companion object {
+    /** The all-zeros bundle that burned value and units are credited to (token destruction). */
+    const val BURN_BUNDLE = "0000000000000000000000000000000000000000000000000000000000000000"
+
     private val jsonFormat: Json
       get() = Json {
         encodeDefaults = true
@@ -592,24 +596,42 @@ import kotlin.math.ceil
   }
 
   /**
-   * Replenishes non-finite token supplies
+   * Replenishes a non-finite token supply (contract 9.1): a C atom signed by the identity's USER
+   * wallet, as [initTokenCreation] signs, followed by the ContinuID atom. The C value is [amount]
+   * for a fungible token or the number of new [units] for a stackable one. Metas, in order: `action`
+   * = `add`, then the `address`, `position` and `pubkey` of [creditedWallet] (the identity's wallet
+   * for the token), its `batchId` when it has one, and `tokenUnits` for the new units.
+   *
+   * @throws StackableUnitAmountException when [units] are given with a different [amount].
+   * @throws NegativeAmountException when the replenished value is not positive.
    */
   @JvmOverloads
-  @Throws(MetaMissingException::class)
+  @Throws(NegativeAmountException::class, StackableUnitAmountException::class)
   fun replenishTokens(
-    amount: Number,
+    amount: Number?,
     token: String,
-    metas: MutableList<MetaData> = mutableListOf()
+    creditedWallet: Wallet,
+    units: List<TokenUnit> = emptyList()
   ): Molecule {
-    val meta = metas.also {
-      setOf("address", "position", "batchId").forEach { key ->
-        it.forEach { metaData ->
-          if (metaData.key == key && metaData.value == null) {
-            throw MetaMissingException("Molecule::replenishTokens() - Missing $key in meta!")
-          }
-        }
-      }
-      it.add(MetaData(key = "action", value = "add"))
+    if (units.isNotEmpty() && amount != null && amount.toDouble() != units.size.toDouble()) {
+      throw StackableUnitAmountException()
+    }
+    val value: Number = if (units.isNotEmpty()) units.size else amount ?: 0
+    if (value.toDouble() <= 0.0) {
+      throw NegativeAmountException("Molecule::replenishTokens() - Amount to replenish must be positive!")
+    }
+
+    val meta = mutableListOf(
+      MetaData(key = "action", value = "add"),
+      MetaData(key = "address", value = creditedWallet.address),
+      MetaData(key = "position", value = creditedWallet.position),
+      MetaData(key = "pubkey", value = creditedWallet.pubkey)
+    )
+    creditedWallet.batchId?.takeIf { it.isNotEmpty() }?.let {
+      meta.add(MetaData(key = "batchId", value = it))
+    }
+    if (units.isNotEmpty()) {
+      meta.add(MetaData(key = "tokenUnits", value = Wallet.tokenUnitsJson(units)))
     }
 
     addAtom(
@@ -618,16 +640,126 @@ import kotlin.math.ceil
         walletAddress = sourceWallet.address !!,
         isotope = 'C',
         token = sourceWallet.token,
-        value = formatAtomValue(amount),
-        batchId = sourceWallet.batchId,
+        value = formatAtomValue(value),
+        batchId = creditedWallet.batchId,
         metaType = "token",
         metaId = token,
-        meta = finalMetas(meta),
+        meta = meta,
         index = generateIndex()
       )
     )
 
     return addUserRemainderAtom(remainderWallet !!)
+  }
+
+  /**
+   * Fuses the stackable units [fusedTokenUnitIds] (caller order, at least two) held by the source
+   * wallet S into the one new unit [newTokenUnit] (contract 9.2), delivered to [recipientWallet].
+   * Atoms, in order, with no ContinuID atom (S signs at its own position, as in a transfer):
+   *  - V  S           -B      tokenUnits = the fused units in S's order (the SENT set)
+   *  - V  burn wallet +(M-1)  tokenUnits = the fused units except the last, caller order
+   *  - F  recipient   +1      tokenUnits = [N], N's metas.fusedTokenUnits = every fused unit
+   *  - V  remainder   +(B-M)  tokenUnits = S's other units, S's order (the atom is emitted at 0)
+   * The burn atom gets a fresh batch id when S has one; the caller sets the recipient's and the
+   * remainder's batch ids, as for a transfer. The validator tombstones the last fused unit.
+   *
+   * @throws TransferBalanceException for fewer than two units, a unit S does not hold, or a new
+   *   unit id S already holds.
+   */
+  @Throws(TransferBalanceException::class, BalanceInsufficientException::class)
+  fun fuseToken(
+    fusedTokenUnitIds: List<String>,
+    newTokenUnit: TokenUnit,
+    recipientWallet: Wallet
+  ): Molecule {
+    if (fusedTokenUnitIds.size < 2) {
+      throw TransferBalanceException("Token fusion requires at least two token units")
+    }
+
+    val sourceUnits = sourceWallet.tokenUnits.toList()
+    val sourceById = sourceUnits.associateBy { it.id }
+    val fusedUnits = fusedTokenUnitIds.map {
+      sourceById[it] ?: throw TransferBalanceException("Fused token unit ID = $it does not found in the source wallet.")
+    }
+    if (newTokenUnit.id in sourceById) {
+      throw TransferBalanceException("Token fusion unit id already exists in the source wallet")
+    }
+
+    val balance = sourceWallet.balance
+    val fusedCount = fusedTokenUnitIds.size
+    if (balance < fusedCount) {
+      throw BalanceInsufficientException()
+    }
+
+    // SENT (source) and KEPT (remainder) in source order; the burn takes all fused units but the last.
+    sourceWallet.tokenUnits = sourceUnits.filter { it.id in fusedTokenUnitIds }.toMutableList()
+    remainderWallet !!.tokenUnits = sourceUnits.filter { it.id !in fusedTokenUnitIds }.toMutableList()
+    val burnWallet = Wallet.create(BURN_BUNDLE, sourceWallet.token, mlkemParameterSet = mlkemParameterSet).apply {
+      initBatchId(sourceWallet)
+      tokenUnits = fusedUnits.dropLast(1).toMutableList()
+    }
+    val newUnitMetas = kotlinx.serialization.json.JsonObject(
+      mapOf("fusedTokenUnits" to kotlinx.serialization.json.JsonArray(fusedUnits.map { it.toTriple() }))
+    )
+    val newUnitsJson = kotlinx.serialization.json.JsonArray(listOf(newTokenUnit.toTriple(newUnitMetas))).toString()
+
+    addAtom(
+      Atom(
+        position = sourceWallet.position !!,
+        walletAddress = sourceWallet.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(- balance),
+        batchId = sourceWallet.batchId,
+        meta = finalMetas(),
+        index = generateIndex()
+      )
+    )
+
+    addAtom(
+      Atom(
+        position = burnWallet.position ?: "",
+        walletAddress = burnWallet.address ?: "",
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(fusedCount - 1),
+        batchId = burnWallet.batchId,
+        metaType = "walletBundle",
+        metaId = BURN_BUNDLE,
+        meta = finalMetas(wallet = burnWallet),
+        index = generateIndex()
+      )
+    )
+
+    addAtom(
+      Atom(
+        position = recipientWallet.position ?: "",
+        walletAddress = recipientWallet.address ?: "",
+        isotope = 'F',
+        token = sourceWallet.token,
+        value = formatAtomValue(1),
+        batchId = recipientWallet.batchId,
+        metaType = "walletBundle",
+        metaId = recipientWallet.bundle,
+        meta = listOf(MetaData(key = "tokenUnits", value = newUnitsJson)),
+        index = generateIndex()
+      )
+    )
+
+    return addAtom(
+      Atom(
+        position = remainderWallet !!.position !!,
+        walletAddress = remainderWallet !!.address !!,
+        isotope = 'V',
+        token = sourceWallet.token,
+        value = formatAtomValue(balance - fusedCount),
+        batchId = remainderWallet !!.batchId,
+        metaType = "walletBundle",
+        metaId = remainderWallet !!.bundle,
+        meta = finalMetas(wallet = remainderWallet),
+        index = generateIndex()
+      )
+    )
   }
 
   /**
@@ -651,11 +783,13 @@ import kotlin.math.ceil
     // no position/address (coerced to "" below; the hash absorbs "" as a no-op). The
     // validator credits the burn amount to this unspendable bundle, satisfying V-isotope
     // conservation (sum == 0) while permanently destroying the tokens. Mirrors JS burnToken.
+    // A batch-bearing source needs a batch id on every V atom (CheckMolecule.batchId), so the
+    // burn atom gets a fresh one, as the fusion burn atom does.
     val burnWallet = Wallet.create(
-      "0000000000000000000000000000000000000000000000000000000000000000",
+      BURN_BUNDLE,
       sourceWallet.token,
       mlkemParameterSet = mlkemParameterSet
-    )
+    ).apply { initBatchId(sourceWallet) }
 
     // V-atom 1: debit the ENTIRE source balance (UTXO model). Must be -balance (not -amount):
     // the burn target gets +amount and the remainder gets +(balance-amount), so the three
@@ -858,6 +992,10 @@ import kotlin.math.ceil
    * (a BVB / BV..VB molecule). The withdraw half of the B/F buffer family; inverse of
    * [initDepositBuffer]. Mirrors the JS/PHP/Rust/Python reference so the B+V atoms conserve to
    * zero (source -balance + Σ recipients + remainder +(balance-Σ) = 0).
+   *
+   * The remainder wallet must be a FRESH position (contract 9.6): a remainder at the source's
+   * signing position sits behind a consumed one-time key, and validator 0.6.1 rejects it with
+   * "Value may not be credited to a consumed signing position".
    *
    * @param recipients map of recipient bundle-hash -> amount.
    */

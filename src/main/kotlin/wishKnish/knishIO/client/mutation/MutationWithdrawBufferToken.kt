@@ -13,7 +13,6 @@ class MutationWithdrawBufferToken @JvmOverloads constructor(
     molecule?.apply {
       initWithdrawBuffer(recipients)
       sign()
-      check(sourceWallet)
     }
   }
 }

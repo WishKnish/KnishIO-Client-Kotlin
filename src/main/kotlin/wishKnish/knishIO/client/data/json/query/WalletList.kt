@@ -5,10 +5,13 @@ package wishKnish.knishIO.client.data.json.query
 import kotlinx.serialization.Serializable
 import wishKnish.knishIO.client.data.json.variables.WalletListVariable
 
+// The validator's `Wallet` field takes bundleHash/token/unspent (no address or position
+// arguments) and its Wallet type has no `molecules` field; either made every query a
+// GraphQL validation error. Selection mirrors JS QueryWalletList.
 @Serializable data class WalletList(@JvmField val variables: WalletListVariable) : QueryInterface {
   override val query = $$"""
-    query( $address: String, $bundleHash: String, $token: String, $position: String, $unspent: Boolean ) {
-      Wallet( address: $address, bundleHash: $bundleHash, token: $token, position: $position, unspent: $unspent ) {
+    query( $bundleHash: String, $token: String, $unspent: Boolean ) {
+      Wallet( bundleHash: $bundleHash, token: $token, unspent: $unspent ) {
         address,
         bundleHash,
         token {
@@ -17,10 +20,6 @@ import wishKnish.knishIO.client.data.json.variables.WalletListVariable
           fungibility,
           supply
         },
-        molecules {
-          molecularHash,
-          createdAt
-        }
         tokenSlug,
         batchId,
         position,

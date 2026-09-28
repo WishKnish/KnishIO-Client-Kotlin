@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import wishKnish.knishIO.client.data.graphql.types.TokenUnit
+import wishKnish.knishIO.client.exception.TransferBalanceException
 import wishKnish.knishIO.client.libraries.CheckMolecule
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.libraries.Shake256
@@ -335,6 +337,198 @@ class PatentVectorValidationTest {
                 assertEquals(expectedSourceValue, bValues[0], "source B (full-balance debit) for $name")
                 assertEquals(expectedRecipientValue, vValue, "recipient V for $name")
                 assertEquals(expectedRemainderValue, bValues[1], "remainder B for $name")
+            }
+        }
+    }
+
+    // =========================================================================
+    // 0c. Phase B vectors (validator 0.6.x / SDK patch wave): replenish, stackable
+    //     fusion, and a buffer withdraw whose remainder sits at a fresh position.
+    //     Every built molecule must also pass the SDK's own check (contract 9.7).
+    // =========================================================================
+
+    /** Unit ids of an atom's `tokenUnits` meta; an absent meta is the empty list. */
+    private fun unitIds(atom: Atom): List<String> {
+        val units = atom.meta.firstOrNull { it.key == "tokenUnits" }?.value ?: return emptyList()
+        return json.parseToJsonElement(units).jsonArray.map { it.jsonArray[0].jsonPrimitive.content }
+    }
+
+    private fun ids(test: JsonObject, key: String): List<String> =
+        test[key]!!.jsonArray.map { it.jsonPrimitive.content }
+
+    @Nested
+    @DisplayName("Token replenish — C(action=add) + I (Phase B 9.1)")
+    inner class TokenReplenish {
+
+        private val replenishTests by lazy {
+            vectors["token_replenish"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("replenishTokens builds the canonical C+I molecule and passes the check")
+        fun replenishMatchesVectors() {
+            val secret = Crypto.generateSecret("TOKEN_REPLENISH_TESTSEED")
+            replenishTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                val token = test["token"]!!.jsonPrimitive.content
+                val amount = test["amount"]!!.jsonPrimitive.intOrNull
+                val units = test["units"]!!.jsonArray.map {
+                    val triple = it.jsonArray
+                    TokenUnit(triple[0].jsonPrimitive.content, triple[1].jsonPrimitive.content, listOf())
+                }
+
+                val credited = Wallet.create(secret, token)
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = Wallet.create(secret, "USER"),
+                    remainderWallet = Wallet.create(secret, "USER"),
+                    cellSlug = "repltest"
+                )
+                molecule.replenishTokens(amount, token, credited, units)
+                val cAtom = molecule.atoms[0]
+
+                assertEquals(ids(test, "expectedIsotopes"), molecule.atoms.map { it.isotope.toString() }, "isotopes for $name")
+                assertEquals(test["expectedCValue"]!!.jsonPrimitive.content, cAtom.value, "C value for $name")
+                assertEquals(test["expectedMetaType"]!!.jsonPrimitive.content, cAtom.metaType, "metaType for $name")
+                assertEquals(test["expectedMetaId"]!!.jsonPrimitive.content, cAtom.metaId, "metaId for $name")
+                assertEquals(
+                    listOf(test["expectedAction"]!!.jsonPrimitive.content, credited.address, credited.position, credited.pubkey),
+                    cAtom.meta.take(4).map { it.value },
+                    "action, then the credited wallet's address/position/pubkey for $name"
+                )
+                val expectedUnitIds = test["expectedTokenUnitIds"]!!.takeUnless { it is JsonNull }?.jsonArray
+                    ?.map { it.jsonPrimitive.content }
+                val expectedKeys = listOf("action", "address", "position", "pubkey") +
+                    (if (expectedUnitIds == null) listOf() else listOf("tokenUnits"))
+                assertEquals(expectedKeys, cAtom.meta.map { it.key }, "C meta keys for $name")
+                assertEquals(expectedUnitIds ?: listOf<String>(), unitIds(cAtom), "tokenUnits for $name")
+
+                molecule.sign()
+                assertTrue(Molecule.verify(molecule, molecule.sourceWallet), "the SDK check accepts $name")
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Stackable fusion conservation — V V F V (Phase B 9.2)")
+    inner class StackableFusion {
+
+        private val fusionTests by lazy {
+            vectors["stackable_fusion_conservation"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        private fun build(secret: String, test: JsonObject): Pair<Molecule, Wallet> {
+            val source = Wallet.create(secret, "FUSETOK")
+            source.tokenUnits = ids(test, "sourceUnits").map { TokenUnit(it, it, listOf()) }.toMutableList()
+            source.balance = source.tokenUnits.size.toDouble()
+            val recipient = Wallet.create(secret, "FUSETOK")
+            val molecule = Molecule(
+                secret = secret,
+                sourceWallet = source,
+                remainderWallet = Wallet.create(secret, "FUSETOK"),
+                cellSlug = "fusetest"
+            )
+            val newId = test["newUnitId"]!!.jsonPrimitive.content
+            molecule.fuseToken(ids(test, "fuse"), TokenUnit(newId, newId, listOf()), recipient)
+            return molecule to recipient
+        }
+
+        @Test
+        @DisplayName("fuseToken builds the canonical molecule, conserves, and passes the check")
+        fun fusionMatchesVectors() {
+            val secret = Crypto.generateSecret("STACKABLE_FUSION_TESTSEED")
+            fusionTests.map { it.jsonObject }.filter { it["mustReject"] == null }.forEach { test ->
+                val name = test["name"]!!.jsonPrimitive.content
+                val (molecule, recipient) = build(secret, test)
+                val (source, burn, fusion, remainder) = molecule.atoms
+
+                assertEquals(ids(test, "expectedIsotopes"), molecule.atoms.map { it.isotope.toString() }, "isotopes for $name")
+                assertEquals(test["expectedSourceValue"]!!.jsonPrimitive.content, source.value, "source V for $name")
+                assertEquals(test["expectedBurnValue"]!!.jsonPrimitive.content, burn.value, "burn V for $name")
+                assertEquals(test["expectedFusionValue"]!!.jsonPrimitive.content, fusion.value, "F for $name")
+                assertEquals(test["expectedRemainderValue"]!!.jsonPrimitive.content, remainder.value, "remainder V for $name")
+                assertEquals(
+                    test["expectedSum"]!!.jsonPrimitive.content,
+                    molecule.atoms.sumOf { it.value!!.toLong() }.toString(),
+                    "V+F sum for $name"
+                )
+
+                assertEquals(ids(test, "expectedSourceUnitIds"), unitIds(source), "source units for $name")
+                assertEquals(ids(test, "expectedBurnUnitIds"), unitIds(burn), "burn units for $name")
+                assertEquals(ids(test, "expectedRemainderUnitIds"), unitIds(remainder), "remainder units for $name")
+                assertEquals(listOf(test["newUnitId"]!!.jsonPrimitive.content), unitIds(fusion), "F unit for $name")
+
+                assertEquals("walletBundle" to Molecule.BURN_BUNDLE, burn.metaType to burn.metaId, "burn target for $name")
+                assertEquals("walletBundle" to recipient.bundle, fusion.metaType to fusion.metaId, "F target for $name")
+                assertEquals("walletBundle" to molecule.bundle, remainder.metaType to remainder.metaId, "remainder target for $name")
+
+                val newUnit = json.parseToJsonElement(fusion.meta.single { it.key == "tokenUnits" }.value!!).jsonArray.single().jsonArray
+                val fused = newUnit[2].jsonObject["fusedTokenUnits"]!!.jsonArray.map { it.jsonArray[0].jsonPrimitive.content }
+                assertEquals(ids(test, "expectedFusedTokenUnitIds"), fused, "fusedTokenUnits for $name")
+
+                molecule.sign()
+                assertTrue(Molecule.verify(molecule, molecule.sourceWallet), "the SDK check accepts $name")
+            }
+        }
+
+        @Test
+        @DisplayName("fusing a single unit is refused client-side")
+        fun singleUnitRejected() {
+            val secret = Crypto.generateSecret("STACKABLE_FUSION_TESTSEED")
+            fusionTests.map { it.jsonObject }.filter { it["mustReject"] != null }.forEach { test ->
+                val error = assertThrows(TransferBalanceException::class.java) { build(secret, test) }
+                assertTrue(
+                    error.message!!.contains(test["expectedErrorContains"]!!.jsonPrimitive.content),
+                    "${test["name"]}: ${error.message}"
+                )
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Buffer withdraw with a fresh remainder — B V B (Phase B 9.6)")
+    inner class BufferWithdrawFreshRemainder {
+
+        private val withdrawTests by lazy {
+            vectors["buffer_withdraw_fresh_remainder"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        @Test
+        @DisplayName("initWithdrawBuffer credits the change to a position other than the source's")
+        fun withdrawMatchesVectors() {
+            val secret = Crypto.generateSecret("BUFFER_WITHDRAW_FRESH_TESTSEED")
+            withdrawTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                val source = Wallet.create(secret, "BUFTOK")
+                source.balance = test["sourceBalance"]!!.jsonPrimitive.double
+                val molecule = Molecule(
+                    secret = secret,
+                    sourceWallet = source,
+                    remainderWallet = Wallet.create(secret, "BUFTOK"),
+                    cellSlug = "buftest"
+                )
+                molecule.initWithdrawBuffer(mapOf(source.bundle !! to test["amount"]!!.jsonPrimitive.int))
+                val (sourceAtom, recipientAtom, remainderAtom) = molecule.atoms
+
+                assertEquals(ids(test, "expectedIsotopes"), molecule.atoms.map { it.isotope.toString() }, "isotopes for $name")
+                assertEquals(test["expectedSourceValue"]!!.jsonPrimitive.content, sourceAtom.value, "source B for $name")
+                assertEquals(test["expectedRecipientValue"]!!.jsonPrimitive.content, recipientAtom.value, "recipient V for $name")
+                assertEquals(test["expectedRemainderValue"]!!.jsonPrimitive.content, remainderAtom.value, "remainder B for $name")
+                assertEquals(
+                    test["expectedSum"]!!.jsonPrimitive.content,
+                    molecule.atoms.sumOf { it.value!!.toLong() }.toString(),
+                    "B+V sum for $name"
+                )
+                assertEquals(
+                    test["expectedRemainderPositionDistinctFromSource"]!!.jsonPrimitive.boolean,
+                    remainderAtom.position != sourceAtom.position,
+                    "remainder position distinct from the source's for $name"
+                )
+
+                molecule.sign()
+                assertTrue(Molecule.verify(molecule, source), "the SDK check accepts $name")
             }
         }
     }
