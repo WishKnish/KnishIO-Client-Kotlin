@@ -15,17 +15,26 @@
 
 package wishKnish.knishIO.client
 
+import io.mockk.every
+import io.mockk.mockkConstructor
+import io.mockk.unmockkConstructor
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import wishKnish.knishIO.client.data.MetaData
+import wishKnish.knishIO.client.data.graphql.types.AccessToken
 import wishKnish.knishIO.client.data.graphql.types.TokenUnit
+import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
+import wishKnish.knishIO.client.data.json.query.ContinuId
 import wishKnish.knishIO.client.exception.TransferBalanceException
+import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.libraries.CheckMolecule
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.libraries.Shake256
 import wishKnish.knishIO.client.libraries.Strings
+import java.net.URI
 
 @DisplayName("Patent Vector Validation (Canonical Appendix B)")
 class PatentVectorValidationTest {
@@ -529,6 +538,73 @@ class PatentVectorValidationTest {
 
                 molecule.sign()
                 assertTrue(Molecule.verify(molecule, source), "the SDK check accepts $name")
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("createToken with units — C tokenUnits as [id, name, metas] triples")
+    inner class CreateTokenUnits {
+
+        private val createTests by lazy {
+            vectors["create_token_units"]!!.jsonObject["tests"]!!.jsonArray
+        }
+
+        /**
+         * Runs [operation] on an authorized client whose transport is stubbed: the ContinuId
+         * query answers the identity's USER wallet, and the one ProposeMolecule is recorded and
+         * accepted. Returns the molecule the client sent.
+         */
+        private fun proposed(secret: String, operation: (KnishIOClient) -> Unit): Molecule {
+            val uri = URI("https://vectors.test.knish.io/graphql")
+            val userPosition = "c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7"
+            val userWallet = Wallet(secret, "USER", userPosition)
+            val proposals = mutableListOf<Molecule>()
+            mockkConstructor(HttpClient::class)
+            try {
+                every { anyConstructed<HttpClient>().query(any()) } answers {
+                    check(firstArg<Any>() is ContinuId) { "unexpected query ${firstArg<Any>()::class.simpleName}" }
+                    """{"data":{"ContinuId":{"address":"${userWallet.address}","bundleHash":"${userWallet.bundle}","tokenSlug":"USER","position":"$userPosition","amount":"0"}}}"""
+                }
+                every { anyConstructed<HttpClient>().mutate(any()) } answers {
+                    val molecule = firstArg<MoleculeMutation>().variables.molecule
+                    proposals.add(molecule)
+                    """{"data":{"ProposeMolecule":{"molecularHash":"${molecule.molecularHash}","status":"accepted"}}}"""
+                }
+                val client = KnishIOClient(listOf(uri))
+                client.setSecret(secret)
+                client.authTokenObjects[uri.toASCIIString()] =
+                    AuthToken.create(AccessToken("T", 9999999, "server-key", "server-key", false, 9999999), userWallet)
+                operation(client)
+            } finally {
+                unmockkConstructor(HttpClient::class)
+            }
+            return proposals.single()
+        }
+
+        @Test
+        @DisplayName("createToken sends each unit id as [id, id, {}] and passes the check")
+        fun createTokenMatchesVectors() {
+            val secret = Crypto.generateSecret("CREATE_TOKEN_UNITS_TESTSEED")
+            createTests.forEach { element ->
+                val test = element.jsonObject
+                val name = test["name"]!!.jsonPrimitive.content
+                val token = test["token"]!!.jsonPrimitive.content
+                val units = ids(test, "units").map { TokenUnit(it, it, listOf()) }.toMutableList()
+
+                val molecule = proposed(secret) {
+                    it.createToken(token, null, mutableListOf(MetaData("fungibility", "stackable")), units = units)
+                }
+                val cAtom = molecule.atoms.single { it.isotope == 'C' }
+                val tokenUnits = cAtom.meta.single { it.key == "tokenUnits" }.value
+                println("[create-token-units] $name tokenUnits=$tokenUnits")
+
+                assertEquals(test["expectedTokenUnits"]!!.jsonPrimitive.content, tokenUnits, "tokenUnits for $name")
+                assertEquals(test["expectedCValue"]!!.jsonPrimitive.content, cAtom.value, "C value for $name")
+                assertEquals(test["expectedMetaType"]!!.jsonPrimitive.content, cAtom.metaType, "metaType for $name")
+                assertEquals(test["expectedMetaId"]!!.jsonPrimitive.content, cAtom.metaId, "metaId for $name")
+                assertEquals(ids(test, "expectedTokenUnitIds"), unitIds(cAtom), "unit ids for $name")
+                assertTrue(Molecule.verify(molecule, molecule.sourceWallet), "the SDK check accepts $name")
             }
         }
     }

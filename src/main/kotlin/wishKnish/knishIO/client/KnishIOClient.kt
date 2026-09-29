@@ -776,9 +776,11 @@ class KnishIOClient @JvmOverloads constructor(
           it.value = "1"
         } ?: meta.add(MetaData("splittable", "1"))
 
+        // [id, name, metas] triples, as every other unit operation sends them
+        val unitsJson = Wallet.tokenUnitsJson(units)
         meta.firstOrNull { it.key == "tokenUnits" }?.let {
-          it.value = jsonFormat.encodeToString(units)
-        } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
+          it.value = unitsJson
+        } ?: meta.add(MetaData("tokenUnits", unitsJson))
       }
     }
 

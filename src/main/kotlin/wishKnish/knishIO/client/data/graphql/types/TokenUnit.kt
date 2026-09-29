@@ -24,7 +24,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * serialized-JSON blob, or null), but the SDK models a unit's metas as List<String> (its internal
  * array form for the [[id, name, …metas], …] write shape). Tolerate the wire shape on READ
  * (String / null / object -> emptyList; an actual array decodes normally) while preserving the
- * array encode the write path relies on (createToken's encodeToString, tokenUnitsJson). Without
+ * array encode the write path relies on (requestTokens' encodeToString, tokenUnitsJson). Without
  * this, deserializing any stackable Balance response throws — kotlinx is strict on type mismatches.
  */
 object TokenUnitMetasSerializer : KSerializer<List<String>> {
