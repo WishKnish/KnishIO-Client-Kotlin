@@ -14,6 +14,13 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [1.2.2] — 2026-09-29
+
+### Fixed
+
+- createToken sends tokenUnits as [id, name, metas] triples (a bare id becomes [id, id, {}]), the
+  form every other unit operation already uses; pinned by the create_token_units vector.
+
 ## [1.2.1] — 2026-09-28
 
 ### Fixed
@@ -469,7 +476,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.2
 [1.2.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.1
 [1.2.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.0
 [1.1.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.1.2
