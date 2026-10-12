@@ -590,6 +590,34 @@ class CheckMolecule {
       return true
     }
 
+    private val SIGNABLE_HASH = Regex("[0-9a-g]{64}")
+
+    /**
+     * True when [hash] is exactly 64 symbols of `[0-9a-g]` (the only shape that can be signed or verified).
+     */
+    @JvmStatic
+    fun isSignableHash(hash: String?): Boolean {
+      return hash != null && SIGNABLE_HASH.matches(hash)
+    }
+
+    private fun otsHex(concatenated: String): String {
+      if (concatenated.length == 2048 || concatenated.length == 8192) {
+        return concatenated
+      }
+      val hex = try {
+        org.bouncycastle.util.encoders.Hex.toHexString(java.util.Base64.getDecoder().decode(concatenated))
+      } catch (e: IllegalArgumentException) {
+        throw SignatureMalformedException("OTS malformed", e)
+      }
+      if (hex.length != 2048 && hex.length != 8192) {
+        throw SignatureMalformedException()
+      }
+      return hex
+    }
+
+    /**
+     * Verifies the molecule's one-time signature (v1: 16 chains, v2: 64 chains).
+     */
     @JvmStatic
     @Throws(
       MolecularHashMissingException::class,
@@ -599,29 +627,21 @@ class CheckMolecule {
     )
     fun ots(molecule: Molecule): Boolean {
       missing(molecule)
+      if (!isSignableHash(molecule.molecularHash)) {
+        throw SignatureMalformedException()
+      }
       // Determine first atom
       val firstAtom = molecule.atoms.first()
       val walletAddress = firstAtom.walletAddress
-      // Rebuilding OTS out of all the atoms
-      var ots = molecule.atoms.map { it.otsFragment }.reduce { accumulator, otsFragment -> accumulator + otsFragment }
-
-      ots?.let {
-        // Wrong size? Maybe it's compressed
-        if (it.length != 2048) {
-          ots = Strings.base64ToHex(it)
-          // Still wrong? That's a failure
-          if (ots !!.length != 2048) {
-            throw SignatureMalformedException()
-          }
-        }
-      } ?: throw SignatureMalformedException()
+      // Rebuilding OTS out of all the atoms (a missing fragment counts as empty)
+      val ots = otsHex(molecule.atoms.joinToString("") { it.otsFragment ?: "" })
 
       // WOTS+ Verification: Reconstruct the public key fragments from signature
       val normalizedHash = normalizedHash(molecule.molecularHash !!)
       val digestSponge = Shake256.create()
-      
-      // Subdivide signature into 16 segments of 128 characters each
-      ots!!.chunked(128).forEachIndexed { idx, signatureChunk ->
+
+      // Subdivide signature into segments of 128 characters each (16 for v1, 64 for v2)
+      ots.chunked(128).forEachIndexed { idx, signatureChunk ->
         var workingFragment = signatureChunk
         
         // Apply WOTS+ verification iterations to reconstruct public key fragment

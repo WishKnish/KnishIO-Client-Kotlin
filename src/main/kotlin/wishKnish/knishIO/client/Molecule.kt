@@ -90,7 +90,7 @@ import kotlin.math.ceil
     
     // If sourceWallet is not properly initialized but we have a secret, create a proper sourceWallet
     if (sourceWallet.position == null && secret != null && molecularHash == null) {
-      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters, mlkemParameterSet = mlkemParameterSet)
+      sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters, mlkemParameterSet = mlkemParameterSet, otsVersion = sourceWallet.otsVersion)
     }
     
     if (sourceWallet.position == null && molecularHash == null) {
@@ -104,7 +104,8 @@ import kotlin.math.ceil
         token = sourceWallet.token,
         batchId = sourceWallet.batchId,
         characters = sourceWallet.characters,
-        mlkemParameterSet = mlkemParameterSet
+        mlkemParameterSet = mlkemParameterSet,
+        otsVersion = signingOtsVersion()
       )
 
       clear()
@@ -936,7 +937,8 @@ import kotlin.math.ceil
       secretOrBundle = secret,
       token = sourceWallet.token,
       batchId = sourceWallet.batchId,
-      mlkemParameterSet = mlkemParameterSet
+      mlkemParameterSet = mlkemParameterSet,
+      otsVersion = signingOtsVersion()
     )
 
     // Source V-atom: debit the ENTIRE balance (UTXO drain) so the B + remainder atoms conserve.
@@ -1368,11 +1370,16 @@ import kotlin.math.ceil
   }
 
   /**
+   * OTS version this molecule signs with: the source wallet's version (1 by default).
+   */
+  fun signingOtsVersion(): Int = sourceWallet.otsVersion
+
+  /**
    * Creates a one-time signature for a molecule and breaks it up across multiple atoms within that
-   * molecule. Resulting 4096 byte (2048 character) string is the one-time signature, which is then compressed.
+   * molecule. The signature (2048 hex for v1, 8192 hex for v2) is then optionally base64-compressed.
    */
   @JvmOverloads
-  @Throws(AtomsMissingException::class, IllegalArgumentException::class)
+  @Throws(AtomsMissingException::class, IllegalArgumentException::class, SignatureMalformedException::class)
   fun sign(
     anonymous: Boolean = false,
     compressed: Boolean = true
@@ -1394,12 +1401,17 @@ import kotlin.math.ceil
 
     // Hash atoms to get molecular hash
     molecularHash = Atom.hashAtoms(atoms = atoms)
+    if (!CheckMolecule.isSignableHash(molecularHash)) {
+      throw SignatureMalformedException()
+    }
 
     // Determine signing atom
     val signingAtom = atoms.first()
 
     // Generate the private signing key for this molecule using original secret (same as Wallet constructor)
-    val key = Wallet.generatePrivateKey(secret = secret, token = signingAtom.token, position = signingAtom.position)
+    val key = Wallet.generatePrivateKey(
+      secret = secret, token = signingAtom.token, position = signingAtom.position, otsVersion = signingOtsVersion()
+    )
 
     // Building a one-time-signature
     var signatureFragments = signatureFragments(key)

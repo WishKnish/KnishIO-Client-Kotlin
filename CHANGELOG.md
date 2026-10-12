@@ -14,6 +14,28 @@ Entries above `0.8.0` were backfilled on 2026-07-27 from the repository's own ta
 and commit history rather than written at release time; where the history does
 not substantiate a detail, the entry says so instead of guessing.
 
+## [Unreleased]
+
+### Added
+
+- Opt-in OTS v2 signatures (64-chain WOTS+, 8192-hex keys): `Wallet(..., otsVersion = 2)`,
+  `Wallet.create(..., otsVersion)`, `Wallet.generatePrivateKey(secret, token, position, otsVersion)`,
+  `Wallet.requireSupportedOtsVersion`, `Molecule.signingOtsVersion()` and
+  `CheckMolecule.isSignableHash`. v1 stays the default.
+
+### Changed
+
+- `CheckMolecule.ots()` verifies both v1 (2048-hex) and v2 (8192-hex) signatures, raw or base64.
+- A molecular hash that is not exactly 64 characters of `[0-9a-g]` now fails with
+  `SignatureMalformedException`, both in `Molecule.sign()` and in `CheckMolecule.ots()`; an invalid
+  base64 signature also fails with `SignatureMalformedException`.
+- Wallets a molecule creates for its signer (remainder, deposit buffer) and the
+  `KnishIOClient.createMolecule` default remainder use the source wallet's OTS version.
+- Key derivation treats a secret or position as hex only when it matches `[0-9A-Fa-f]+`; anything
+  else is hashed first. An empty secret or position is rejected with `NumberFormatException`.
+- A keyed `Wallet` keeps the position it is given (a non-hex position is hashed during key
+  derivation) instead of replacing a non-64-hex position with a random one.
+
 ## [1.2.2] — 2026-09-29
 
 ### Fixed

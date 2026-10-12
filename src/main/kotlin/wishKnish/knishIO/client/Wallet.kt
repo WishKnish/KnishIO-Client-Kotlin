@@ -70,7 +70,8 @@ class Wallet @JvmOverloads constructor(
   @JvmField var position: String? = null, // hexadecimal string used to salt the secret and produce one-time signatures
   @JvmField var batchId: String? = null,
   @JvmField var characters: String? = null,
-  @JvmField var mlkemParameterSet: Int = 1024
+  @JvmField var mlkemParameterSet: Int = 1024,
+  @JvmField val otsVersion: Int = 1 // OTS key version: 1 (16 chains) or 2 (64 chains)
 ) {
 
   @JvmField var balance: Double = 0.0
@@ -105,16 +106,13 @@ class Wallet @JvmOverloads constructor(
     require(mlkemParameterSet in listOf(1024, 768)) {
       "KnishIO: unsupported ML-KEM parameter set $mlkemParameterSet; expected 1024 or 768."
     }
+    requireSupportedOtsVersion(otsVersion)
     // Set default characters to BASE64 to match JS SDK
     characters = characters ?: "BASE64"
     
     bundle = secret?.let {
-      // Validate position or generate a new one
-      position = when {
-        position == null -> Wallet.generatePosition()
-        position!!.matches(Regex("^[a-f0-9]{64}$")) -> position
-        else -> Wallet.generatePosition() // Invalid position, generate a fresh random one
-      }
+      // Generate a position when none is given; a given position is used as-is (stage 0 hashes a non-hex one)
+      position = position?.takeIf { p -> p.isNotEmpty() } ?: Wallet.generatePosition()
       val bundleHash = Crypto.generateBundleHash(it)
       prepareKeys(it)
       // Re-enable post-quantum key generation
@@ -133,7 +131,8 @@ class Wallet @JvmOverloads constructor(
       token: String = "USER",
       batchId: String? = null,
       characters: String? = null,
-      mlkemParameterSet: Int = 1024
+      mlkemParameterSet: Int = 1024,
+      otsVersion: Int = 1
     ): Wallet {
 
       val secret = secretOrBundle?.let {
@@ -148,7 +147,7 @@ class Wallet @JvmOverloads constructor(
 
       // Wallet initialization
       return Wallet(
-        secret, token, position, batchId, characters, mlkemParameterSet
+        secret, token, position, batchId, characters, mlkemParameterSet, otsVersion
       ).apply {
         bundle = secret?.let {
           Crypto.generateBundleHash(it)
@@ -179,48 +178,66 @@ class Wallet @JvmOverloads constructor(
     }
 
     /**
-     * Generates a private key for the given parameters
+     * Throws [IllegalArgumentException] unless [otsVersion] is 1 or 2.
      */
     @JvmStatic
+    fun requireSupportedOtsVersion(otsVersion: Int) {
+      require(otsVersion == 1 || otsVersion == 2) {
+        "KnishIO: unsupported OTS version $otsVersion; expected 1 or 2."
+      }
+    }
+
+    private val HEX_PATTERN = Regex("[0-9A-Fa-f]+")
+
+    /**
+     * Generates a private key for the given parameters.
+     *
+     * [otsVersion] 1 yields a 2048-hex key (16 chains); 2 yields an 8192-hex key (64 chains).
+     */
+    @JvmStatic
+    @JvmOverloads
     @Throws(NumberFormatException::class)
     fun generatePrivateKey(
       secret: String,
       token: String,
-      position: String
+      position: String,
+      otsVersion: Int = 1
     ): String {
+      requireSupportedOtsVersion(otsVersion)
+      if (secret.isEmpty() || position.isEmpty()) {
+        throw NumberFormatException("KnishIO: secret and position are required to generate a key.")
+      }
 
       // Normalize secret to hex if it's not already valid hex
-      val secretHex = try {
-        // Test if secret is valid hex
-        BigInteger(secret, 16)
+      val secretHex = if (HEX_PATTERN.matches(secret)) {
         secret
-      } catch (e: NumberFormatException) {
-        // If not valid hex, hash it to create a valid hex string
-        Shake256.hash(secret, 128) // 128 bytes = 256 hex chars for 2048-char compatibility
+      } else {
+        Shake256.hash(secret, 128) // 128 bytes = 256 hex chars
       }
 
       // Converting secret to bigInt
       val bigIntSecret = BigInteger(secretHex, 16)
 
       // Convert position to hex if it's not already valid hex
-      val positionHex = try {
-        // Test if position is valid hex
-        BigInteger(position, 16)
+      val positionHex = if (HEX_PATTERN.matches(position)) {
         position
-      } catch (e: NumberFormatException) {
-        // If not valid hex, hash it to create a valid hex string
+      } else {
         Shake256.hash(position, 32)
       }
 
       // Adding new position to the user secret to produce the indexed key
       val indexedKey = bigIntSecret.add(BigInteger(positionHex, 16))
 
-      // Hashing the indexed key to produce the intermediate key
-      val intermediateKeySponge = Shake256.create()
-
       // Convert to hex string without padding (matches JS implementation)
       val indexedKeyHex = indexedKey.toString(16).lowercase()
-      
+
+      if (otsVersion == 2) {
+        val intermediate = Shake256.hash("KnishIO-OTS-v2|$indexedKeyHex|$token", 1024)
+        return Shake256.hash(intermediate, 4096)
+      }
+
+      // Hashing the indexed key to produce the intermediate key
+      val intermediateKeySponge = Shake256.create()
       intermediateKeySponge.absorb(indexedKeyHex)
       intermediateKeySponge.absorb(token)
 
@@ -275,7 +292,7 @@ class Wallet @JvmOverloads constructor(
       // Generating wallet digest
       val digestSponge = Shake256.create()
 
-      // Subdivide private key into 16 fragments of 128 characters each
+      // Subdivide private key into fragments of 128 characters each (16 for v1, 64 for v2)
       key.chunked(128).forEach {
         var workingFragment = it
 
@@ -428,7 +445,7 @@ class Wallet @JvmOverloads constructor(
     if (key == null && address == null) {
 
       key = generatePrivateKey(
-        secret = secret, token = token, position = position as String
+        secret = secret, token = token, position = position as String, otsVersion = otsVersion
       )
       address = generatePublicKey(key = key as String)
       // Note: pubkey is now set by preparePostQuantumKeys() for ML-KEM compatibility

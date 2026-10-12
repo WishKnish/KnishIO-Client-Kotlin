@@ -499,7 +499,8 @@ class KnishIOClient @JvmOverloads constructor(
 
     // Set the remainder wallet for the next transaction
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters, mlkemParameterSet = mlkemParameterSet
+      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters,
+      mlkemParameterSet = mlkemParameterSet, otsVersion = signingWallet.otsVersion
     )
 
     val molecule = Molecule(
