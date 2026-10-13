@@ -68,7 +68,9 @@ class AuthToken(
     val mlkemParameterSet: Int? = null,
     // The bound wallet's token: AUTH, or USER for a login signed from the ContinuID pointer.
     // Absent in snapshots written before it existed → restored as AUTH.
-    val token: String? = null
+    val token: String? = null,
+    // OTS version of the bound wallet's key. Absent in snapshots written before it existed → 1.
+    val otsVersion: Int? = null
   )
   inner class Snapshot(
     val token: String,
@@ -83,7 +85,8 @@ class AuthToken(
         getWallet()!!.position,
         getWallet()!!.characters,
         getWallet()!!.mlkemParameterSet,
-        getWallet()!!.token
+        getWallet()!!.token,
+        getWallet()!!.otsVersion
       )
     }
   }
@@ -114,6 +117,17 @@ class AuthToken(
         ?: 768
     }
 
+    /**
+     * OTS version a restored session's wallet must use: the snapshot's explicit field, or 1 for a
+     * snapshot written before the field existed (every such session was v1).
+     */
+    @JvmStatic
+    fun resolveOtsVersion(snapshot: Snapshot): Int {
+      val otsVersion = snapshot.wallet.otsVersion ?: 1
+      ClientWallet.requireSupportedOtsVersion(otsVersion)
+      return otsVersion
+    }
+
     @JvmStatic
     fun restore(snapshot: Snapshot, secret: String): AuthToken {
       val wallet = ClientWallet(
@@ -122,7 +136,8 @@ class AuthToken(
         snapshot.wallet.position,
         null,
         snapshot.wallet.characters,
-        resolveMlkemParameterSet(snapshot)
+        resolveMlkemParameterSet(snapshot),
+        resolveOtsVersion(snapshot)
       )
 
       return create(

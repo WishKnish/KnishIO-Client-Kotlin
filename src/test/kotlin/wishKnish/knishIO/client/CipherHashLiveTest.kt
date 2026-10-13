@@ -8,6 +8,7 @@ import strikt.assertions.contains
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
 import strikt.assertions.isTrue
+import wishKnish.knishIO.client.libraries.Shake256
 import java.net.URI
 
 /**
@@ -25,6 +26,14 @@ import java.net.URI
 @Tag("mlkem")
 class CipherHashLiveTest {
 
+    // CIPHERHASH_OTS_VERSION=2 runs the session at OTS v2; anything else at v1.
+    private fun otsVersion(): Int = if (System.getenv("CIPHERHASH_OTS_VERSION") == "2") 2 else 1
+
+    // A v2 run uses its own stable identity, derived from the v1 secret, so each identity's
+    // ContinuID wallets stay at one OTS version across runs.
+    private fun secretFor(v1Secret: String): String =
+        if (otsVersion() == 2) Shake256.hash("$v1Secret|ots-v2", 1024) else v1Secret
+
     private fun serverUrl(): String {
         val url = System.getenv("CIPHERHASH_TEST_URL")
         Assumptions.assumeTrue(url != null) { "set CIPHERHASH_TEST_URL to run the live CipherHash test" }
@@ -34,7 +43,7 @@ class CipherHashLiveTest {
     @Test
     fun `encrypted CipherHash round-trip matches plaintext`() {
         val url = serverUrl()
-        val secret = "phase-e-live-kotlin-secret-0123456789ABCDEF"
+        val secret = secretFor("phase-e-live-kotlin-secret-0123456789ABCDEF")
 
         // ONE session, transport toggled on it — the queried balance wallet stays fixed. (A fresh
         // second auth would rotate the USER remainder via ContinuID → a different address/position/
@@ -48,8 +57,9 @@ class CipherHashLiveTest {
         // `encrypt = true` instead would make the plaintext baseline leg below a silent downgrade,
         // which the validator rejects when ENFORCE_ENCRYPTED_TRANSPORT is at its secure default.
         val param = System.getenv("CIPHERHASH_MLKEM_PARAMETER_SET")?.toIntOrNull() ?: 1024
-        val client = KnishIOClient(listOf(URI(url)), encrypt = false, mlkemParameterSet = param)
+        val client = KnishIOClient(listOf(URI(url)), encrypt = false, mlkemParameterSet = param, otsVersion = otsVersion())
         client.requestAuthToken(secret = secret, encrypt = false)
+        expectThat(client.getAuthToken()!!.getWallet()!!.otsVersion).isEqualTo(otsVersion())
 
         // Encrypted round-trip: the validator ML-KEM-decrypts the request, executes it, and
         // encrypts the response back to the client's ML-KEM pubkey; the client decrypts it.
@@ -80,11 +90,12 @@ class CipherHashLiveTest {
     @Test
     fun `an encrypt-true session is refused when it drops to plaintext`() {
         val url = serverUrl()
-        val secret = "phase-e-enforcement-kotlin-secret-0123456789ABCDEF"
+        val secret = secretFor("phase-e-enforcement-kotlin-secret-0123456789ABCDEF")
 
         val param = System.getenv("CIPHERHASH_MLKEM_PARAMETER_SET")?.toIntOrNull() ?: 1024
-        val client = KnishIOClient(listOf(URI(url)), encrypt = true, mlkemParameterSet = param)
+        val client = KnishIOClient(listOf(URI(url)), encrypt = true, mlkemParameterSet = param, otsVersion = otsVersion())
         client.requestAuthToken(secret = secret, encrypt = true)
+        expectThat(client.getAuthToken()!!.getWallet()!!.otsVersion).isEqualTo(otsVersion())
 
         // The encrypted transport still works for this session.
         val encResp = client.queryBalance("USER")

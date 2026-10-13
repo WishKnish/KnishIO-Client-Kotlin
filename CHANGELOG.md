@@ -22,6 +22,14 @@ not substantiate a detail, the entry says so instead of guessing.
   `Wallet.create(..., otsVersion)`, `Wallet.generatePrivateKey(secret, token, position, otsVersion)`,
   `Wallet.requireSupportedOtsVersion`, `Molecule.signingOtsVersion()` and
   `CheckMolecule.isSignableHash`. v1 stays the default.
+- **Client-level OTS version.** `KnishIOClient(..., otsVersion = 2)` (1 default, or 2) and the
+  `otsVersion` property. Keys the client creates from its secret (the first source wallet, AUTH and
+  guest wallets, `createWallet`, token, recipient and claim wallets) use it.
+- `Wallet.detectOtsVersion(secret, token, position, address, preferred)`: the OTS version a
+  wallet address was derived at, or null.
+- `AuthToken` snapshots carry the session wallet's `otsVersion` (`AuthToken.resolveOtsVersion`);
+  a snapshot without it restores at v1.
+- `MutationClaimShadowWallet.fillMolecule(token, batchId, otsVersion)`.
 
 ### Changed
 
@@ -29,12 +37,21 @@ not substantiate a detail, the entry says so instead of guessing.
 - A molecular hash that is not exactly 64 characters of `[0-9a-g]` now fails with
   `SignatureMalformedException`, both in `Molecule.sign()` and in `CheckMolecule.ots()`; an invalid
   base64 signature also fails with `SignatureMalformedException`.
-- Wallets a molecule creates for its signer (remainder, deposit buffer) and the
-  `KnishIOClient.createMolecule` default remainder use the source wallet's OTS version.
+- Wallets a molecule creates for its signer (remainder, deposit buffer), the
+  `KnishIOClient.createMolecule` default remainder and the new ContinuID head of a login use the
+  signing wallet's OTS version.
 - Key derivation treats a secret or position as hex only when it matches `[0-9A-Fa-f]+`; anything
   else is hashed first. An empty secret or position is rejected with `NumberFormatException`.
 - A keyed `Wallet` keeps the position it is given (a non-hex position is hashed during key
   derivation) instead of replacing a non-64-hex position with a random one.
+- `Wallet.otsVersion` is settable on a wallet that holds no key; changing a keyed wallet's version
+  throws `IllegalStateException`.
+- Wallets the ledger returns for this client (the ContinuID head in `sourceWallet()` and the login
+  pointer, and the balance wallets that `transferToken()`, `transferTokens()`, `burnTokens()`,
+  `replenishToken()`, `fuseToken()`, `withdrawBufferToken()` and `depositBufferToken()` sign from
+  or credit) are used at the OTS version their address was derived at; those operations'
+  remainders use the same version. They throw `IllegalStateException` when neither version derives
+  the address; the login pointer falls back to an AUTH wallet as before.
 
 ## [1.2.2] — 2026-09-29
 

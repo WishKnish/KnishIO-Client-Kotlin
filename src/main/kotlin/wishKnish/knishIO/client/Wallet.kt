@@ -71,8 +71,19 @@ class Wallet @JvmOverloads constructor(
   @JvmField var batchId: String? = null,
   @JvmField var characters: String? = null,
   @JvmField var mlkemParameterSet: Int = 1024,
-  @JvmField val otsVersion: Int = 1 // OTS key version: 1 (16 chains) or 2 (64 chains)
+  otsVersion: Int = 1 // OTS key version: 1 (16 chains) or 2 (64 chains)
 ) {
+
+  /**
+   * OTS key version: 1 (16 chains) or 2 (64 chains). Settable on a wallet that holds no key
+   * (e.g. a wallet rebuilt from ledger data); a keyed wallet keeps the version its key was derived at.
+   */
+  var otsVersion: Int = otsVersion
+    set(value) {
+      requireSupportedOtsVersion(value)
+      check(key == null || value == field) { "KnishIO: cannot change the OTS version of a keyed wallet." }
+      field = value
+    }
 
   @JvmField var balance: Double = 0.0
   @JvmField var key: String? = null
@@ -184,6 +195,29 @@ class Wallet @JvmOverloads constructor(
     fun requireSupportedOtsVersion(otsVersion: Int) {
       require(otsVersion == 1 || otsVersion == 2) {
         "KnishIO: unsupported OTS version $otsVersion; expected 1 or 2."
+      }
+    }
+
+    /**
+     * The OTS version whose key, derived from [secret], [token] and [position], has [address].
+     * Tries [preferred] first, then the other version; null when neither matches.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun detectOtsVersion(
+      secret: String?,
+      token: String,
+      position: String?,
+      address: String?,
+      preferred: Int = 1
+    ): Int? {
+      requireSupportedOtsVersion(preferred)
+      if (secret.isNullOrEmpty() || position.isNullOrEmpty() || address.isNullOrEmpty()) {
+        return null
+      }
+      val wanted = address.lowercase()
+      return listOf(preferred, if (preferred == 1) 2 else 1).firstOrNull { version ->
+        generatePublicKey(generatePrivateKey(secret, token, position, version)) == wanted
       }
     }
 
