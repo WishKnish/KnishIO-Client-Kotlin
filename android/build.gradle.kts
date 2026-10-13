@@ -5,9 +5,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   id("com.android.library") version "9.2.0"
-  // Not applied. Puts KGP 2.4.10 on the build classpath so AGP's built-in Kotlin compiles with the
-  // same compiler the core (kotlin("jvm") 2.4.10) uses; Kotlin metadata is readable at most one minor ahead.
-  kotlin("jvm") version "2.4.10" apply false
+  // Not applied. Puts KGP 2.4.20 on the build classpath so AGP's built-in Kotlin compiles with the
+  // same compiler the core (kotlin("jvm") 2.4.20) uses; Kotlin metadata is readable at most one minor ahead.
+  kotlin("jvm") version "2.4.20" apply false
   id("com.vanniktech.maven.publish") version "0.37.0"
 }
 
@@ -16,7 +16,7 @@ version = "1.2.2"
 
 android {
   namespace = "wishKnish.knishIO.client.storage.keystore"
-  compileSdk = 36
+  compileSdk = 37
 
   defaultConfig {
     minSdk = 31
@@ -103,7 +103,7 @@ dependencies {
   api("io.knish:knishio-client-kotlin:1.2.2") {
     exclude(group = "org.graalvm.polyglot")
   }
-  implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+  implementation("org.bouncycastle:bcprov-jdk18on:1.86")
 
 
   testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")

@@ -1,10 +1,10 @@
 package wishKnish.knishIO.client.libraries
 
-import org.bouncycastle.pqc.crypto.mlkem.MLKEMExtractor
-import org.bouncycastle.pqc.crypto.mlkem.MLKEMGenerator
-import org.bouncycastle.pqc.crypto.mlkem.MLKEMParameters
-import org.bouncycastle.pqc.crypto.mlkem.MLKEMPrivateKeyParameters
-import org.bouncycastle.pqc.crypto.mlkem.MLKEMPublicKeyParameters
+import org.bouncycastle.crypto.kems.MLKEMExtractor
+import org.bouncycastle.crypto.kems.MLKEMGenerator
+import org.bouncycastle.crypto.params.MLKEMParameters
+import org.bouncycastle.crypto.params.MLKEMPrivateKeyParameters
+import org.bouncycastle.crypto.params.MLKEMPublicKeyParameters
 import java.security.SecureRandom
 
 /** Raw-bytes ML-KEM key wrappers. Sizes are FIPS 203: ek 1184/1568, dk 2400/3168 (s‖t‖rho‖H(ek)‖z). */
@@ -50,7 +50,6 @@ interface MlKemBackend {
   }
 }
 
-@Suppress("DEPRECATION")
 object BouncyCastleMlKemBackend : MlKemBackend {
   override val name: String = "bouncycastle"
 
@@ -75,7 +74,8 @@ object BouncyCastleMlKemBackend : MlKemBackend {
   override fun keygenFromSeed(seed: ByteArray, parameterSet: Int): Pair<ByteArray, ByteArray> {
     require(seed.size == 64) { "KnishIO: ML-KEM seed must be 64 bytes (d‖z), got ${seed.size}" }
     val sk = MLKEMPrivateKeyParameters(paramsFor(parameterSet), seed)
-    return Pair(sk.publicKeyParameters.encoded, sk.encoded)
+    // The expanded FIPS 203 decapsulation key (2400/3168 bytes), not the seed or seed+key form.
+    return Pair(sk.publicKeyParameters.encoded, sk.withPreferredFormat(MLKEMPrivateKeyParameters.EXPANDED_KEY).encoded)
   }
 
   override fun encapsulate(publicKey: ByteArray): Pair<ByteArray, ByteArray> {

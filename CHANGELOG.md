@@ -52,6 +52,9 @@ not substantiate a detail, the entry says so instead of guessing.
   or credit) are used at the OTS version their address was derived at; those operations'
   remainders use the same version. They throw `IllegalStateException` when neither version derives
   the address; the login pointer falls back to an AUTH wallet as before.
+- BouncyCastle 1.86, with ML-KEM on its `org.bouncycastle.crypto.kems` / `crypto.params` API (ML-KEM
+  keys and ciphertexts are unchanged); Kotlin 2.4.20, Ktor 3.6.0, GraalVM polyglot 25.4.4.1.1 and
+  Gradle 9.8.0. The Android module compiles against API 37.
 
 ## [1.2.2] — 2026-09-29
 
