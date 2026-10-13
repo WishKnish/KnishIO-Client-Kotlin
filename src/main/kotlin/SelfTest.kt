@@ -629,7 +629,7 @@ class KotlinSelfTest {
             molecule.atoms.add(metaAtom)
             
             // Add required ContinuID atom
-            molecule.addUserRemainderAtom(molecule.remainderWallet!!)
+            molecule.addUserRemainderAtom(molecule.remainderWallet)
             
             logTest("Metadata molecule initialization", true)
 

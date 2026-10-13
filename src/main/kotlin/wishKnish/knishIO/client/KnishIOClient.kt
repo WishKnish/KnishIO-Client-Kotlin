@@ -435,14 +435,9 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   private fun proposeAuthorization(secret: String, wallet: Wallet, encrypt: Boolean): ResponseRequestAuthorization {
-    // Explicit USER remainder (mirror JS createMolecule), so the ContinuID I-atom added by
-    // initAuthorization is USER-token with previousPosition = the signer's position. Without it,
-    // createMolecule auto-derives the remainder from an AUTH source token → a wrong-token I-atom.
-    // The new ContinuID head is never below the client's OTS version.
-    val molecule = createMolecule(
-      secret, wallet,
-      Wallet.create(secret, "USER", mlkemParameterSet = mlkemParameterSet, otsVersion = maxOf(wallet.otsVersion, otsVersion))
-    )
+    // The source wallet (AUTH, or the USER wallet at the ContinuID pointer) signs the U-atom;
+    // createMolecule's default USER remainder registers the next ContinuID position.
+    val molecule = createMolecule(secret, wallet)
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
     // PQ-transport (cycle 162): convey the source wallet's ML-KEM public key as a SIGNED
@@ -538,10 +533,10 @@ class KnishIOClient @JvmOverloads constructor(
       signingWallet = sourceWallet()
     }
 
-    // Set the remainder wallet for the next transaction: never below the client's OTS version, so
-    // a client set to v2 moves the identity's ContinuID head to v2
+    // Set the remainder wallet for the next transaction: a USER wallet (JS createMolecule), never
+    // below the client's OTS version, so a client set to v2 moves the identity's ContinuID head to v2
     this.remainderWallet = remainderWallet ?: Wallet.create(
-      currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters,
+      currentSecret, "USER", signingWallet.batchId, signingWallet.characters,
       mlkemParameterSet = mlkemParameterSet, otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
 
@@ -559,9 +554,8 @@ class KnishIOClient @JvmOverloads constructor(
    * Retrieves this session's wallet used for signing the next Molecule
    */
   fun sourceWallet(): Wallet {
-    // Resolve the bundle's live USER ContinuID position (mirror C++/Python: ContinuId needs the
-    // token arg, else the validator can't resolve the chain head and returns null). Null ->
-    // genesis fallback (Wallet(getSecret()) is a USER wallet by default).
+    // Resolve the bundle's live USER ContinuID head (mirror C++/Python). Null -> genesis fallback
+    // (Wallet(getSecret()) is a USER wallet by default).
     queryContinuId(bundle(), "USER").payload()?.let { return bindOwnWalletOtsVersion(it) }
     if (hasSecret()) {
       val sec = if (secret.isNotEmpty()) secret else retrieveSecret()

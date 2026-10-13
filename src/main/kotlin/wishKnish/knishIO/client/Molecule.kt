@@ -562,9 +562,20 @@ import kotlin.math.ceil
   }
 
   /**
-   * Add user remainder atom for ContinuID
+   * Add user remainder atom for ContinuID. The ContinuID head is a USER wallet (mirrors JS
+   * Molecule.addContinuIdAtom): a missing or non-USER [userRemainderWallet] is replaced with a USER
+   * wallet derived from the molecule secret, which also becomes the molecule's remainder wallet.
    */
-  fun addUserRemainderAtom(userRemainderWallet: Wallet): Molecule {
+  fun addUserRemainderAtom(userRemainderWallet: Wallet? = remainderWallet): Molecule {
+    val headWallet = if (userRemainderWallet != null && userRemainderWallet.token == "USER") {
+      userRemainderWallet
+    } else {
+      val moleculeSecret = secret?.takeIf { it.isNotEmpty() }
+        ?: error("KnishIO: a ContinuID remainder needs the molecule secret.")
+      Wallet.create(moleculeSecret, mlkemParameterSet = mlkemParameterSet, otsVersion = successorOtsVersion())
+        .also { remainderWallet = it }
+    }
+
     // ContinuID metadata for chain-integrity validation (mirrors JS Molecule.addContinuIdAtom).
     // Key ORDER is load-bearing for the cross-SDK molecular hash: previousPosition, pubkey, characters.
     // Built INLINE (not via finalMetas) so V-atoms stay empty; each entry only when truthy, like JS.
@@ -572,21 +583,22 @@ import kotlin.math.ceil
     sourceWallet.position?.takeIf { it.isNotEmpty() }?.let {
       continuIdMeta.add(MetaData(key = "previousPosition", value = it))
     }
-    userRemainderWallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
+    headWallet.pubkey?.takeIf { it.isNotEmpty() }?.let {
       continuIdMeta.add(MetaData(key = "pubkey", value = it))
     }
-    userRemainderWallet.characters?.takeIf { it.isNotEmpty() }?.let {
+    headWallet.characters?.takeIf { it.isNotEmpty() }?.let {
       continuIdMeta.add(MetaData(key = "characters", value = it))
     }
 
     return addAtom(
       Atom(
-        position = userRemainderWallet.position !!,
-        walletAddress = userRemainderWallet.address !!,
+        position = headWallet.position !!,
+        walletAddress = headWallet.address !!,
         isotope = 'I',
-        token = userRemainderWallet.token,
+        token = headWallet.token,
+        batchId = headWallet.batchId,
         metaType = "walletBundle",
-        metaId = userRemainderWallet.bundle,
+        metaId = headWallet.bundle,
         meta = continuIdMeta,
         index = generateIndex()
       )
@@ -654,7 +666,7 @@ import kotlin.math.ceil
       )
     )
 
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1156,7 +1168,7 @@ import kotlin.math.ceil
       )
     )
 
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1192,7 +1204,7 @@ import kotlin.math.ceil
     )
 
     // User remainder atom
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   @Throws(MetaMissingException::class)
@@ -1221,7 +1233,7 @@ import kotlin.math.ceil
     )
 
     // User remainder atom
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1256,7 +1268,7 @@ import kotlin.math.ceil
     )
 
     // User remainder atom
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1284,7 +1296,7 @@ import kotlin.math.ceil
       )
     )
 
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1312,7 +1324,7 @@ import kotlin.math.ceil
     )
 
     // User remainder atom
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1346,7 +1358,7 @@ import kotlin.math.ceil
     )
 
     // User remainder atom
-    return addUserRemainderAtom(remainderWallet !!)
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**
@@ -1369,8 +1381,8 @@ import kotlin.math.ceil
 
     // ContinuID I-atom — registers the bundle's relay head on-ledger so subsequent molecules
     // advance the chain instead of falling to fresh genesis (mirror JS initAuthorization + every
-    // other init*; remainderWallet is set to USER in getProfileAuthToken).
-    return addUserRemainderAtom(remainderWallet !!)
+    // other init*).
+    return addUserRemainderAtom(remainderWallet)
   }
 
   /**

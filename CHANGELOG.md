@@ -64,6 +64,13 @@ not substantiate a detail, the entry says so instead of guessing.
   keys and ciphertexts are unchanged); Kotlin 2.4.20, Ktor 3.6.0, GraalVM polyglot 25.4.4.1.1 and
   Gradle 9.8.0. The Android module compiles against API 37.
 
+### Fixed
+
+- A ContinuID remainder that is not a USER wallet is replaced with a USER wallet, as in the other
+  SDKs; the client's default remainder is a USER wallet. The ContinuID atom carries the remainder's
+  `batchId`. `Molecule.addUserRemainderAtom()` throws `IllegalStateException` when it must replace
+  the remainder and the molecule has no secret.
+
 ## [1.2.2] — 2026-09-29
 
 ### Fixed
