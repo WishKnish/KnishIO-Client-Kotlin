@@ -68,7 +68,10 @@ import kotlin.math.ceil
   @Transient var sourceWallet: Wallet = Wallet(),
   @Transient var remainderWallet: Wallet? = null,
   @JvmField var cellSlug: String? = null,
-  @Transient var mlkemParameterSet: Int = 1024
+  @Transient var mlkemParameterSet: Int = 1024,
+  // Lowest OTS version for the wallets this molecule creates for its signer (1 or 2); see
+  // successorOtsVersion()
+  @Transient var minOtsVersion: Int = 1
 ) {
 
   @JvmField var createdAt: String = Strings.currentTimeMillis()
@@ -87,6 +90,7 @@ import kotlin.math.ceil
     // Preserve the original cellSlug value
     _cellSlugOrigin = cellSlug
     mlkemParameterSet = if (mlkemParameterSet in listOf(1024, 768)) mlkemParameterSet else sourceWallet.mlkemParameterSet
+    Wallet.requireSupportedOtsVersion(minOtsVersion)
     
     // If sourceWallet is not properly initialized but we have a secret, create a proper sourceWallet
     if (sourceWallet.position == null && secret != null && molecularHash == null) {
@@ -105,7 +109,7 @@ import kotlin.math.ceil
         batchId = sourceWallet.batchId,
         characters = sourceWallet.characters,
         mlkemParameterSet = mlkemParameterSet,
-        otsVersion = signingOtsVersion()
+        otsVersion = successorOtsVersion()
       )
 
       clear()
@@ -938,7 +942,7 @@ import kotlin.math.ceil
       token = sourceWallet.token,
       batchId = sourceWallet.batchId,
       mlkemParameterSet = mlkemParameterSet,
-      otsVersion = signingOtsVersion()
+      otsVersion = successorOtsVersion()
     )
 
     // Source V-atom: debit the ENTIRE balance (UTXO drain) so the B + remainder atoms conserve.
@@ -1373,6 +1377,12 @@ import kotlin.math.ceil
    * OTS version this molecule signs with: the source wallet's version (1 by default).
    */
   fun signingOtsVersion(): Int = sourceWallet.otsVersion
+
+  /**
+   * OTS version of the wallets this molecule creates for its signer (remainder, ContinuID,
+   * buffer): the higher of the signing version and [minOtsVersion].
+   */
+  fun successorOtsVersion(): Int = maxOf(signingOtsVersion(), minOtsVersion)
 
   /**
    * Creates a one-time signature for a molecule and breaks it up across multiple atoms within that

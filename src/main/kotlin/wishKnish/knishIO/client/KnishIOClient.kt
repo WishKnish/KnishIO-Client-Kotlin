@@ -438,7 +438,11 @@ class KnishIOClient @JvmOverloads constructor(
     // Explicit USER remainder (mirror JS createMolecule), so the ContinuID I-atom added by
     // initAuthorization is USER-token with previousPosition = the signer's position. Without it,
     // createMolecule auto-derives the remainder from an AUTH source token → a wrong-token I-atom.
-    val molecule = createMolecule(secret, wallet, Wallet.create(secret, "USER", mlkemParameterSet = mlkemParameterSet, otsVersion = wallet.otsVersion))
+    // The new ContinuID head is never below the client's OTS version.
+    val molecule = createMolecule(
+      secret, wallet,
+      Wallet.create(secret, "USER", mlkemParameterSet = mlkemParameterSet, otsVersion = maxOf(wallet.otsVersion, otsVersion))
+    )
     val query = createMoleculeMutation(MutationRequestAuthorization::class, molecule) as MutationRequestAuthorization
 
     // PQ-transport (cycle 162): convey the source wallet's ML-KEM public key as a SIGNED
@@ -534,14 +538,16 @@ class KnishIOClient @JvmOverloads constructor(
       signingWallet = sourceWallet()
     }
 
-    // Set the remainder wallet for the next transaction
+    // Set the remainder wallet for the next transaction: never below the client's OTS version, so
+    // a client set to v2 moves the identity's ContinuID head to v2
     this.remainderWallet = remainderWallet ?: Wallet.create(
       currentSecret, signingWallet.token, signingWallet.batchId, signingWallet.characters,
-      mlkemParameterSet = mlkemParameterSet, otsVersion = signingWallet.otsVersion
+      mlkemParameterSet = mlkemParameterSet, otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
 
     val molecule = Molecule(
-      currentSecret, signingWallet, remainderWallet(), cellSlug, mlkemParameterSet = mlkemParameterSet
+      currentSecret, signingWallet, remainderWallet(), cellSlug, mlkemParameterSet = mlkemParameterSet,
+      minOtsVersion = otsVersion
     )
     if (hasBundle()) {
       molecule.bundle = bundle()
@@ -1030,7 +1036,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     remainderWallet = Wallet.create(
       getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet,
-      otsVersion = signingWallet.otsVersion
+      otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
 
     remainderWallet !!.initBatchId(signingWallet, true)
@@ -1109,7 +1115,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     remainderWallet = Wallet.create(
       getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet,
-      otsVersion = signingWallet.otsVersion
+      otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
     remainderWallet !!.initBatchId(signingWallet, true)
 
@@ -1145,7 +1151,7 @@ class KnishIOClient @JvmOverloads constructor(
       ?: throw TransferBalanceException()
     val remainderWallet = Wallet.create(
       getSecret(), token, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet,
-      otsVersion = signingWallet.otsVersion
+      otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
     var burnAmount = amount
 
@@ -1241,7 +1247,7 @@ class KnishIOClient @JvmOverloads constructor(
 
     remainderWallet = Wallet.create(
       getSecret(), tokenSlug, characters = signingWallet.characters, mlkemParameterSet = mlkemParameterSet,
-      otsVersion = signingWallet.otsVersion
+      otsVersion = maxOf(signingWallet.otsVersion, otsVersion)
     )
     remainderWallet !!.initBatchId(signingWallet, true)
 
@@ -1293,7 +1299,8 @@ class KnishIOClient @JvmOverloads constructor(
     val recipients = mapOf(bundle() to amount)
 
     val remainder = Wallet.create(
-      getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet, otsVersion = source.otsVersion
+      getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet,
+      otsVersion = maxOf(source.otsVersion, otsVersion)
     )
     remainder.initBatchId(source, true)
 
@@ -1327,7 +1334,8 @@ class KnishIOClient @JvmOverloads constructor(
 
     // Deposit routes the change to a FRESH remainder (not the source, unlike withdraw).
     val remainder = Wallet.create(
-      getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet, otsVersion = source.otsVersion
+      getSecret(), token, characters = source.characters, mlkemParameterSet = mlkemParameterSet,
+      otsVersion = maxOf(source.otsVersion, otsVersion)
     )
     remainder.initBatchId(source, true)
 

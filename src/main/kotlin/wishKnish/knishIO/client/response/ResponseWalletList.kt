@@ -24,8 +24,15 @@ class ResponseWalletList(
       if (data.position == null) {
         wallet = Wallet.create(data.bundleHash, data.tokenSlug as String, data.batchId, data.characters)
       } else {
+        // With a secret, the wallet is keyed at the OTS version its ledger address was derived at;
+        // it stays keyless when neither version derives that address from the secret
+        val token = data.tokenSlug as String
+        val otsVersion = Wallet.detectOtsVersion(secret, token, data.position, data.address)
         wallet =
-          Wallet(secret, data.tokenSlug as String, data.position as String?, data.batchId, data.characters).apply {
+          Wallet(
+            if (otsVersion != null) secret else null, token, data.position, data.batchId, data.characters,
+            otsVersion = otsVersion ?: 1
+          ).apply {
             address = data.address
             bundle = data.bundleHash
           }

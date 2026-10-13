@@ -37,9 +37,16 @@ not substantiate a detail, the entry says so instead of guessing.
 - A molecular hash that is not exactly 64 characters of `[0-9a-g]` now fails with
   `SignatureMalformedException`, both in `Molecule.sign()` and in `CheckMolecule.ots()`; an invalid
   base64 signature also fails with `SignatureMalformedException`.
-- Wallets a molecule creates for its signer (remainder, deposit buffer), the
-  `KnishIOClient.createMolecule` default remainder and the new ContinuID head of a login use the
-  signing wallet's OTS version.
+- Wallets a molecule creates for its signer (remainder, deposit buffer) take the higher of the
+  signing wallet's OTS version and `Molecule(..., minOtsVersion)` (`Molecule.successorOtsVersion()`).
+  The `KnishIOClient.createMolecule` default remainder and the new ContinuID head of a login take
+  the higher of the signing wallet's and the client's OTS version.
+- A client set to `otsVersion = 2` creates the ContinuID head, token remainders and deposit buffer
+  of every molecule it signs at version 2, so an identity created at version 1 moves to version 2
+  on its next sign-in or molecule. A client at version 1 keeps a version 2 identity at version 2.
+- `ResponseWalletList.toClientWallet(data, secret)` (and `getWallets(secret)`) keys each wallet at
+  the OTS version its address was derived at, and returns it without a key when neither version
+  derives that address.
 - Key derivation treats a secret or position as hex only when it matches `[0-9A-Fa-f]+`; anything
   else is hashed first. An empty secret or position is rejected with `NumberFormatException`.
 - A keyed `Wallet` keeps the position it is given (a non-hex position is hashed during key
@@ -50,8 +57,9 @@ not substantiate a detail, the entry says so instead of guessing.
   pointer, and the balance wallets that `transferToken()`, `transferTokens()`, `burnTokens()`,
   `replenishToken()`, `fuseToken()`, `withdrawBufferToken()` and `depositBufferToken()` sign from
   or credit) are used at the OTS version their address was derived at; those operations'
-  remainders use the same version. They throw `IllegalStateException` when neither version derives
-  the address; the login pointer falls back to an AUTH wallet as before.
+  remainders take the higher of that version and the client's. They throw `IllegalStateException`
+  when neither version derives the address; the login pointer falls back to an AUTH wallet as
+  before.
 - BouncyCastle 1.86, with ML-KEM on its `org.bouncycastle.crypto.kems` / `crypto.params` API (ML-KEM
   keys and ciphertexts are unchanged); Kotlin 2.4.20, Ktor 3.6.0, GraalVM polyglot 25.4.4.1.1 and
   Gradle 9.8.0. The Android module compiles against API 37.

@@ -37,6 +37,7 @@ import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
 import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.libraries.CheckMolecule
 import wishKnish.knishIO.client.libraries.Crypto
+import wishKnish.knishIO.client.response.ResponseWalletList
 import java.io.File
 import java.net.URI
 
@@ -208,13 +209,21 @@ class OtsV2VectorsTest {
     assertThrows(IllegalArgumentException::class.java) { keyless.otsVersion = 3 }
   }
 
-  /** Runs [block] against a client whose transport answers every query with [continuIdData]. */
-  private fun <T> withClient(otsVersion: Int, continuIdData: String, block: (KnishIOClient, MutableList<Molecule>) -> T): T {
+  /**
+   * Runs [block] against a client whose transport answers every query with [continuIdData] (and
+   * [balanceData] for balance queries).
+   */
+  private fun <T> withClient(
+    otsVersion: Int,
+    continuIdData: String,
+    balanceData: String = "null",
+    block: (KnishIOClient, MutableList<Molecule>) -> T
+  ): T {
     val authPayload = """{\"token\":\"auth-token\",\"time\":3600,\"key\":\"server-key\",\"pubkey\":\"server-key\",\"encrypt\":false,\"expiresAt\":2000000000}"""
     val proposals = mutableListOf<Molecule>()
     mockkConstructor(HttpClient::class)
     try {
-      every { anyConstructed<HttpClient>().query(any()) } returns """{"data":{"ContinuId":$continuIdData}}"""
+      every { anyConstructed<HttpClient>().query(any()) } returns """{"data":{"ContinuId":$continuIdData,"Balance":$balanceData}}"""
       every { anyConstructed<HttpClient>().mutate(any()) } answers {
         proposals.add(firstArg<MoleculeMutation>().variables.molecule)
         """{"data":{"ProposeMolecule":{"molecularHash":"hash","status":"accepted","payload":"$authPayload"}}}"""
@@ -319,5 +328,105 @@ class OtsV2VectorsTest {
     snapshot.wallet = snapshot.wallet.copy(otsVersion = 3)
     val error = assertThrows(IllegalArgumentException::class.java) { AuthToken.restore(snapshot, clientSecret) }
     assertEquals("KnishIO: unsupported OTS version 3; expected 1 or 2.", error.message)
+  }
+
+  private fun continuIdHead(molecule: Molecule): Atom = molecule.atoms.first { it.isotope == 'I' }
+
+  private fun addressAt(token: String, position: String, otsVersion: Int): String =
+    Wallet(clientSecret, token, position, otsVersion = otsVersion).address!!
+
+  @Test
+  @DisplayName("a v2 client signing in from a v1 ContinuID pointer registers a v2 head")
+  fun v2ClientLoginMovesV1PointerToV2() {
+    withClient(2, continuIdData(v1Address)) { client, proposals ->
+      client.requestAuthToken(secret = clientSecret, cellSlug = "public", encrypt = false)
+      val molecule = proposals.single()
+      assertEquals(v1Address, molecule.atoms[0].walletAddress)
+      val head = continuIdHead(molecule)
+      assertEquals(addressAt("USER", head.position!!, 2), head.walletAddress)
+      assertEquals(1, client.getAuthToken()!!.getWallet()!!.otsVersion)
+    }
+  }
+
+  @Test
+  @DisplayName("a v2 client signing from a v1 ContinuID head registers a v2 head")
+  fun v2ClientMoleculeMovesV1HeadToV2() {
+    withClient(2, continuIdData(v1Address)) { client, proposals ->
+      client.setSecret(clientSecret)
+      client.createMeta("ots", "migrate", mutableListOf(MetaData("k", "v")))
+      val molecule = proposals.last()
+      assertEquals(v1Address, molecule.atoms[0].walletAddress)
+      val head = continuIdHead(molecule)
+      assertEquals(addressAt("USER", head.position!!, 2), head.walletAddress)
+    }
+  }
+
+  @Test
+  @DisplayName("a v1 client signing from a v2 ContinuID head keeps a v2 head")
+  fun v1ClientKeepsV2Head() {
+    withClient(1, continuIdData(v2Address)) { client, proposals ->
+      client.setSecret(clientSecret)
+      client.createMeta("ots", "keep", mutableListOf(MetaData("k", "v")))
+      val molecule = proposals.last()
+      assertEquals(v2Address, molecule.atoms[0].walletAddress)
+      val head = continuIdHead(molecule)
+      assertEquals(addressAt("USER", head.position!!, 2), head.walletAddress)
+    }
+  }
+
+  @Test
+  @DisplayName("a molecule creates its signer wallets at the higher of the signing version and minOtsVersion")
+  fun moleculeSuccessorOtsVersion() {
+    val sourceWallet = Wallet(clientSecret, "TKN", clientPosition).apply { balance = 10.0 }
+    val molecule = Molecule(clientSecret, sourceWallet, minOtsVersion = 2)
+    assertEquals(1, molecule.signingOtsVersion())
+    assertEquals(2, molecule.successorOtsVersion())
+    assertEquals(2, molecule.remainderWallet!!.otsVersion)
+
+    molecule.initDepositBuffer(4)
+    val buffer = molecule.atoms.first { it.isotope == 'B' }
+    assertEquals(addressAt("TKN", buffer.position!!, 2), buffer.walletAddress)
+
+    assertEquals(1, Molecule(clientSecret, sourceWallet).successorOtsVersion())
+    val error = assertThrows(IllegalArgumentException::class.java) { Molecule(clientSecret, sourceWallet, minOtsVersion = 3) }
+    assertEquals("KnishIO: unsupported OTS version 3; expected 1 or 2.", error.message)
+  }
+
+  @Test
+  @DisplayName("a v2 client transferring from a v1 token wallet creates a v2 remainder")
+  fun v2ClientTransferCreatesV2Remainder() {
+    val tokenPosition = "d".repeat(64)
+    val tokenAddress = addressAt("TKN", tokenPosition, 1)
+    val balance = """{"address":"$tokenAddress","bundleHash":"${Crypto.generateBundleHash(clientSecret)}","tokenSlug":"TKN","position":"$tokenPosition","amount":"100"}"""
+    withClient(2, continuIdData(v1Address), balance) { client, proposals ->
+      client.setSecret(clientSecret)
+      client.transferToken(Wallet.create(Crypto.generateBundleHash("e".repeat(2048)), "TKN"), "TKN", 10)
+      val molecule = proposals.last()
+      assertEquals(tokenAddress, molecule.atoms[0].walletAddress)
+      val remainder = molecule.atoms.drop(1).last { it.isotope == 'V' && it.token == "TKN" }
+      assertEquals(addressAt("TKN", remainder.position!!, 2), remainder.walletAddress)
+    }
+  }
+
+  @Test
+  @DisplayName("a ledger wallet rebuilt with the secret is keyed at the version its address was derived at")
+  fun ledgerWalletRebuildDetectsVersion() {
+    val tokenPosition = "d".repeat(64)
+    fun data(address: String) = wishKnish.knishIO.client.data.graphql.types.Wallet(
+      address = address, bundleHash = Crypto.generateBundleHash(clientSecret), tokenSlug = "TKN",
+      position = tokenPosition, amount = "5"
+    )
+    val expected = Wallet(clientSecret, "TKN", tokenPosition, otsVersion = 2)
+    val rebuilt = ResponseWalletList.toClientWallet(data(expected.address!!), clientSecret)
+    assertEquals(2, rebuilt.otsVersion)
+    assertEquals(expected.address, rebuilt.address)
+    assertEquals(expected.key, rebuilt.key)
+    assertTrue(expected.pqPublicKey!!.encoded.contentEquals(rebuilt.pqPublicKey!!.encoded))
+
+    val unrelated = Wallet("someone-else", "TKN", tokenPosition).address!!
+    val keyless = ResponseWalletList.toClientWallet(data(unrelated), clientSecret)
+    assertNull(keyless.key)
+    assertNull(keyless.pqPublicKey)
+    assertEquals(unrelated, keyless.address)
   }
 }
