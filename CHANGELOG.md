@@ -16,6 +16,8 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-13
+
 ### Added
 
 - Opt-in OTS v2 signatures (64-chain WOTS+, 8192-hex keys): `Wallet(..., otsVersion = 2)`,
@@ -533,7 +535,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.3.0
 [1.2.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.2
 [1.2.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.1
 [1.2.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.0
