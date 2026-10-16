@@ -546,38 +546,11 @@ class CrossPlatformVectorsTest {
     }
 
     /**
-     * Reconstructs a molecule from server-data JSON the way the cross-SDK self-test does
-     * (`CrossSdkMoleculeDeserializer` → verbatim field copy, never a "create atom" constructor
-     * that would regenerate `createdAt`), plus the signed molecule's own source wallet as the
-     * validation context. `Molecule.fromJSON` cannot be used here: it builds the instance with
-     * a default `Wallet()` and no secret, which the `Molecule` initialiser rejects outright
-     * ("SourceWallet parameter not initialized by valid wallet").
+     * Reconstructs the signed molecule with [Molecule.fromJSON]: verbatim fields (never a
+     * "create atom" constructor that would regenerate `createdAt`), no secret, and the signed
+     * molecule's own source wallet as the validation context.
      */
-    private fun reconstructMolecule(data: JsonObject): Molecule {
-        val sw = data["sourceWallet"]!!.jsonObject
-        val sourceWallet = Wallet(
-            secret = null,
-            token = sw.str("token"),
-            position = sw.str("position"),
-            characters = sw.str("characters")
-        ).apply {
-            address = sw.str("address")
-            bundle = sw.str("bundle")
-            pubkey = sw.str("pubkey")
-        }
-
-        return Molecule(
-            secret = null,
-            sourceWallet = sourceWallet,
-            cellSlug = data["cellSlug"]!!.jsonPrimitive.content
-        ).apply {
-            molecularHash = data.str("molecularHash")
-            bundle = data.str("bundle")
-            createdAt = data.str("createdAt")
-            atoms.clear()
-            data["atoms"]!!.jsonArray.forEach { atoms.add(Atom.fromJSON(it.toString())) }
-        }
-    }
+    private fun reconstructMolecule(data: JsonObject): Molecule = Molecule.fromJSON(data.toString())
 
     @Test
     @DisplayName("legacyMlkem768AuthMolecule: full check() — hash plus WOTS+ signature — passes")

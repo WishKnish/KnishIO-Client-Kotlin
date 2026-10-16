@@ -27,6 +27,14 @@ not substantiate a detail, the entry says so instead of guessing.
   `Atom.fromJSON` reads `version`, and `Atom.hashAtoms` hashes the Version4 structured view
   whenever every atom carries a version.
 
+### Fixed
+
+- `Molecule.fromJSON` reconstructs a molecule without a secret instead of always failing with
+  "SourceWallet parameter not initialized by valid wallet". The source wallet is the JSON
+  `sourceWallet`, or a secretless wallet at the first atom's position, address and token, so
+  `Molecule.verify` can check a molecule another SDK signed. Null wallet fields in the JSON are
+  read as absent.
+
 ## [1.3.0] — 2026-10-13
 
 ### Added

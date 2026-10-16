@@ -36,27 +36,12 @@ class SigningWalletForgeryTest {
     private fun JsonObject.str(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     /**
-     * Rebuilds a secretless molecule from JS `Molecule.toJSON()` output by verbatim field copy
-     * (atoms via [Atom.fromJSON]), as CrossPlatformVectorsTest does. [Molecule.fromJSON] cannot
-     * load it: it constructs `Molecule(secret = null)` with a default position-less `Wallet()`,
-     * which the initialiser rejects ("SourceWallet parameter not initialized by valid wallet").
-     * The fixture carries no sourceWallet, so the validation context is a secretless wallet at
-     * atoms[0]'s token and position; the M and I checks do not read it.
+     * Loads a secretless molecule from JS `Molecule.toJSON()` output with [Molecule.fromJSON]
+     * (atoms via [Atom.fromJSON]). The fixture carries no sourceWallet, so the validation context
+     * is a secretless wallet at atoms[0]'s token, position and address; the M and I checks do
+     * not read it.
      */
-    private fun loadMolecule(data: JsonObject): Molecule {
-        val atoms = data["atoms"]!!.jsonArray.map { Atom.fromJSON(it.toString()) }
-        val first = atoms.first()
-        val sourceWallet = Wallet(secret = null, token = first.token, position = first.position)
-
-        return Molecule(secret = null, sourceWallet = sourceWallet, cellSlug = data.str("cellSlug")).apply {
-            molecularHash = data.str("molecularHash")
-            bundle = data.str("bundle")
-            createdAt = data.str("createdAt")!!
-            status = data.str("status")
-            this.atoms.clear()
-            this.atoms.addAll(atoms)
-        }
-    }
+    private fun loadMolecule(data: JsonObject): Molecule = Molecule.fromJSON(data.toString())
 
     @Test
     @DisplayName("genuine molecule (signed by its own wallet) loads and passes check()")

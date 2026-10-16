@@ -1,10 +1,7 @@
 package wishKnish.knishIO.client.libraries
 
 import kotlinx.serialization.json.*
-import wishKnish.knishIO.client.Atom
 import wishKnish.knishIO.client.Molecule
-import wishKnish.knishIO.client.Wallet
-import wishKnish.knishIO.client.exception.AtomsMissingException
 import wishKnish.knishIO.client.exception.MolecularHashMismatchException
 import java.math.BigDecimal
 import java.time.OffsetDateTime
@@ -136,24 +133,17 @@ internal object ServedMolecule {
 
   fun fromServerData(servedJson: String): Molecule = fromServerData(parse(servedJson))
 
-  /**
-   * Builds the molecule from client-format atoms (parsed by [Atom.fromJSON]) the way a peer molecule
-   * is reconstructed for verification: no secret, and a source wallet that only names the signer.
-   */
+  /** Maps the served molecule to client-format JSON and reconstructs it with [Molecule.fromJSON]. */
   private fun fromServerData(data: JsonObject): Molecule {
-    val atoms = data["atoms"]!!.jsonArray.map { Atom.fromJSON(atom(it.jsonObject).toString()) }
-    val signer = atoms.firstOrNull() ?: throw AtomsMissingException()
-    val source = Wallet(secret = null, token = signer.token, position = signer.position).apply {
-      address = signer.walletAddress
+    val client = buildJsonObject {
+      put("molecularHash", string(data["molecularHash"]))
+      put("bundle", string(data["bundleHash"]))
+      put("cellSlug", string(data["cellSlug"]))
+      put("status", string(data["status"]))
+      toSignedTimestamp(data["createdAt"])?.let { put("createdAt", it) }
+      put("atoms", JsonArray(data["atoms"]!!.jsonArray.map { atom(it.jsonObject) }))
     }
-    return Molecule(secret = null, sourceWallet = source, cellSlug = string(data["cellSlug"])).apply {
-      molecularHash = string(data["molecularHash"])
-      bundle = string(data["bundleHash"])
-      status = string(data["status"])
-      toSignedTimestamp(data["createdAt"])?.let { createdAt = it }
-      this.atoms.clear()
-      this.atoms.addAll(atoms)
-    }
+    return Molecule.fromJSON(client.toString(), includeValidationContext = false)
   }
 
   private class Attempt(val result: ServedVerification, val hashMismatch: Boolean)

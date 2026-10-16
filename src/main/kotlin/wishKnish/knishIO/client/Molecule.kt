@@ -186,6 +186,10 @@ import kotlin.math.ceil
      *
      * Handles cross-SDK deserialization with robust error handling following
      * JavaScript canonical patterns for perfect cross-platform compatibility.
+     * No secret is ever read: the source wallet is the JSON `sourceWallet` (when
+     * [includeValidationContext] is set and it has a position), otherwise a secretless
+     * wallet at the first atom's position, address and token, so [verify] can check
+     * a molecule another SDK signed.
      *
      * @param json JSON string or data to deserialize
      * @param options Deserialization options
@@ -213,9 +217,33 @@ import kotlin.math.ceil
           }
         }
 
+        // Reconstruct atoms array with proper Atom instances
+        val atoms = mutableListOf<Atom>()
+        if (jsonObject.has("atoms") && jsonObject.get("atoms").isJsonArray) {
+          for ((index, atomElement) in jsonObject.getAsJsonArray("atoms").withIndex()) {
+            try {
+              atoms.add(Atom.fromJSON(gson.toJson(atomElement)))
+            } catch (e: Exception) {
+              throw Exception("Failed to reconstruct atom $index: ${e.message}")
+            }
+          }
+        }
+
+        // Source wallet for validation (never with a secret)
+        val sourceWalletObj = jsonObject.get("sourceWallet")
+          ?.takeIf { includeValidationContext && it.isJsonObject }?.asJsonObject
+        val sourceWallet = sourceWalletObj?.let { secretlessWallet(it) }?.takeIf { it.position != null } ?: run {
+          val signer = atoms.firstOrNull()
+            ?: throw IllegalArgumentException("Invalid molecule data: no atoms and no sourceWallet")
+          Wallet(secret = null, token = signer.token, position = signer.position).apply {
+            address = signer.walletAddress
+          }
+        }
+
         // Create minimal molecule instance (never include secret from JSON)
         val molecule = Molecule(
           secret = null,
+          sourceWallet = sourceWallet,
           cellSlug = jsonObject.get("cellSlug")?.takeIf { !it.isJsonNull }?.asString
         )
 
@@ -225,73 +253,13 @@ import kotlin.math.ceil
         molecule.bundle = jsonObject.get("bundle")?.takeIf { !it.isJsonNull }?.asString
         molecule.createdAt = jsonObject.get("createdAt")?.takeIf { !it.isJsonNull }?.asString ?: Strings.currentTimeMillis()
         molecule._cellSlugOrigin = jsonObject.get("cellSlugOrigin")?.takeIf { !it.isJsonNull }?.asString
+        molecule.atoms.clear()
+        molecule.atoms.addAll(atoms)
 
-        // Reconstruct atoms array with proper Atom instances
-        if (jsonObject.has("atoms") && jsonObject.get("atoms").isJsonArray) {
-          val atomsArray = jsonObject.getAsJsonArray("atoms")
-          molecule.atoms.clear()
-          
-          for ((index, atomElement) in atomsArray.withIndex()) {
-            try {
-              val atomJson = gson.toJson(atomElement)
-              val atom = Atom.fromJSON(atomJson)
-              molecule.atoms.add(atom)
-            } catch (e: Exception) {
-              throw Exception("Failed to reconstruct atom $index: ${e.message}")
-            }
-          }
-        }
-
-        // Reconstruct validation context if available and requested
+        // Reconstruct the remaining validation context if available and requested
         if (includeValidationContext) {
-          if (jsonObject.has("sourceWallet") && !jsonObject.get("sourceWallet").isJsonNull) {
-            val sourceWalletObj = jsonObject.getAsJsonObject("sourceWallet")
-            
-            // Create source wallet for validation (without secret for security)
-            val sourceWallet = Wallet(
-              secret = null,
-              token = sourceWalletObj.get("token")?.asString ?: "USER",
-              position = sourceWalletObj.get("position")?.asString,
-              batchId = sourceWalletObj.get("batchId")?.takeIf { !it.isJsonNull }?.asString,
-              characters = sourceWalletObj.get("characters")?.asString ?: "BASE64"
-            )
-
-            // Set additional properties for validation context
-            sourceWallet.balance = sourceWalletObj.get("balance")?.asDouble ?: 0.0
-            sourceWallet.address = sourceWalletObj.get("address")?.asString
-            sourceWallet.bundle = sourceWalletObj.get("bundle")?.asString
-            sourceWallet.pubkey = sourceWalletObj.get("pubkey")?.takeIf { !it.isJsonNull }?.asString
-            
-            // Set token units if present
-            if (sourceWalletObj.has("tokenUnits") && sourceWalletObj.get("tokenUnits").isJsonArray) {
-              // Handle tokenUnits array reconstruction
-              @Suppress("UnusedPrivateProperty")  // stub: full TokenUnit reconstruction not yet implemented
-              val tokenUnitsArray = sourceWalletObj.getAsJsonArray("tokenUnits")
-              // Note: TokenUnit reconstruction would require full TokenUnit class support
-            }
-
-            molecule.sourceWallet = sourceWallet
-          }
-
-          if (jsonObject.has("remainderWallet") && !jsonObject.get("remainderWallet").isJsonNull) {
-            val remainderWalletObj = jsonObject.getAsJsonObject("remainderWallet")
-            
-            // Create remainder wallet for validation (without secret for security)
-            val remainderWallet = Wallet(
-              secret = null,
-              token = remainderWalletObj.get("token")?.asString ?: "USER",
-              position = remainderWalletObj.get("position")?.asString,
-              batchId = remainderWalletObj.get("batchId")?.takeIf { !it.isJsonNull }?.asString,
-              characters = remainderWalletObj.get("characters")?.asString ?: "BASE64"
-            )
-
-            // Set additional properties for validation context
-            remainderWallet.balance = remainderWalletObj.get("balance")?.asDouble ?: 0.0
-            remainderWallet.address = remainderWalletObj.get("address")?.asString
-            remainderWallet.bundle = remainderWalletObj.get("bundle")?.asString
-            remainderWallet.pubkey = remainderWalletObj.get("pubkey")?.takeIf { !it.isJsonNull }?.asString
-
-            molecule.remainderWallet = remainderWallet
+          jsonObject.get("remainderWallet")?.takeIf { it.isJsonObject }?.let {
+            molecule.remainderWallet = secretlessWallet(it.asJsonObject)
           }
         }
 
@@ -299,6 +267,24 @@ import kotlin.math.ceil
 
       } catch (e: Exception) {
         throw Exception("Molecule deserialization failed: ${e.message}")
+      }
+    }
+
+    /** A wallet for validation context, read from wallet JSON without any secret. */
+    private fun secretlessWallet(obj: com.google.gson.JsonObject): Wallet {
+      fun text(key: String) = obj.get(key)?.takeIf { !it.isJsonNull }?.asString
+
+      return Wallet(
+        secret = null,
+        token = text("token") ?: "USER",
+        position = text("position"),
+        batchId = text("batchId"),
+        characters = text("characters") ?: "BASE64"
+      ).apply {
+        balance = obj.get("balance")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
+        address = text("address")
+        bundle = text("bundle")
+        pubkey = text("pubkey")
       }
     }
 
