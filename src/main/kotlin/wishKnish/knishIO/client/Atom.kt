@@ -60,7 +60,11 @@ import kotlin.jvm.Throws
 
 /**
  * Atom class used to form micro-transactions within a Molecule
+ *
+ * [version] is the atom's hash version as a validator serves it. It is only emitted in JSON when set,
+ * so molecules this SDK signs serialize exactly as before.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable data class Atom @JvmOverloads constructor(
   @JvmField var position: String,
   @JvmField var walletAddress: String,
@@ -73,7 +77,8 @@ import kotlin.jvm.Throws
   @JvmField var meta: List<MetaData> = mutableListOf(),
   @JvmField var otsFragment: String? = null,
   @JvmField var index: Int = 0,
-  @JvmField var createdAt: String = Strings.currentTimeMillis()
+  @JvmField var createdAt: String = Strings.currentTimeMillis(),
+  @EncodeDefault(EncodeDefault.Mode.NEVER) @JvmField var version: String? = null
 ) {
 
   companion object {
@@ -187,7 +192,8 @@ import kotlin.jvm.Throws
           metaType = jsonObject.get("metaType")?.takeIf { !it.isJsonNull }?.asString,
           metaId = jsonObject.get("metaId")?.takeIf { !it.isJsonNull }?.asString,
           index = jsonObject.get("index")?.asInt ?: 0,
-          createdAt = jsonObject.get("createdAt")?.asString ?: Strings.currentTimeMillis()
+          createdAt = jsonObject.get("createdAt")?.asString ?: Strings.currentTimeMillis(),
+          version = jsonObject.get("version")?.takeIf { !it.isJsonNull }?.asString
         )
 
         // Set additional properties that may not be in constructor
@@ -241,11 +247,48 @@ import kotlin.jvm.Throws
     }
 
     /**
+     * Serializes the Version4 structured view of [atoms] (sorted by index): one JSON array per atom
+     * of single-key objects in the fixed key order below, written compactly. This exact string is
+     * hashed when every atom carries a version.
+     */
+    @JvmStatic
+    fun version4ViewJson(atoms: List<Atom>): String {
+      fun field(key: String, value: JsonElement) = JsonObject(mapOf(key to value))
+      fun text(value: String?) = JsonPrimitive(value)
+
+      return JsonArray(sortAtoms(atoms).map { atom ->
+        JsonArray(
+          listOf(
+            field("batchId", text(atom.batchId)),
+            field("createdAt", text(atom.createdAt)),
+            field("index", JsonPrimitive(atom.index)),
+            field("isotope", text(atom.isotope.toString())),
+            field("meta", JsonArray(atom.meta.map {
+              JsonArray(listOf(field("key", text(it.key)), field("value", text(it.value))))
+            })),
+            field("metaId", text(atom.metaId)),
+            field("metaType", text(atom.metaType)),
+            field("position", text(atom.position)),
+            field("token", text(atom.token)),
+            field("value", text(atom.value)),
+            field("version", text(atom.version)),
+            field("walletAddress", text(atom.walletAddress))
+          )
+        )
+      }).toString()
+    }
+
+    /**
      * Produces a hash of the atoms inside a molecule using JavaScript-compatible patterns.
-     * Used to generate the molecularHash field for Molecules.
+     * Used to generate the molecularHash field for Molecules. When every atom carries a
+     * version (any value), the Version4 structured view is hashed instead.
      */
     @JvmStatic
     private fun hash(atoms: List<Atom>): Shake256 {
+      if (atoms.isNotEmpty() && atoms.all { it.version != null }) {
+        return Shake256.create().absorb(version4ViewJson(atoms))
+      }
+
       val atomList = sortAtoms(atoms)
       val molecularSponge = Shake256.create()
       val numberOfAtoms = atomList.size.toString()
@@ -371,6 +414,9 @@ import kotlin.jvm.Throws
         "index" to index,
         "createdAt" to createdAt
       )
+
+      // Hash version, only when set (keeps signed-molecule JSON unchanged)
+      version?.let { serialized["version"] = it }
 
       // Optional OTS fragments (can be large, so optional)
       if (includeOtsFragments && !otsFragment.isNullOrBlank()) {

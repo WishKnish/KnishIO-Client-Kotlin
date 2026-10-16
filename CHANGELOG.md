@@ -16,6 +16,17 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Added
+
+- `CheckMolecule.verifyFromServerData(json)` verifies a molecule exactly as a validator's GraphQL
+  API serves it: RFC 3339 timestamps, `metasJson`, atoms carrying any version, and molecules served
+  without their atom versions. It returns a `ServedVerification(molecularHash, verified, error)`
+  and never throws. `CheckMolecule.fromServerData(json)` builds the `Molecule`, and
+  `CheckMolecule.toSignedTimestamp(value)` normalizes a served `createdAt` to epoch milliseconds.
+- `Atom.version` (optional, emitted in JSON only when set) and `Atom.version4ViewJson(atoms)`.
+  `Atom.fromJSON` reads `version`, and `Atom.hashAtoms` hashes the Version4 structured view
+  whenever every atom carries a version.
+
 ## [1.3.0] — 2026-10-13
 
 ### Added

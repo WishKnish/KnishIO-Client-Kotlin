@@ -667,5 +667,28 @@ class CheckMolecule {
       // Looks like we passed all the tests!
       return true
     }
+
+    /**
+     * Normalizes a served `createdAt` to the epoch-millisecond string atoms are hashed with:
+     * null or "" gives null, integers and digit strings stay as decimal strings, RFC 3339
+     * timestamps become epoch milliseconds, anything else is returned unchanged.
+     */
+    @JvmStatic
+    fun toSignedTimestamp(value: Any?): String? = ServedMolecule.toSignedTimestamp(value)
+
+    /**
+     * Builds a [Molecule] from molecule JSON exactly as a validator's GraphQL API serves it
+     * (`bundleHash`, `tokenSlug`, `metasJson`, RFC 3339 timestamps, optional atom `version`).
+     */
+    @JvmStatic
+    fun fromServerData(json: String): Molecule = ServedMolecule.fromServerData(json)
+
+    /**
+     * Verifies served molecule JSON with the full molecule check (no sender wallet). A molecule
+     * served without atom versions whose hash does not match is retried with version "4", then "3".
+     * Never throws: malformed input gives `verified = false` with an error.
+     */
+    @JvmStatic
+    fun verifyFromServerData(json: String): ServedVerification = ServedMolecule.verifyFromServerData(json)
   }
 }
