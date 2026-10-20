@@ -867,7 +867,7 @@ class Wallet @JvmOverloads constructor(
       val cipherText = encryptedData["cipherText"] ?: return null
       val encryptedMessage = encryptedData["encryptedMessage"] ?: return null
 
-      // Recover shared secret using NobleMLKEMBridge (JavaScript compatibility)
+      // Recover the shared secret through MlKemBackend
       val cipherTextBytes = java.util.Base64.getDecoder().decode(cipherText)
 
       val sharedSecret = mlkemDecapsulate(cipherTextBytes) ?: return null

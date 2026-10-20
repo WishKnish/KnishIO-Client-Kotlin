@@ -59,12 +59,10 @@ dependencies {
   implementation("org.bouncycastle:bcutil-jdk18on:$bouncyCastleVersion")
   
   // NOTE: asia.hombre:kyber (KyberKotlin) removed — it had ZERO references in
-  // src/. ML-KEM is provided by the GraalJS noble-ml-kem bridge below (kept) for
-  // byte-identical cross-SDK parity with the JS SDK.
+  // src/. ML-KEM runs on BouncyCastle (above) by default.
 
-  // GraalJS for JavaScript interop (noble-post-quantum bridge — LOAD-BEARING:
-  // Wallet.preparePostQuantumKeys + encrypt/decrypt route ML-KEM through the
-  // bundled noble-ml-kem-bundle.js for JS-SDK-identical keys. Do NOT remove.)
+  // GraalJS runs the optional noble ML-KEM backend (-Dknishio.mlkem.backend=noble), which
+  // evaluates the bundled noble-ml-kem-bundle.js; the default backend is BouncyCastle.
   implementation("org.graalvm.polyglot:polyglot:25.4.4.1.1")
   implementation("org.graalvm.polyglot:js:25.4.4.1.1")
   
@@ -114,17 +112,17 @@ tasks.test {
   )
 }
 
-// The ML-KEM vector suite again, with the BouncyCastle backend forced — the path Android
-// takes because the AAR excludes GraalVM. Same frozen vectors, second implementation.
-val testMlKemBouncyCastle by tasks.registering(Test::class) {
+// The ML-KEM vector suite again on the opt-in GraalJS noble backend. Same frozen vectors,
+// second implementation.
+val testMlKemNoble by tasks.registering(Test::class) {
   group = "verification"
   testClassesDirs = sourceSets["test"].output.classesDirs
   classpath = sourceSets["test"].runtimeClasspath
   useJUnitPlatform { includeTags("mlkem") }
-  systemProperty("knishio.mlkem.backend", "bouncycastle")
+  systemProperty("knishio.mlkem.backend", "noble")
   jvmArgs("--enable-native-access=ALL-UNNAMED", "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED")
 }
-tasks.check { dependsOn(testMlKemBouncyCastle) }
+tasks.check { dependsOn(testMlKemNoble) }
 
 // The live CipherHash tests read these env vars directly, which Gradle does not track, so a
 // run with a new URL or parameter set would otherwise be reported UP-TO-DATE from the last

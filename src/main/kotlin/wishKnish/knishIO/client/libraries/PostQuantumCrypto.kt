@@ -40,7 +40,7 @@ class PostQuantumCrypto {
             message: String,
             recipientPublicKey: PublicKey
         ): PostQuantumEncryptedMessage {
-            // Step 1: Generate shared secret using NobleMLKEMBridge for compatibility
+            // Step 1: Generate the shared secret through MlKemBackend
             val (sharedSecret, encapsulation) = MlKemBackend.instance.encapsulate(recipientPublicKey.encoded)
             
             // Step 2: Use shared secret directly as AES key (JavaScript compatibility)
@@ -78,7 +78,7 @@ class PostQuantumCrypto {
             encryptedMessage: PostQuantumEncryptedMessage,
             privateKey: PrivateKey
         ): String {
-            // Step 1: Extract shared secret using NobleMLKEMBridge for compatibility
+            // Step 1: Extract the shared secret through MlKemBackend
             val encapsulation = Hex.decode(encryptedMessage.encapsulation)
             val sharedSecret = MlKemBackend.instance.decapsulate(encapsulation, privateKey.encoded)
             

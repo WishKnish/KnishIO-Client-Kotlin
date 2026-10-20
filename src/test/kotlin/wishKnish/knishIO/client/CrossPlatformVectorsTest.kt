@@ -103,7 +103,7 @@ class CrossPlatformVectorsTest {
     @Tag("mlkem")
     @DisplayName("Active ML-KEM backend instance matches system property configuration")
     fun backendMatchesConfiguration() {
-        val expected = System.getProperty(wishKnish.knishIO.client.libraries.MlKemBackend.BACKEND_PROPERTY) ?: "noble"
+        val expected = System.getProperty(wishKnish.knishIO.client.libraries.MlKemBackend.BACKEND_PROPERTY) ?: "bouncycastle"
         assertEquals(expected, wishKnish.knishIO.client.libraries.MlKemBackend.instance.name, "MlKemBackend.instance must match configured property")
     }
 

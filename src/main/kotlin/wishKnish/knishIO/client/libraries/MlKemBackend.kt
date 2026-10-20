@@ -38,14 +38,7 @@ interface MlKemBackend {
           else -> throw IllegalArgumentException("KnishIO: unknown $BACKEND_PROPERTY '$prop'; expected 'noble' or 'bouncycastle'")
         }
       }
-      return try {
-        Class.forName("org.graalvm.polyglot.Context", false, MlKemBackend::class.java.classLoader)
-        NobleMlKemBackend
-      } catch (e: ClassNotFoundException) {
-        BouncyCastleMlKemBackend
-      } catch (e: LinkageError) {
-        BouncyCastleMlKemBackend
-      }
+      return BouncyCastleMlKemBackend
     }
   }
 }

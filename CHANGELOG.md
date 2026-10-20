@@ -16,6 +16,13 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Changed
+
+- ML-KEM runs on the BouncyCastle backend by default on the JVM, as it already did on Android. The
+  GraalJS-evaluated noble backend stays available with `-Dknishio.mlkem.backend=noble`. Keys,
+  ciphertexts and shared secrets are unchanged; both backends run the same `mlkem768`/`mlkem1024`
+  vectors (`testMlKemNoble` runs the suite on noble).
+
 ## [1.4.0] — 2026-10-16
 
 ### Added

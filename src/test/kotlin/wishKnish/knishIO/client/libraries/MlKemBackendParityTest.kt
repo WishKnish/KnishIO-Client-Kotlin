@@ -69,7 +69,7 @@ class MlKemBackendParityTest {
   }
 
   @Test
-  @DisplayName("MlKemBackend.select respects system property and defaults to noble on JVM with GraalVM")
+  @DisplayName("MlKemBackend.select respects system property and defaults to bouncycastle")
   fun testBackendSelection() {
     System.setProperty(MlKemBackend.BACKEND_PROPERTY, "bouncycastle")
     assertEquals("bouncycastle", MlKemBackend.select().name)
@@ -84,6 +84,6 @@ class MlKemBackendParityTest {
     assertTrue(ex.message!!.contains("expected 'noble' or 'bouncycastle'"))
 
     System.clearProperty(MlKemBackend.BACKEND_PROPERTY)
-    assertEquals("noble", MlKemBackend.select().name, "Default on classpath with GraalVM must be noble")
+    assertEquals("bouncycastle", MlKemBackend.select().name, "Default backend must be bouncycastle")
   }
 }
