@@ -1,5 +1,5 @@
 /*
- * signingWallet forgery regression (WOTS+ mitigation plan §8 Phase 0.2).
+ * signingWallet forgery regression.
  *
  * signing-wallet-forgery.json is the cross-SDK fixture built with the published
  * @wishknish/knishio-client-js 1.2.1 (byte-identical copy in every SDK). `forged` claims the
