@@ -22,6 +22,10 @@ not substantiate a detail, the entry says so instead of guessing.
   GraalJS-evaluated noble backend stays available with `-Dknishio.mlkem.backend=noble`. Keys,
   ciphertexts and shared secrets are unchanged; both backends run the same `mlkem768`/`mlkem1024`
   vectors (`testMlKemNoble` runs the suite on noble).
+- `KnishIOClient` creates keys and signs at OTS version 2 by default (was 1). An identity a
+  version-2 client signs for moves to version 2 and stays there, so the client needs a validator
+  that accepts version 2 (0.8.0 or later). Pass `otsVersion = 1` to keep version 1. Standalone
+  `Wallet` construction still defaults to version 1.
 
 ## [1.4.0] — 2026-10-16
 

@@ -266,6 +266,12 @@ class OtsV2VectorsTest {
   }
 
   @Test
+  @DisplayName("a client created without otsVersion is at OTS version 2")
+  fun clientDefaultsToV2() {
+    assertEquals(2, KnishIOClient(listOf(URI("http://localhost:8080/graphql"))).otsVersion)
+  }
+
+  @Test
   @DisplayName("a client at OTS version 1 binds a ledger wallet derived at v2 to version 2")
   fun bindsLedgerWalletVersion() {
     withClient(1, continuIdData(v2Address)) { client, _ ->

@@ -90,10 +90,10 @@ class KnishIOClient @JvmOverloads constructor(
   insecureTls: Boolean = false,
   secretStorage: SecretStorageProvider? = null,
   @JvmField val mlkemParameterSet: Int = 1024,
-  otsVersion: Int = 1
+  otsVersion: Int = 2
 ) {
   /**
-   * OTS version of the keys this client creates from its secret: 1 (default) or 2. Wallets the
+   * OTS version of the keys this client creates from its secret: 2 (default) or 1. Wallets the
    * ledger returns keep the version their address was derived at.
    */
   var otsVersion: Int = otsVersion
