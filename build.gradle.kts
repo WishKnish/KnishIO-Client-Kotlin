@@ -19,7 +19,7 @@ plugins {
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
   // CycloneDX SBOM for dependency auditing (CI runs osv-scanner against the BOM;
   // Gradle has no committed lockfile, so the SBOM is the scannable dependency graph).
-  id("org.cyclonedx.bom") version "3.5.0"
+  id("org.cyclonedx.bom") version "3.5.1"
   `java-library`
 }
 
