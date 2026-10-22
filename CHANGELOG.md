@@ -16,15 +16,19 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-10-21
+
 ### Changed
 
 - ML-KEM runs on the BouncyCastle backend by default on the JVM, as it already did on Android. The
   GraalJS-evaluated noble backend stays available with `-Dknishio.mlkem.backend=noble`. Keys,
   ciphertexts and shared secrets are unchanged; both backends run the same `mlkem768`/`mlkem1024`
   vectors (`testMlKemNoble` runs the suite on noble).
-- `KnishIOClient` creates keys and signs at OTS version 2 by default (was 1). An identity a
-  version-2 client signs for moves to version 2 and stays there, so the client needs a validator
-  that accepts version 2 (0.8.0 or later). Pass `otsVersion = 1` to keep version 1. Standalone
+- `KnishIOClient` defaults to OTS version 2 and ML-KEM-1024. It creates keys and signs at OTS
+  version 2 (was 1); ML-KEM-1024 stays the post-quantum transport parameter set, as it has been
+  by default since 1.0.0 (ML-KEM-768 remains the opt-in step-back). An identity a version-2
+  client signs for moves to version 2 and stays there, so the client needs a validator that
+  accepts version 2 (0.8.0 or later). Pass `otsVersion = 1` to keep version 1. Standalone
   `Wallet` construction still defaults to version 1.
 
 ## [1.4.0] — 2026-10-16
@@ -567,7 +571,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.0
 [1.4.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.4.0
 [1.3.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.3.0
 [1.2.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.2.2
