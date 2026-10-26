@@ -11,3 +11,6 @@ node_modules
 
 # Publishing credentials (DO NOT COMMIT)
 /gradle.properties
+
+# SBOM staged for the GitHub Release (ci.yml audit job)
+/sbom-out/

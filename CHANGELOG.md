@@ -16,6 +16,11 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Added
+
+- Each GitHub Release attaches the CycloneDX SBOM that the CI audit job already scans with OSV, as
+  `knishio-client-kotlin-<version>.cdx.json`.
+
 ### Fixed
 
 - Encrypted transport treats an empty validator public key like a missing one: `HttpClient.pubkey()` throws

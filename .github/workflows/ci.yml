@@ -182,12 +182,27 @@ jobs:
     - name: Generate runtime-scoped SBOM
       run: ./gradlew cyclonedxDirectBom --no-daemon
 
+    - name: Stage SBOM for release
+      run: |
+        set -euo pipefail
+        VERSION="$(bash .github/scripts/check-version.sh | sed -n 's/^OK: version is \([^ ]*\).*/\1/p')"
+        mkdir -p sbom-out
+        if grep -q 'file://' build/reports/cyclonedx-direct/bom.json; then echo "::error::SBOM contains a file:// reference"; exit 1; fi
+        cp build/reports/cyclonedx-direct/bom.json "sbom-out/knishio-client-kotlin-$VERSION.cdx.json"
+
     - name: OSV scan (runtime dependency graph)
       uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36  # v2.7.0
       with:
         scan-args: |-
           -L
           build/reports/cyclonedx-direct/bom.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: sbom
+        path: sbom-out/*.cdx.json
+        if-no-files-found: error
 
   changelog:
     name: changelog entry for version bump
@@ -279,7 +294,7 @@ jobs:
     environment: release
     # `version` is a hard dependency, not a courtesy: publishing a tag the manifest does not
     # claim is the failure this pipeline exists to prevent.
-    needs: [build, version, android]
+    needs: [build, version, android, audit]
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -352,12 +367,19 @@ jobs:
         ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
         ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
 
+    - name: Download SBOM
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        name: sbom
+        path: sbom-out
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
       with:
         files: |
           build/libs/*.jar
           build/libs/*.jar.asc
+          sbom-out/*.cdx.json
         # Was `body:` with a bare link to CHANGELOG.md, which told a reader nothing about the
         # release they were looking at. `generate_release_notes` stays OFF too — the action
         # appends the WHOLE generated block (`<body>\n\n<notes>`), which would add the
