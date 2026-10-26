@@ -16,6 +16,11 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Fixed
+
+- Encrypted transport treats an empty validator public key like a missing one: `HttpClient.pubkey()` throws
+  `CodeException("Server public key missing.")` before any request is sent.
+
 ## [1.5.0] — 2026-10-21
 
 ### Changed

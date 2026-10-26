@@ -171,7 +171,11 @@ class HttpClient @JvmOverloads constructor(
 
   @Throws(CodeException::class)
   fun pubkey(): String {
-    return pubkey ?: throw CodeException("Server public key missing.")
+    val key = pubkey
+    if (key.isNullOrEmpty()) {
+      throw CodeException("Server public key missing.")
+    }
+    return key
   }
 
   @OptIn(DelicateCoroutinesApi::class)
