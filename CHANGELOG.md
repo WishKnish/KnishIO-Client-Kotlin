@@ -16,6 +16,8 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-10-27
+
 ### Added
 
 - Each GitHub Release attaches the CycloneDX SBOM that the CI audit job already scans with OSV, as
@@ -581,7 +583,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.1
 [1.5.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.0
 [1.4.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.4.0
 [1.3.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.3.0
