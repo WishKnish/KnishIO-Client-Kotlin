@@ -44,7 +44,7 @@ repositories {
 dependencies {
   val ktorVersion = "3.6.0"
   val coroutinesVersion = "1.11.0"
-  val serializationVersion = "1.11.0"
+  val serializationVersion = "1.12.0"
   val bouncyCastleVersion = "1.86"
 
   // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
