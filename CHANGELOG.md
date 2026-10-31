@@ -16,6 +16,8 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-10-31
+
 ### Fixed
 
 - `HttpClient` now reuses one Ktor/OkHttp client across requests (and recreates it only if
@@ -592,7 +594,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.2
 [1.5.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.1
 [1.5.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.0
 [1.4.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.4.0
