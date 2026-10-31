@@ -59,6 +59,7 @@ import wishKnish.knishIO.client.mutation.*
 import wishKnish.knishIO.client.query.*
 import wishKnish.knishIO.client.response.*
 import java.net.URI
+import java.io.Closeable
 import kotlin.reflect.KClass
 import kotlin.reflect.full.primaryConstructor
 import kotlinx.serialization.json.Json
@@ -91,7 +92,7 @@ class KnishIOClient @JvmOverloads constructor(
   secretStorage: SecretStorageProvider? = null,
   @JvmField val mlkemParameterSet: Int = 1024,
   otsVersion: Int = 2
-) {
+) : Closeable {
   /**
    * OTS version of the keys this client creates from its secret: 2 (default) or 1. Wallets the
    * ledger returns keep the version their address was derived at.
@@ -1359,5 +1360,12 @@ class KnishIOClient @JvmOverloads constructor(
    */
   fun cellSlug(): String? {
     return cellSlug
+  }
+
+  /**
+   * Closes the underlying HTTP client and releases its pooled keep-alive connections.
+   */
+  override fun close() {
+    client.close()
   }
 }

@@ -16,6 +16,15 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Fixed
+
+- `HttpClient` now reuses one Ktor/OkHttp client across requests (and recreates it only if
+  `insecureTls` is changed or after `close()`) instead of building a fresh client on every access
+  and closing it at the end of `query()`. Every request previously opened a new TCP connection and
+  OkHttp connection pool, leaving thousands of sockets in `TIME_WAIT` under sustained load. Both
+  `HttpClient` and `KnishIOClient` implement `java.io.Closeable`, and OkHttp's dispatcher uses
+  daemon threads so an unclosed client does not hold a CLI JVM open on exit.
+
 ## [1.5.1] — 2026-10-27
 
 ### Added

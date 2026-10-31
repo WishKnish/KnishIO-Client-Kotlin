@@ -92,6 +92,7 @@ import wishKnish.knishIO.client.data.json.variables.BatchHistoryVariable
 import wishKnish.knishIO.client.data.json.variables.ActiveSessionVariable
 import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
 import wishKnish.knishIO.client.exception.CodeException
+import java.io.Closeable
 import java.net.URI
 import java.security.GeneralSecurityException
 import java.security.cert.X509Certificate
@@ -105,7 +106,7 @@ class HttpClient @JvmOverloads constructor(
   @JvmField var uri: URI,
   @JvmField var encrypt: Boolean = false,
   @JvmField var insecureTls: Boolean = false
-) {
+) : Closeable {
 
   companion object {
     // Shared Json instances to avoid repeated creation - performance optimization
@@ -125,20 +126,45 @@ class HttpClient @JvmOverloads constructor(
   @JvmField var authToken = ""
   @JvmField var pubkey: String? = null
   @JvmField var wallet: Wallet? = null
-  private val ktorClient: io.ktor.client.HttpClient
-    get() = io.ktor.client.HttpClient(OkHttp) {
+  @Volatile private var cachedClient: io.ktor.client.HttpClient? = null
+  @Volatile private var cachedInsecureTls: Boolean = insecureTls
+
+  @Synchronized
+  private fun ktorClient(): io.ktor.client.HttpClient {
+    val existing = cachedClient
+    if (existing != null && cachedInsecureTls == insecureTls) {
+      return existing
+    }
+    existing?.close()
+    val useInsecureTls = insecureTls
+    return io.ktor.client.HttpClient(OkHttp) {
       expectSuccess = false
       engine {
         config {
           connectTimeout(java.time.Duration.ofMillis(10000))
           readTimeout(java.time.Duration.ofMillis(30000))
           writeTimeout(java.time.Duration.ofMillis(30000))
+          // Daemon dispatcher threads so an unclosed client never holds a CLI JVM open for
+          // OkHttp's 60-second idle worker keep-alive after main() returns.
+          dispatcher(
+            okhttp3.Dispatcher(
+              java.util.concurrent.ThreadPoolExecutor(
+                0,
+                Int.MAX_VALUE,
+                60L,
+                java.util.concurrent.TimeUnit.SECONDS,
+                java.util.concurrent.SynchronousQueue()
+              ) { runnable ->
+                Thread(runnable, "KnishIO OkHttp Dispatcher").apply { isDaemon = true }
+              }
+            )
+          )
           // Opt-in, dev-only TLS bypass for self-signed validators — secure by default
           // (insecureTls defaults to false), parity with the C/C++/Rust SDKs' insecure_tls
           // knob and the validator's own dev knob. Never enable in production.
           // NOTE: the engine is OkHttp (JVM TLS stack → TLS 1.3) because Ktor CIO's
           // TLS only negotiates 1.2 and cannot reach a TLS-1.3-only node.
-          if (insecureTls) {
+          if (useInsecureTls) {
             val trustAll = object : X509TrustManager {
               override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
               override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
@@ -162,7 +188,17 @@ class HttpClient @JvmOverloads constructor(
         logger = Logger.DEFAULT
         level = LogLevel.NONE
       }
+    }.also {
+      cachedClient = it
+      cachedInsecureTls = useInsecureTls
     }
+  }
+
+  @Synchronized
+  override fun close() {
+    cachedClient?.close()
+    cachedClient = null
+  }
 
   @Throws(CodeException::class)
   fun wallet(): Wallet {
@@ -186,47 +222,46 @@ class HttpClient @JvmOverloads constructor(
     SerializationException::class
   )
   fun query(request: QueryInterface): String {
+    val client = ktorClient()
     val completable = GlobalScope.future {
-      ktorClient.use { client ->
-        // Convert request to QueryData format
-        val queryData = QueryData(request.query, when (request) {
-          is CipherHash -> Json.encodeToString(CipherHashVariable.serializer(), request.variables)
-          is ContinuId -> Json.encodeToString(ContinuIdVariable.serializer(), request.variables)
-          is MetaType -> Json.encodeToString(MetaTypeVariable.serializer(), request.variables)
-          is Balance -> Json.encodeToString(BalanceVariable.serializer(), request.variables)
-          is WalletList -> Json.encodeToString(WalletListVariable.serializer(), request.variables)
-          is Batch -> Json.encodeToString(BatchVariable.serializer(), request.variables)
-          is BatchHistory -> Json.encodeToString(BatchHistoryVariable.serializer(), request.variables)
-          is ActiveSession -> Json.encodeToString(ActiveSessionVariable.serializer(), request.variables)
-          // Use encodeDefaults=true so default-valued atom fields (notably index=0 on the
-          // first/source atom) are emitted — otherwise the validator's CheckMolecule rejects
-          // with AtomIndex (an atom with no index). The default Json omits defaults.
-          is MoleculeMutation -> contentNegotiationJson.encodeToString(MoleculeMutationVariable.serializer(), request.variables)
-          else -> null
-        })
-        
-        val requestBody = Json.encodeToString(QueryData.serializer(), queryData)
-        
-        val finalBody = if (encrypt) {
-          encryptBody(requestBody)
-        } else {
-          requestBody
+      // Convert request to QueryData format
+      val queryData = QueryData(request.query, when (request) {
+        is CipherHash -> Json.encodeToString(CipherHashVariable.serializer(), request.variables)
+        is ContinuId -> Json.encodeToString(ContinuIdVariable.serializer(), request.variables)
+        is MetaType -> Json.encodeToString(MetaTypeVariable.serializer(), request.variables)
+        is Balance -> Json.encodeToString(BalanceVariable.serializer(), request.variables)
+        is WalletList -> Json.encodeToString(WalletListVariable.serializer(), request.variables)
+        is Batch -> Json.encodeToString(BatchVariable.serializer(), request.variables)
+        is BatchHistory -> Json.encodeToString(BatchHistoryVariable.serializer(), request.variables)
+        is ActiveSession -> Json.encodeToString(ActiveSessionVariable.serializer(), request.variables)
+        // Use encodeDefaults=true so default-valued atom fields (notably index=0 on the
+        // first/source atom) are emitted — otherwise the validator's CheckMolecule rejects
+        // with AtomIndex (an atom with no index). The default Json omits defaults.
+        is MoleculeMutation -> contentNegotiationJson.encodeToString(MoleculeMutationVariable.serializer(), request.variables)
+        else -> null
+      })
+
+      val requestBody = Json.encodeToString(QueryData.serializer(), queryData)
+
+      val finalBody = if (encrypt) {
+        encryptBody(requestBody)
+      } else {
+        requestBody
+      }
+
+      val response = client.post(uri.normalize().toASCIIString()) {
+        headers {
+          append("X-Auth-Token", authToken)
         }
-        
-        val response = client.post(uri.normalize().toASCIIString()) {
-          headers {
-            append("X-Auth-Token", authToken)
-          }
-          contentType(ContentType.Application.Json)
-          setBody(finalBody)
-        }
-        
-        val responseText = response.bodyAsText()
-        if (encrypt) {
-          decryptBody(responseText) ?: responseText
-        } else {
-          responseText
-        }
+        contentType(ContentType.Application.Json)
+        setBody(finalBody)
+      }
+
+      val responseText = response.bodyAsText()
+      if (encrypt) {
+        decryptBody(responseText) ?: responseText
+      } else {
+        responseText
       }
     }
 
