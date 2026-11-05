@@ -44,7 +44,7 @@ repositories {
 dependencies {
   val ktorVersion = "3.6.0"
   val coroutinesVersion = "1.11.0"
-  val serializationVersion = "1.11.0"
+  val serializationVersion = "1.12.0"
   val bouncyCastleVersion = "1.86"
 
   // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
@@ -77,7 +77,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutinesVersion")
   // slf4j-jdk14 removed — a library must not ship an SLF4J *binding* (forces JUL on
   // consumers); no slf4j usage in main (Ktor uses its own Logger).
-  implementation("com.google.code.gson:gson:2.14.0")
+  implementation("com.google.code.gson:gson:2.15.0")
   implementation("com.graphql-java:graphql-java:26.1")
   
   // Testing dependencies
