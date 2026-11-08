@@ -37,7 +37,7 @@ dependencies {
 
 **Requirements:**
 - JDK 17 or higher — the published jar is Java 17 bytecode (class file major version 61)
-- Gradle 9.x to build from source (the wrapper pins 9.8.1)
+- Gradle 9.x to build from source (the wrapper pins 9.8.2)
 - Kotlin 2.3 or higher to consume 1.5.2 — it is built with Kotlin 2.4.21 and emits
   `@Metadata(mv = [2, 4, 0])`, which Kotlin compilers older than 2.3 cannot read. 0.9.4 and
   earlier emitted `mv = [2, 0]` and only required Kotlin 2.0.
