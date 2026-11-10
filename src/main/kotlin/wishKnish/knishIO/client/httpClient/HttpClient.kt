@@ -68,11 +68,13 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.ClientTokenData
 import wishKnish.knishIO.client.data.QueryData
 import wishKnish.knishIO.client.data.json.query.CipherHash
-import wishKnish.knishIO.client.data.json.response.query.cipherHash.CipherHash as RCipherHash
 import wishKnish.knishIO.client.data.json.query.QueryInterface
 import wishKnish.knishIO.client.data.json.query.ContinuId
 import wishKnish.knishIO.client.data.json.query.MetaType
@@ -248,6 +250,9 @@ class HttpClient @JvmOverloads constructor(
       } else {
         requestBody
       }
+      // encryptBody returns bootstrap operations (__schema, ContinuId, AccessToken, U-isotope
+      // ProposeMolecule) unchanged; only a wrapped request is held to the encrypted-reply rule.
+      val wrapped = encrypt && finalBody != requestBody
 
       val response = client.post(uri.normalize().toASCIIString()) {
         headers {
@@ -258,11 +263,7 @@ class HttpClient @JvmOverloads constructor(
       }
 
       val responseText = response.bodyAsText()
-      if (encrypt) {
-        decryptBody(responseText) ?: responseText
-      } else {
-        responseText
-      }
+      if (wrapped) decryptReply(responseText) else responseText
     }
 
     return completable.get()
@@ -330,17 +331,36 @@ class HttpClient @JvmOverloads constructor(
     return cipherHash.toJson()
   }
 
-  @Throws(
-    IllegalArgumentException::class, GeneralSecurityException::class, SerializationException::class
-  )
-  private fun decryptBody(body: String): String? {
-    RCipherHash.jsonToObject(body).data?.cipherHash?.hash?.let {
+  /**
+   * The reply to a request this client wrapped in the CipherHash envelope. Accepted only as a
+   * decryptable envelope, or as an errors-only reply (`data` missing, null or `{}`), which is
+   * returned unchanged so the validator's `errors` stay visible. Any other plaintext `data` is
+   * refused: the validator re-encrypts every successful reply to a wrapped request.
+   */
+  @Throws(CodeException::class, SerializationException::class)
+  private fun decryptReply(body: String): String {
+    val data = (Json.parseToJsonElement(body) as? JsonObject)?.get("data")
+    val hash = ((data as? JsonObject)?.get("CipherHash") as? JsonObject)?.get("hash")
+      ?.let { it as? JsonPrimitive }
+      ?.takeIf { it.isString }
+      ?.content
+
+    if (hash != null) {
       // PQ-transport (cycle 161): the response is the ML-KEM envelope map keyed by hashShare,
       // each value the object {cipherText, encryptedMessage} (not the classical NaCl String).
       // decryptMyMessageML returns the RAW decrypted GraphQL response JSON text.
-      val message = decryptionJson.decodeFromString<Map<String, Map<String, String>>>(it)
-      return wallet().decryptMyMessageML(message)
+      val decrypted = try {
+        val message = decryptionJson.decodeFromString<Map<String, Map<String, String>>>(hash)
+        wallet().decryptMyMessageML(message)
+      } catch (e: Exception) {
+        throw CodeException("CipherHash: reply could not be decrypted", e)
+      }
+      return decrypted ?: throw CodeException("CipherHash: reply could not be decrypted")
     }
-    return null
+
+    if (data == null || data is JsonNull || (data is JsonObject && data.isEmpty())) {
+      return body
+    }
+    throw CodeException("CipherHash: plaintext reply to an encrypted request")
   }
 }

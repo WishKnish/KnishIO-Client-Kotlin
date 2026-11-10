@@ -16,6 +16,18 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Security
+
+- The reply to a request `HttpClient` sent in the encrypted (CipherHash) envelope is accepted only
+  as an envelope that decrypts for this wallet, or as an errors-only reply (`data` missing, `null` or
+  `{}`), which is returned unchanged so the validator's `errors` stay visible. A plaintext `data`
+  reply now throws `CodeException("CipherHash: plaintext reply to an encrypted request")` instead of
+  being returned as if it had come through the encrypted channel, and an envelope that is malformed,
+  has no entry for this wallet or fails to decrypt throws
+  `CodeException("CipherHash: reply could not be decrypted")`. Bootstrap operations sent unwrapped
+  (`__schema`, `ContinuId`, `AccessToken`, U-isotope `ProposeMolecule`) are unaffected. This is the
+  rule the PHP and C SDKs already apply.
+
 ## [1.5.2] — 2026-10-31
 
 ### Fixed
