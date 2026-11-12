@@ -1,109 +1,55 @@
-package examples
+@file:JvmName("BasicUsage")
+
+package examples.basicusage
 
 import wishKnish.knishIO.client.KnishIOClient
-import wishKnish.knishIO.client.libraries.Strings
+import wishKnish.knishIO.client.exception.UnauthenticatedException
+import wishKnish.knishIO.client.libraries.Crypto
 import java.net.URI
 
 /**
- * Basic Usage Example
- * 
- * This example demonstrates the simplest way to get started with the Knish.IO Kotlin SDK.
- * It covers authentication, querying balances, and basic wallet operations.
+ * Basic usage: connect to a node, log in, and read the identity's ledger state.
+ *
+ * Environment: KNISHIO_NODE_URI (GraphQL endpoint), KNISHIO_SECRET (the identity's secret),
+ * KNISHIO_CELL (optional cell slug).
  */
 fun main() {
-    // Step 1: Initialize the client
-    // In production, use your actual node URIs
-    val nodeUri = System.getenv("KNISHIO_NODE_URI") ?: "https://node.wishknish.com/graphql"
-    
-    val client = KnishIOClient(
-        nodeUris = listOf(URI(nodeUri)),
-        encrypt = true  // Enable encryption for secure communication
-    )
-    
-    // Optional: Set a specific cell for your application
-    val cellSlug = System.getenv("KNISHIO_CELL") ?: "myapp"
-    client.setCellSlug(cellSlug)
-    
-    // Step 2: Generate or retrieve your secret
-    // IMPORTANT: In production, use secure key management!
-    val secret = System.getenv("KNISHIO_SECRET") ?: generateDemoSecret()
-    
-    println("=== Knish.IO Basic Usage Demo ===")
-    println("Node: $nodeUri")
-    println("Cell: $cellSlug")
-    println()
-    
-    try {
-        // Step 3: Authenticate with the node
-        println("Authenticating...")
-        val authResponse = client.requestAuthToken(secret)
-        
-        if (authResponse.success()) {
-            println("✓ Authentication successful!")
-            println("  Token: ${authResponse.payload()?.token}")
-            println("  Wallet: ${authResponse.payload()?.wallet?.address}")
-            println()
-        } else {
-            println("✗ Authentication failed: ${authResponse.reason()}")
+    val nodeUri = System.getenv("KNISHIO_NODE_URI") ?: "http://localhost:8000/graphql"
+    val secret = System.getenv("KNISHIO_SECRET") ?: demoSecret()
+
+    KnishIOClient(uris = listOf(URI(nodeUri))).use { client ->
+        client.setCellSlug(System.getenv("KNISHIO_CELL"))
+
+        // Log in. `encrypt = true` asks for CipherHash (ML-KEM) encrypted transport; the client
+        // follows the flag given here after login.
+        val authToken = try {
+            client.requestAuthToken(secret = secret, encrypt = true)
+        } catch (e: UnauthenticatedException) {
+            println("Login rejected: ${e.message}")
             return
         }
-        
-        // Step 4: Query wallet balance
-        println("Querying USER token balance...")
-        val balanceResponse = client.queryBalance("USER")
-        
-        if (balanceResponse.success()) {
-            val balance = balanceResponse.payload()?.balance ?: 0
-            println("✓ Balance query successful!")
-            println("  USER balance: $balance")
-            println()
-        } else {
-            println("✗ Balance query failed: ${balanceResponse.reason()}")
+        println("Logged in; the session token expires in ${authToken.getExpireInterval()} ms")
+        println("Bundle: ${client.bundle()}")
+
+        // The USER wallet and its balance (null when the bundle has no USER wallet yet)
+        val userWallet = client.queryBalance("USER").payload()
+        println("USER balance: ${userWallet?.balance ?: 0.0}")
+
+        // Every wallet of this bundle
+        client.queryWallets(bundle = client.bundle()).forEach { wallet ->
+            println("${wallet.token}: ${wallet.balance} at ${wallet.address}")
         }
-        
-        // Step 5: List all wallets in the bundle
-        println("Listing wallets...")
-        val walletsResponse = client.queryWallets()
-        
-        if (walletsResponse.success()) {
-            val wallets = walletsResponse.payload() ?: emptyList()
-            println("✓ Found ${wallets.size} wallet(s):")
-            
-            wallets.forEach { wallet ->
-                println("  - Token: ${wallet.token}")
-                println("    Address: ${wallet.address}")
-                println("    Balance: ${wallet.balance}")
-            }
-            println()
-        } else {
-            println("✗ Wallet query failed: ${walletsResponse.reason()}")
+
+        // Bundle metadata, keyed by bundle hash
+        client.queryBundle().forEach { (bundleHash, walletBundle) ->
+            println("$bundleHash: created ${walletBundle.createdAt}, ${walletBundle.metas.size} meta entries")
         }
-        
-        // Step 6: Query wallet bundle information
-        println("Querying wallet bundle...")
-        val bundleResponse = client.queryBundle(null) // Use current bundle
-        
-        if (bundleResponse.success()) {
-            val bundle = bundleResponse.payload()
-            println("✓ Bundle information:")
-            println("  Hash: ${bundle?.bundleHash}")
-            println("  Created: ${bundle?.createdAt}")
-            println()
-        }
-        
-    } catch (e: Exception) {
-        println("Error: ${e.message}")
-        e.printStackTrace()
+
+        // ContinuID head: the USER wallet that signs this identity's next molecule
+        val head = client.queryContinuId(client.bundle()).payload()
+        println("ContinuID position: ${head?.position}")
     }
-    
-    println("=== Demo Complete ===")
 }
 
-/**
- * Generate a demo secret for testing
- * WARNING: Never use this in production! Always use secure key generation.
- */
-fun generateDemoSecret(): String {
-    println("⚠️  Generating demo secret (NOT FOR PRODUCTION USE)")
-    return Strings.generateSecret()
-}
+/** A random secret for a throwaway identity. A real identity uses its stored secret. */
+fun demoSecret(): String = Crypto.generateSecret()

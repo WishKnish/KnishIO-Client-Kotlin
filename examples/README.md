@@ -1,197 +1,87 @@
 # Knish.IO Kotlin SDK Examples
 
-This directory contains example code demonstrating various features of the Knish.IO Kotlin SDK. Each example is self-contained and can be run independently.
+Each file in this directory is a self-contained program with its own `main`, in its own package.
+The examples are not part of the SDK's Gradle build and are not published.
 
 ## Prerequisites
 
-Before running the examples, ensure you have:
+- JDK 17 or higher and Kotlin 2.3 or higher (see the [main README](../README.md#installation))
+- A Knish.IO node to talk to
+- Environment variables (all optional):
+  - `KNISHIO_NODE_URI` - GraphQL endpoint (default `http://localhost:8000/graphql`)
+  - `KNISHIO_SECRET` - the identity's secret (default: a random secret, i.e. a new identity)
+  - `KNISHIO_CELL` - cell slug
+  - `KNISHIO_RECIPIENT_SECRET` - second identity for `token-operations.kt`
+  - `KNISHIO_TOKEN` - a token the identity holds, for `advanced-molecules.kt`
 
-1. **JDK 8 or higher** installed
-2. **Gradle** configured (the project includes Gradle wrapper)
-3. **Node access** - either set up your own or use the demo node
-4. **Environment variables** (optional):
-   - `KNISHIO_NODE_URI` - GraphQL endpoint (default: demo node)
-   - `KNISHIO_SECRET` - Your 2048-character secret
-   - `KNISHIO_CELL` - Application cell slug
+## Running an example
 
-## Running Examples
+Copy the file into a Kotlin/JVM project that depends on the SDK:
 
-From the project root directory:
-
-```bash
-# Run a specific example
-./gradlew run -PmainClass=examples.BasicUsageKt
-
-# Or compile and run directly
-./gradlew build
-java -cp build/libs/knishio-client-kotlin-*.jar examples.BasicUsageKt
-```
-
-## Available Examples
-
-### 1. **basic-usage.kt** - Getting Started
-The simplest introduction to the SDK covering:
-- Client initialization
-- Authentication
-- Balance queries
-- Wallet listing
-- Bundle information
-
-**Perfect for:** First-time users wanting to understand the basics.
-
-### 2. **token-operations.kt** - Token Management
-Comprehensive token operations including:
-- Creating fungible tokens
-- Creating non-fungible tokens (NFTs)
-- Setting token properties (decimals, supply type)
-- Token transfers
-- Balance verification
-
-**Perfect for:** Developers building token-based applications.
-
-### 3. **metadata-management.kt** - Data Storage
-Store and query arbitrary data on the ledger:
-- User profiles
-- Product catalogs
-- Vehicle registrations
-- IoT sensor data
-- Application settings
-- Complex queries with filters
-
-**Perfect for:** Applications needing decentralized data storage.
-
-### 4. **wallet-management.kt** - Wallet Operations
-Advanced wallet management features:
-- Wallet generation mechanics
-- Multi-token wallets
-- Bundle operations
-- Shadow wallet claiming
-- ContinuID position tracking
-- Multi-bundle scenarios
-
-**Perfect for:** Understanding wallet architecture and identity management.
-
-### 5. **advanced-molecules.kt** - Low-Level Operations
-Manual molecule construction for complex scenarios:
-- Multi-party transfers
-- Batch operations
-- Atomic swaps
-- Custom isotope combinations
-- Direct molecule composition
-
-**Perfect for:** Advanced users needing fine-grained control.
-
-### 6. **complete-example.kt** - Full Feature Demo
-Comprehensive demonstration of all SDK features:
-- Complete workflow from authentication to transfers
-- All major SDK operations
-- Error handling patterns
-- Production-ready code structure
-
-**Perfect for:** Understanding how all features work together.
-
-## Example Patterns
-
-### Basic Pattern
 ```kotlin
-// 1. Initialize client
-val client = KnishIOClient(listOf(URI(nodeUri)))
-
-// 2. Authenticate
-val auth = client.requestAuthToken(secret)
-
-// 3. Perform operations
-val balance = client.queryBalance("USER")
-```
-
-### Environment Configuration
-```kotlin
-// Use environment variables with defaults
-val nodeUri = System.getenv("KNISHIO_NODE_URI") 
-    ?: "https://node.wishknish.com/graphql"
-    
-val secret = System.getenv("KNISHIO_SECRET") 
-    ?: generateDemoSecret()
-```
-
-### Error Handling
-```kotlin
-val response = client.someOperation()
-if (response.success()) {
-    // Handle success
-    val data = response.payload()
-} else {
-    // Handle failure
-    println("Failed: ${response.reason()}")
+dependencies {
+    implementation("io.knish:knishio-client-kotlin:1.5.2")
 }
 ```
 
-## Security Notes
+and run its main class:
 
-⚠️ **Important Security Considerations:**
+| File | Main class |
+|---|---|
+| `basic-usage.kt` | `examples.basicusage.BasicUsage` |
+| `token-operations.kt` | `examples.tokenoperations.TokenOperations` |
+| `metadata-management.kt` | `examples.metadatamanagement.MetadataManagement` |
+| `wallet-management.kt` | `examples.walletmanagement.WalletManagement` |
+| `advanced-molecules.kt` | `examples.advancedmolecules.AdvancedMolecules` |
+| `complete-example.kt` | `examples.complete.CompleteExample` |
 
-1. **Never hardcode secrets** in production code
-2. **Use secure key management** systems
-3. **Enable encryption** for node communication
-4. **Validate all inputs** before ledger operations
-5. **Handle errors gracefully** without exposing sensitive data
+## Available Examples
 
-## Demo vs Production
+1. **basic-usage.kt**: connect, log in with encrypted transport, read the USER balance, the
+   bundle's wallets, bundle metadata and the ContinuID head.
+2. **token-operations.kt**: issue a fungible token, transfer and burn it; issue a stackable token
+   and transfer, replenish and fuse its units; the recipient claims its shadow wallet.
+3. **metadata-management.kt**: write Meta Asset records and query them by type, id, key, value
+   and filter.
+4. **wallet-management.kt**: how wallets derive from a secret, ML-KEM encryption between two
+   wallets, declaring and listing wallets, shadow wallets, the ContinuID head.
+5. **advanced-molecules.kt**: build molecules with the `Molecule` builders and by hand, sign,
+   verify locally, submit; multi-recipient transfers and buffer deposit/withdrawal.
+6. **complete-example.kt**: one session end to end.
 
-These examples use demo patterns for simplicity:
+## Patterns
 
-**Demo Pattern:**
+Log in: `requestAuthToken` returns the `AuthToken` and throws `UnauthenticatedException` when
+the node rejects the login.
+
 ```kotlin
-val secret = Strings.generateSecret() // Auto-generated
+val client = KnishIOClient(uris = listOf(URI(nodeUri)))
+val authToken = client.requestAuthToken(secret = secret, encrypt = true)
 ```
 
-**Production Pattern:**
+Ledger writes return a `ResponseProposeMolecule`:
+
 ```kotlin
-val secret = KeyVault.getSecret("knishio-secret") // From secure storage
+val response = client.createWallet("FOO")
+if (response.success()) {
+    println("Accepted: ${response.data()?.molecularHash}")
+} else {
+    println("Rejected: ${response.reason()}")
+}
 ```
 
-## Troubleshooting
+Local checks (balance, token units, molecule verification) throw a subclass of
+`wishKnish.knishIO.client.exception.BaseException` before anything is sent.
 
-### Common Issues
+## Security notes
 
-1. **Authentication fails**
-   - Check node URI is correct
-   - Verify secret is 2048 characters
-   - Ensure network connectivity
-
-2. **Token creation fails**
-   - Token slug might already exist
-   - Check metadata requirements
-   - Verify authentication succeeded
-
-3. **Balance shows 0**
-   - Wallet might not be declared
-   - Token might not exist
-   - Check correct bundle hash
-
-### Debug Mode
-
-Enable debug output:
-```kotlin
-val client = KnishIOClient(
-    nodeUris = listOf(URI(nodeUri)),
-    logging = true  // Enable debug logging
-)
-```
-
-## Next Steps
-
-After running these examples:
-
-1. Read the [API Reference](../API_REFERENCE.md) for detailed documentation
-2. Check the [main README](../README.md) for SDK features
-3. Join the [Telegram community](https://t.me/wishknish) for support
-4. Explore the [Technical Whitepaper](https://github.com/WishKnish/KnishIO-Technical-Whitepaper)
-
-## Contributing
-
-Have an example to share? We welcome contributions! See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+1. Never hardcode secrets. Keep them in a `SecretStorageProvider` (see the main README,
+   "Secret storage").
+2. A random secret (`Crypto.generateSecret()`) creates a new identity each run; it is only for
+   trying things out.
+3. Pass `encrypt = true` to `requestAuthToken` for CipherHash (ML-KEM) encrypted transport.
 
 ## License
 
-These examples are part of the Knish.IO Kotlin SDK and are licensed under the MIT License.
+These examples are part of the Knish.IO Kotlin SDK and are licensed under the GNU General Public
+License v3.0 or later (GPL-3.0-or-later); see [LICENSE](../LICENSE).

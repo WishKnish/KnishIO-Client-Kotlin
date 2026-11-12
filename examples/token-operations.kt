@@ -1,211 +1,115 @@
-package examples
+@file:JvmName("TokenOperations")
+
+package examples.tokenoperations
 
 import wishKnish.knishIO.client.KnishIOClient
-import wishKnish.knishIO.client.Wallet
 import wishKnish.knishIO.client.data.MetaData
-import wishKnish.knishIO.client.libraries.Strings
+import wishKnish.knishIO.client.data.graphql.types.TokenUnit
+import wishKnish.knishIO.client.exception.UnauthenticatedException
+import wishKnish.knishIO.client.libraries.Crypto
+import wishKnish.knishIO.client.response.ResponseProposeMolecule
 import java.net.URI
 
 /**
- * Token Operations Example
- * 
- * This example demonstrates how to create custom tokens, transfer them between wallets,
- * and manage token properties using the Knish.IO Kotlin SDK.
+ * Token operations: issue a fungible token, transfer and burn it, then issue a stackable token
+ * and transfer, replenish and fuse its units. The recipient claims what it received in a shadow
+ * wallet.
+ *
+ * Environment: KNISHIO_NODE_URI, KNISHIO_SECRET (issuer), KNISHIO_RECIPIENT_SECRET (recipient).
  */
 fun main() {
-    // Initialize client
-    val nodeUri = System.getenv("KNISHIO_NODE_URI") ?: "https://node.wishknish.com/graphql"
-    val client = KnishIOClient(
-        nodeUris = listOf(URI(nodeUri)),
-        encrypt = true
-    )
-    
-    // Use environment secrets or generate for demo
-    val creatorSecret = System.getenv("KNISHIO_SECRET") ?: Strings.generateSecret()
-    val recipientSecret = System.getenv("KNISHIO_RECIPIENT_SECRET") ?: Strings.generateSecret()
-    
-    println("=== Knish.IO Token Operations Demo ===")
-    println()
-    
-    try {
-        // Step 1: Authenticate as token creator
-        println("1. Authenticating token creator...")
-        val authResponse = client.requestAuthToken(creatorSecret)
-        if (!authResponse.success()) {
-            println("✗ Authentication failed: ${authResponse.reason()}")
+    val nodeUri = URI(System.getenv("KNISHIO_NODE_URI") ?: "http://localhost:8000/graphql")
+    val issuerSecret = System.getenv("KNISHIO_SECRET") ?: Crypto.generateSecret()
+    val recipientSecret = System.getenv("KNISHIO_RECIPIENT_SECRET") ?: Crypto.generateSecret()
+    val recipientBundle = Crypto.generateBundleHash(recipientSecret)
+
+    // A fresh slug per run: a slug can only be issued once
+    val fungibleSlug = "DEMO${(1000..9999).random()}"
+    val stackableSlug = "UNIT${(1000..9999).random()}"
+
+    KnishIOClient(uris = listOf(nodeUri)).use { client ->
+        try {
+            client.requestAuthToken(secret = issuerSecret)
+        } catch (e: UnauthenticatedException) {
+            println("Login rejected: ${e.message}")
             return
         }
-        println("✓ Creator authenticated")
-        println()
-        
-        // Step 2: Create a new custom token
-        println("2. Creating custom token 'DEMO'...")
-        
-        // Define token properties
-        val tokenMeta = mutableListOf(
-            MetaData("name", "Demo Token"),
-            MetaData("fungibility", "fungible"),      // fungible or nonfungible
-            MetaData("supply", "limited"),            // limited or replenishable
-            MetaData("decimals", "2"),                // Number of decimal places
-            MetaData("description", "A demo token for testing"),
-            MetaData("icon", "🪙")
+
+        // 1. Issue a fungible token with a limited supply
+        val created = client.createToken(
+            token = fungibleSlug,
+            amount = 1000000,
+            meta = mutableListOf(
+                MetaData("name", "Demo Token"),
+                MetaData("fungibility", "fungible"),
+                MetaData("supply", "limited"),
+                MetaData("decimals", "2")
+            )
         )
-        
-        val createTokenResponse = client.createToken(
-            token = "DEMO",
-            amount = 1000000,  // Initial supply: 10,000.00 (with 2 decimals)
-            meta = tokenMeta
+        report("createToken $fungibleSlug", created)
+        if (!created.success()) return
+
+        println("Issuer balance: ${client.queryBalance(fungibleSlug).payload()?.balance}")
+
+        // 2. Transfer to another identity by bundle hash. A bundle without a declared wallet for
+        //    this token receives it in a shadow wallet.
+        report("transferToken", client.transferToken(recipient = recipientBundle, token = fungibleSlug, amount = 10000))
+
+        // 3. Burn part of the remaining supply
+        report("burnTokens", client.burnTokens(token = fungibleSlug, amount = 500))
+
+        // 4. Issue a stackable token made of named units (no decimals, no bare amount)
+        val units = mutableListOf(
+            TokenUnit("unit-1", "Unit One"),
+            TokenUnit("unit-2", "Unit Two"),
+            TokenUnit("unit-3", "Unit Three")
         )
-        
-        if (createTokenResponse.success()) {
-            println("✓ Token created successfully!")
-            println("  Token: DEMO")
-            println("  Initial supply: 10,000.00")
-            println("  Molecular hash: ${createTokenResponse.payload()?.molecularHash}")
-            println()
-        } else {
-            println("✗ Token creation failed: ${createTokenResponse.reason()}")
-            // Try to continue with existing token
-        }
-        
-        // Step 3: Query creator's balance
-        println("3. Checking creator's DEMO balance...")
-        val creatorBalance = client.queryBalance("DEMO")
-        if (creatorBalance.success()) {
-            val balance = creatorBalance.payload()?.balance ?: 0
-            println("✓ Creator balance: ${balance / 100.0} DEMO")
-            println()
-        }
-        
-        // Step 4: Create recipient wallet
-        println("4. Setting up recipient wallet...")
-        
-        // Authenticate as recipient to ensure wallet exists
-        client.requestAuthToken(recipientSecret)
-        val recipientWallet = Wallet(recipientSecret, "DEMO")
-        
-        // Declare the wallet on the ledger
-        val createWalletResponse = client.createWallet("DEMO")
-        if (createWalletResponse.success()) {
-            println("✓ Recipient wallet created")
-            println("  Address: ${recipientWallet.address}")
-        } else {
-            println("  Wallet may already exist")
-        }
-        println()
-        
-        // Step 5: Transfer tokens
-        println("5. Transferring 100.00 DEMO to recipient...")
-        
-        // Re-authenticate as creator for transfer
-        client.requestAuthToken(creatorSecret)
-        
-        val transferResponse = client.transferToken(
-            recipient = recipientWallet,
-            token = "DEMO",
-            amount = 10000  // 100.00 with 2 decimals
+        report(
+            "createToken $stackableSlug",
+            client.createToken(
+                token = stackableSlug,
+                meta = mutableListOf(
+                    MetaData("name", "Demo Units"),
+                    MetaData("fungibility", "stackable"),
+                    MetaData("supply", "replenishable"),
+                    MetaData("decimals", "0")
+                ),
+                units = units
+            )
         )
-        
-        if (transferResponse.success()) {
-            println("✓ Transfer successful!")
-            println("  Amount: 100.00 DEMO")
-            println("  To: ${recipientWallet.address}")
-            println("  Molecular hash: ${transferResponse.payload()?.molecularHash}")
-            println()
-        } else {
-            println("✗ Transfer failed: ${transferResponse.reason()}")
-            return
-        }
-        
-        // Step 6: Verify balances after transfer
-        println("6. Verifying balances after transfer...")
-        
-        // Check creator balance
-        val creatorFinalBalance = client.queryBalance("DEMO")
-        if (creatorFinalBalance.success()) {
-            val balance = creatorFinalBalance.payload()?.balance ?: 0
-            println("  Creator balance: ${balance / 100.0} DEMO")
-        }
-        
-        // Check recipient balance
-        client.requestAuthToken(recipientSecret)
-        val recipientBalance = client.queryBalance("DEMO")
-        if (recipientBalance.success()) {
-            val balance = recipientBalance.payload()?.balance ?: 0
-            println("  Recipient balance: ${balance / 100.0} DEMO")
-        }
-        println()
-        
-        // Step 7: Create a non-fungible token (NFT)
-        println("7. Creating non-fungible token 'DEMONFT'...")
-        
-        client.requestAuthToken(creatorSecret)
-        
-        val nftMeta = mutableListOf(
-            MetaData("name", "Demo NFT Collection"),
-            MetaData("fungibility", "nonfungible"),
-            MetaData("supply", "limited"),
-            MetaData("decimals", "0"),  // NFTs don't have decimals
-            MetaData("description", "Unique digital collectibles"),
-            MetaData("maxSupply", "100")
+
+        // 5. Move one unit: units are given instead of an amount
+        report(
+            "transferToken (unit-1)",
+            client.transferToken(recipient = recipientBundle, token = stackableSlug, amount = 0, units = mutableListOf(units[0]))
         )
-        
-        val createNftResponse = client.createToken(
-            token = "DEMONFT",
-            amount = 1,  // Create first NFT
-            meta = nftMeta
+
+        // 6. Add a new unit to the replenishable supply
+        report("replenishToken", client.replenishToken(token = stackableSlug, units = mutableListOf(TokenUnit("unit-4", "Unit Four"))))
+
+        // 7. Fuse two held units into one new unit
+        report(
+            "fuseToken",
+            client.fuseToken(
+                tokenSlug = stackableSlug,
+                newTokenUnit = TokenUnit("unit-5", "Fused Unit"),
+                fusedTokenUnitIds = listOf("unit-2", "unit-3")
+            )
         )
-        
-        if (createNftResponse.success()) {
-            println("✓ NFT created successfully!")
-            println("  Token: DEMONFT")
-            println("  Token ID: #1")
-            println()
-        }
-        
-        // Step 8: Create a replenishable token
-        println("8. Creating replenishable token 'POINTS'...")
-        
-        val pointsMeta = mutableListOf(
-            MetaData("name", "Reward Points"),
-            MetaData("fungibility", "fungible"),
-            MetaData("supply", "replenishable"),  // Can mint more
-            MetaData("decimals", "0"),
-            MetaData("description", "Loyalty reward points")
-        )
-        
-        val createPointsResponse = client.createToken(
-            token = "POINTS",
-            amount = 1000,
-            meta = pointsMeta
-        )
-        
-        if (createPointsResponse.success()) {
-            println("✓ Replenishable token created!")
-            println("  Token: POINTS")
-            println("  Initial supply: 1000")
-            println()
-        }
-        
-        // Step 9: List all tokens in wallet
-        println("9. Listing all tokens in creator's wallet...")
-        val walletsResponse = client.queryWallets()
-        
-        if (walletsResponse.success()) {
-            val wallets = walletsResponse.payload() ?: emptyList()
-            println("✓ Found ${wallets.size} token(s):")
-            wallets.forEach { wallet ->
-                if (wallet.balance > 0) {
-                    println("  - ${wallet.token}: ${wallet.balance}")
-                }
-            }
-        }
-        
-    } catch (e: Exception) {
-        println("Error: ${e.message}")
-        e.printStackTrace()
     }
-    
-    println()
-    println("=== Token Operations Demo Complete ===")
+
+    // 8. The recipient logs in and claims the shadow wallet that received the fungible token
+    KnishIOClient(uris = listOf(nodeUri)).use { recipient ->
+        recipient.requestAuthToken(secret = recipientSecret)
+        report("claimShadowWallet", recipient.claimShadowWallet(token = fungibleSlug))
+        println("Recipient balance: ${recipient.queryBalance(fungibleSlug).payload()?.balance}")
+    }
+}
+
+private fun report(step: String, response: ResponseProposeMolecule) {
+    if (response.success()) {
+        println("$step: accepted (${response.data()?.molecularHash})")
+    } else {
+        println("$step: ${response.status()} - ${response.reason()}")
+    }
 }
