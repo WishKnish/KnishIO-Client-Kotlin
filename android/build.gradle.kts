@@ -4,7 +4,7 @@ import com.vanniktech.maven.publish.SourcesJar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-  id("com.android.library") version "9.2.0"
+  id("com.android.library") version "9.5.1"
   // Not applied. Puts KGP 2.4.21 on the build classpath so AGP's built-in Kotlin compiles with the
   // same compiler the core (kotlin("jvm") 2.4.21) uses; Kotlin metadata is readable at most one minor ahead.
   kotlin("jvm") version "2.4.21" apply false
