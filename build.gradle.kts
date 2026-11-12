@@ -9,7 +9,7 @@ plugins {
   kotlin("jvm") version kotlinVersion
   kotlin("plugin.serialization") version kotlinVersion
   id("com.gradleup.shadow") version "9.6.1"
-  id("org.jetbrains.dokka") version "2.2.0"
+  id("org.jetbrains.dokka") version "2.3.0"
   // Maven Central publishing via the Central Portal (replaces the decommissioned
   // OSSRH s01 endpoint). Applies + manages maven-publish and signing internally.
   // 0.36.0+ requires Dokka v2 (it dropped Dokka v1) and Gradle >= 8.13 — both
