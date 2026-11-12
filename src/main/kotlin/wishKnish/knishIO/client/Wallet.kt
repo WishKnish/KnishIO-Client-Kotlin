@@ -175,17 +175,17 @@ class Wallet @JvmOverloads constructor(
     }
 
     /**
-     * Get formatted token units from the raw data
+     * Token units from stored `[id, name, metas]` rows (JS `TokenUnit.createFromDB`); a row
+     * without a JSON-object metas element gets `{}`.
      */
     @JvmStatic
     fun getTokenUnits(unitsData: List<List<String>>): List<TokenUnit> {
-      val result = mutableListOf<TokenUnit>()
-
-      unitsData.forEach {
-        result.add(TokenUnit(it[0], it[1], it))
+      return unitsData.map { row ->
+        val metas = row.getOrNull(2)?.let {
+          runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) }.getOrNull() as? kotlinx.serialization.json.JsonObject
+        }
+        TokenUnit(row[0], row[1], metas ?: kotlinx.serialization.json.JsonObject(emptyMap()))
       }
-
-      return result.toList()
     }
 
     /**

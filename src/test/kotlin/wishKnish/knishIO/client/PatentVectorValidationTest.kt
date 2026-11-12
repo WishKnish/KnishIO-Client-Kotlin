@@ -384,7 +384,7 @@ class PatentVectorValidationTest {
                 val amount = test["amount"]!!.jsonPrimitive.intOrNull
                 val units = test["units"]!!.jsonArray.map {
                     val triple = it.jsonArray
-                    TokenUnit(triple[0].jsonPrimitive.content, triple[1].jsonPrimitive.content, listOf())
+                    TokenUnit(triple[0].jsonPrimitive.content, triple[1].jsonPrimitive.content)
                 }
 
                 val credited = Wallet.create(secret, token)
@@ -429,7 +429,7 @@ class PatentVectorValidationTest {
 
         private fun build(secret: String, test: JsonObject): Pair<Molecule, Wallet> {
             val source = Wallet.create(secret, "FUSETOK")
-            source.tokenUnits = ids(test, "sourceUnits").map { TokenUnit(it, it, listOf()) }.toMutableList()
+            source.tokenUnits = ids(test, "sourceUnits").map { TokenUnit(it, it) }.toMutableList()
             source.balance = source.tokenUnits.size.toDouble()
             val recipient = Wallet.create(secret, "FUSETOK")
             val molecule = Molecule(
@@ -439,7 +439,7 @@ class PatentVectorValidationTest {
                 cellSlug = "fusetest"
             )
             val newId = test["newUnitId"]!!.jsonPrimitive.content
-            molecule.fuseToken(ids(test, "fuse"), TokenUnit(newId, newId, listOf()), recipient)
+            molecule.fuseToken(ids(test, "fuse"), TokenUnit(newId, newId), recipient)
             return molecule to recipient
         }
 
@@ -590,7 +590,7 @@ class PatentVectorValidationTest {
                 val test = element.jsonObject
                 val name = test["name"]!!.jsonPrimitive.content
                 val token = test["token"]!!.jsonPrimitive.content
-                val units = ids(test, "units").map { TokenUnit(it, it, listOf()) }.toMutableList()
+                val units = ids(test, "units").map { TokenUnit(it, it) }.toMutableList()
 
                 val molecule = proposed(secret) {
                     it.createToken(token, null, mutableListOf(MetaData("fungibility", "stackable")), units = units)

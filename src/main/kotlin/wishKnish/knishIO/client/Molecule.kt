@@ -1336,7 +1336,9 @@ import kotlin.math.ceil
     batchId: String? = null
   ): Molecule {
     meta.find { mataData -> mataData.key == "token" }?.run { value = token } ?: meta.add(MetaData("token", token))
-    meta.find { mataData -> mataData.key == "amount" }?.run { value = amount.toString() } ?: meta.add(MetaData("amount", amount.toString()))
+    // JS: meta.amount = String(amount), the same text as the atom value
+    val amountText = formatAtomValue(amount)
+    meta.find { mataData -> mataData.key == "amount" }?.run { value = amountText } ?: meta.add(MetaData("amount", amountText))
 
     addAtom(
       Atom(

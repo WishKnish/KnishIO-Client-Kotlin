@@ -280,9 +280,9 @@ class WalletTest {
         
         // Set token units
         val units = mutableListOf(
-            TokenUnit("unit1", "Unit One", listOf("100")),
-            TokenUnit("unit2", "Unit Two", listOf("200")),
-            TokenUnit("unit3", "Unit Three", listOf("300"))
+            TokenUnit("unit1", "Unit One", JsonObject(mapOf("value" to JsonPrimitive("100")))),
+            TokenUnit("unit2", "Unit Two", JsonObject(mapOf("value" to JsonPrimitive("200")))),
+            TokenUnit("unit3", "Unit Three", JsonObject(mapOf("value" to JsonPrimitive("300"))))
         )
         wallet.tokenUnits = units
         
@@ -314,9 +314,9 @@ class WalletTest {
         
         // Set token units (matching JS test structure)
         wallet.tokenUnits = mutableListOf(
-            TokenUnit("unit1", "Unit 1", listOf()),
-            TokenUnit("unit2", "Unit 2", listOf()),
-            TokenUnit("unit3", "Unit 3", listOf())
+            TokenUnit("unit1", "Unit 1"),
+            TokenUnit("unit2", "Unit 2"),
+            TokenUnit("unit3", "Unit 3")
         )
         
         expectThat(wallet.tokenUnits).hasSize(3)

@@ -782,50 +782,37 @@ class KnishIOClient @JvmOverloads constructor(
     batchId: String? = null,
     units: MutableList<TokenUnit> = mutableListOf()
   ): ResponseProposeMolecule {
-    val newOrExistingBatchId = batchId ?: Crypto.generateBatchId()
-    var tokenAmount = amount ?: 0
+    val fungibility = meta.firstOrNull { it.key == "fungibility" }?.value
+    var tokenAmount: Number = amount ?: 0
 
-    // Stackable tokens need a new batch for every transfer
-    meta.firstOrNull { it.key == "fungibility" }?.let { _ ->
-
-      // No batch ID specified? Create a random one
-      meta.firstOrNull { it.key == "batchId" }?.let {
-        it.value = newOrExistingBatchId
-      } ?: meta.add(MetaData("batchId", newOrExistingBatchId))
-
-      // Adding unit IDs to the token
-      if (units.isNotEmpty()) {
-
-        // Stackable tokens with Unit IDs must not use decimals
-        meta.firstOrNull { it.key == "decimals" }?.let {
-          if (it.value !!.toDouble() > 0) {
-            throw StackableUnitDecimalsException()
-          }
-        }
-
-        // Can't create stackable units AND provide amount
-        amount?.let {
-          if (it.toDouble() > 0) {
-            throw StackableUnitAmountException()
-          }
-        }
-
-        // Calculating amount based on Unit IDs
-        tokenAmount = units.size
-        meta.firstOrNull { it.key == "splittable" }?.let {
-          it.value = "1"
-        } ?: meta.add(MetaData("splittable", "1"))
-
-        // [id, name, metas] triples, as every other unit operation sends them
-        val unitsJson = Wallet.tokenUnitsJson(units)
-        meta.firstOrNull { it.key == "tokenUnits" }?.let {
-          it.value = unitsJson
-        } ?: meta.add(MetaData("tokenUnits", unitsJson))
-      }
+    // Stackable tokens carry a batch ID in their meta (JS createToken)
+    if (fungibility == "stackable") {
+      meta.putMeta("batchId", batchId ?: Crypto.generateBatchId())
     }
 
-    // Creating the wallet that will receive the new tokens
-    val recipientWallet = Wallet(getSecret(), token, newOrExistingBatchId, mlkemParameterSet = mlkemParameterSet, otsVersion = otsVersion)
+    // Token units (nonfungible or stackable)
+    if (fungibility in listOf("nonfungible", "stackable") && units.isNotEmpty()) {
+
+      // Tokens with unit IDs must not use decimals
+      if ((meta.firstOrNull { it.key == "decimals" }?.value?.toDoubleOrNull() ?: 0.0) > 0) {
+        throw StackableUnitDecimalsException()
+      }
+
+      // Can't create units AND provide amount
+      if (amount != null && amount.toDouble() > 0) {
+        throw StackableUnitAmountException()
+      }
+
+      // Calculating amount based on unit IDs
+      tokenAmount = units.size
+      meta.putMeta("splittable", "1")
+      meta.putMeta("decimals", "0")
+      // [id, name, metas] triples, as every other unit operation sends them
+      meta.putMeta("tokenUnits", Wallet.tokenUnitsJson(units))
+    }
+
+    // Creating the wallet that will receive the new tokens; JS gives it the caller's batch ID
+    val recipientWallet = Wallet(getSecret(), token, batchId = batchId, mlkemParameterSet = mlkemParameterSet, otsVersion = otsVersion)
     val query = createMoleculeMutation(MutationCreateToken::class) as MutationCreateToken
 
     query.fillMolecule(recipientWallet, tokenAmount, meta)
@@ -867,7 +854,8 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
-   * Builds and executes a Molecule that requests token payment from the node
+   * Builds and executes a Molecule that requests token payment from the node for wallet [to]
+   * (the node is given its position and bundle), or for this client's own bundle when [to] is null.
    */
   @JvmOverloads
   fun requestTokens(
@@ -878,26 +866,13 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf(),
     batchId: String? = null
   ): ResponseProposeMolecule {
-    val specification = getSpecificationRequestTokens(to, token)
-    val metaType: String? = specification["metaType"]
-    val metaId: String? = specification["metaId"]
-
-    // Are we specifying a specific recipient?
-    to?.let {
-      meta.firstOrNull { it.key == "position" }?.let {
-        it.value = to.position
-      } ?: meta.add(MetaData("position", to.position))
-
-      meta.firstOrNull { it.key == "bundle" }?.let {
-        it.value = to.bundle
-      } ?: meta.add(MetaData("position", to.bundle))
-    }
-
-    return requestTokensQuery(token, amount, metaType, metaId, units, meta, batchId)
+    return requestTokensFor(token, to, amount, units, meta, batchId)
   }
 
   /**
-   * Builds and executes a Molecule that requests token payment from the node
+   * Builds and executes a Molecule that requests token payment from the node. [to] is a bundle
+   * hash, or a secret from which a new recipient wallet is derived; null or empty requests
+   * tokens for this client's own bundle.
    */
   fun requestTokens(
     token: String,
@@ -907,21 +882,17 @@ class KnishIOClient @JvmOverloads constructor(
     meta: MutableList<MetaData> = mutableListOf(),
     batchId: String? = null
   ): ResponseProposeMolecule {
-    val specification = getSpecificationRequestTokens(to, token)
-    val metaType: String? = specification["metaType"]
-    val metaId: String? = specification["metaId"]
-
-    return requestTokensQuery(token, amount, metaType, metaId, units, meta, batchId)
+    return requestTokensFor(token, to?.takeIf { it.isNotEmpty() }, amount, units, meta, batchId)
   }
 
-  private fun requestTokensQuery(
+  /** JS `requestTokens`: unit meta first, then the recipient's `position`/`bundle`. */
+  private fun requestTokensFor(
     token: String,
-    amount: Number? = null,
-    metaType: String? = null,
-    metaId: String? = null,
-    units: MutableList<TokenUnit> = mutableListOf(),
-    meta: MutableList<MetaData> = mutableListOf(),
-    batchId: String? = null
+    to: Any?,
+    amount: Number?,
+    units: MutableList<TokenUnit>,
+    meta: MutableList<MetaData>,
+    batchId: String?
   ): ResponseProposeMolecule {
     var requestedAmount = amount ?: 0
 
@@ -933,11 +904,28 @@ class KnishIOClient @JvmOverloads constructor(
         throw StackableUnitAmountException()
       }
 
-      // Calculating amount based on Unit IDs
+      // Calculating amount based on Unit IDs; JS writes JSON.stringify(units)
       requestedAmount = units.size
-      meta.firstOrNull { it.key == "tokenUnits" }?.let {
-        it.value = jsonFormat.encodeToString(units)
-      } ?: meta.add(MetaData("tokenUnits", jsonFormat.encodeToString(units)))
+      meta.putMeta("tokenUnits", jsonFormat.encodeToString(units))
+    }
+
+    // A recipient given as a secret becomes a wallet derived from it
+    val recipient = if (to is String && !Wallet.isBundleHash(to)) {
+      Wallet.create(to, token, mlkemParameterSet = mlkemParameterSet, otsVersion = otsVersion)
+    } else {
+      to
+    }
+
+    val (metaType, metaId) = when (recipient) {
+      // A wallet recipient: help the node triangulate it by its position and bundle hash
+      is Wallet -> {
+        meta.putMeta("position", recipient.position)
+        meta.putMeta("bundle", recipient.bundle)
+        "wallet" to recipient.address
+      }
+      is String -> "walletBundle" to recipient
+      // No recipient, so request tokens for ourselves
+      else -> "walletBundle" to bundle()
     }
 
     val query = createMoleculeMutation(MutationRequestTokens::class) as MutationRequestTokens
@@ -947,26 +935,9 @@ class KnishIOClient @JvmOverloads constructor(
     return submit(query)
   }
 
-  private fun <T> getSpecificationRequestTokens(
-    sender: T,
-    token: String
-  ): Map<String, String?> {
-    return when (sender) {
-      // If recipient is a Wallet, we need to help the node triangulate
-      // the transfer by providing position and bundle hash
-      is Wallet -> mapOf("metaType" to "wallet", "metaId" to sender.address)
-      // If the recipient is provided as an object, try to figure out the actual recipient
-      is String -> run {
-        if (Wallet.isBundleHash(sender)) {
-          mapOf("metaType" to "walletBundle", "metaId" to sender)
-        } else {
-          val wallet = Wallet.create(sender, token, mlkemParameterSet = mlkemParameterSet, otsVersion = otsVersion)
-          mapOf("metaType" to "wallet", "metaId" to wallet.address)
-        }
-      }
-      // No recipient, so request tokens for ourselves
-      else -> mapOf("metaType" to "walletBundle", "metaId" to bundle())
-    }
+  /** Sets meta [key] to [value], keeping the key's position when it is already present. */
+  private fun MutableList<MetaData>.putMeta(key: String, value: String?) {
+    firstOrNull { it.key == key }?.let { it.value = value } ?: add(MetaData(key, value))
   }
 
   /**
@@ -1267,7 +1238,7 @@ class KnishIOClient @JvmOverloads constructor(
     bundleHash: String? = null,
     sourceWallet: Wallet? = null
   ): ResponseProposeMolecule {
-    return fuseToken(tokenSlug, TokenUnit(newTokenUnitId, newTokenUnitId, listOf()), fusedTokenUnitIds, bundleHash, sourceWallet)
+    return fuseToken(tokenSlug, TokenUnit(newTokenUnitId, newTokenUnitId), fusedTokenUnitIds, bundleHash, sourceWallet)
   }
 
   /**

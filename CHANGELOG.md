@@ -37,6 +37,19 @@ not substantiate a detail, the entry says so instead of guessing.
   writes the `rule` and `policy` metas as JS `Molecule.createRule()` does (signed bytes change;
   no other SDK reproduced the old R atom). The old `createRule(metaType, metaId, meta)` signature
   is gone.
+- `createToken` builds the C atom JS builds. A `batchId` meta is added only for `stackable` tokens
+  (fungible tokens got a random one); unit tokens (`nonfungible`/`stackable`) also get
+  `decimals = "0"`; and the caller's `batchId` now reaches the recipient wallet's `batchId` — it
+  was passed positionally into `position`, so the C atom had no batch ID and a wallet position
+  equal to the batch ID. Signed bytes change; no other SDK reproduced the old C atom.
+- `TokenUnit.metas` is a JSON object parsed from the string the validator serves (it was
+  discarded), and `toTriple()` writes `[id, name, metas]` with it, so transfers and fusions of
+  served units carry the units' metadata as JS sends it. Signed bytes change for units with
+  metas; no other SDK reproduced the old bytes. `TokenUnit(id, name)` defaults `metas` to `{}`.
+- `requestTokens` builds the T atom JS builds: a `Wallet` recipient's bundle goes under `bundle`
+  (it went under a second `position` key), a secret recipient now adds its `position`/`bundle`
+  meta, unit meta comes before the recipient meta, and the `amount` meta is `"1000"`, not
+  `"1000.0"`, for a `Double` amount. Signed bytes change; no other SDK reproduced the old T atom.
 
 ### Security
 
