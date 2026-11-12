@@ -2,9 +2,9 @@
  * OTS v2 cross-SDK vectors: key derivation, address, the normalized hash, ML-KEM identities
  * of v2 wallets, molecule verdicts and the malformed declared-hash check.
  *
- * Reads the shared master ../shared-test-results/ots-v2-vectors.json (relative to the SDK root).
- * A standalone checkout has no master; the vector suite then registers one visible skip.
- * The v2 sign/verify round trip below always runs.
+ * Reads ots-v2-vectors.json from the test resources (vendored byte-for-byte from
+ * sdks/shared-test-results/ by scripts/sync-cross-sdk-fixtures.sh). A missing or unparsable
+ * file fails the suite; it never skips.
  */
 
 package wishKnish.knishIO.client
@@ -22,7 +22,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.DynamicContainer
@@ -38,7 +37,6 @@ import wishKnish.knishIO.client.httpClient.HttpClient
 import wishKnish.knishIO.client.libraries.CheckMolecule
 import wishKnish.knishIO.client.libraries.Crypto
 import wishKnish.knishIO.client.response.ResponseWalletList
-import java.io.File
 import java.net.URI
 
 @DisplayName("OTS v2")
@@ -46,7 +44,11 @@ class OtsV2VectorsTest {
 
   private val json = Json { ignoreUnknownKeys = true }
 
-  private val vectorsFile = File("../shared-test-results/ots-v2-vectors.json")
+  private val vectorsJson: String by lazy {
+    val stream = javaClass.classLoader.getResourceAsStream("ots-v2-vectors.json")
+      ?: throw IllegalStateException("ots-v2-vectors.json not found in test resources")
+    stream.bufferedReader().use { it.readText() }
+  }
 
   private val exceptions = mapOf(
     "SignatureMismatch" to SignatureMismatchException::class.java,
@@ -77,8 +79,7 @@ class OtsV2VectorsTest {
   @TestFactory
   @DisplayName("shared ots-v2-vectors.json")
   fun vectors(): List<DynamicNode> {
-    assumeTrue(vectorsFile.isFile, "skipped: ../shared-test-results/ots-v2-vectors.json not found (standalone checkout)")
-    val vectors = json.parseToJsonElement(vectorsFile.readText()).jsonObject["vectors"]!!.jsonObject
+    val vectors = json.parseToJsonElement(vectorsJson).jsonObject["vectors"]!!.jsonObject
     val keyDerivation = tests(vectors, "key_derivation")
     val keyFrom = { name: String -> keyDerivation.first { it.str("name") == name } }
 
