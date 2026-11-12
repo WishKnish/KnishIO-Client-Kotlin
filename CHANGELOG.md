@@ -16,6 +16,12 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Changed
+
+- GraalVM Polyglot and GraalJS (`org.graalvm.polyglot:polyglot`, `org.graalvm.polyglot:js`)
+  25.4.4.1.1 → 25.5.5.0.3. They run only the opt-in noble ML-KEM backend
+  (`-Dknishio.mlkem.backend=noble`); the default BouncyCastle backend is unchanged.
+
 ### Security
 
 - The reply to a request `HttpClient` sent in the encrypted (CipherHash) envelope is accepted only

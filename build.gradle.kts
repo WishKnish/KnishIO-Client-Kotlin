@@ -63,8 +63,8 @@ dependencies {
 
   // GraalJS runs the optional noble ML-KEM backend (-Dknishio.mlkem.backend=noble), which
   // evaluates the bundled noble-ml-kem-bundle.js; the default backend is BouncyCastle.
-  implementation("org.graalvm.polyglot:polyglot:25.4.4.1.1")
-  implementation("org.graalvm.polyglot:js:25.4.4.1.1")
+  implementation("org.graalvm.polyglot:polyglot:25.5.5.0.3")
+  implementation("org.graalvm.polyglot:js:25.5.5.0.3")
   
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-okhttp:$ktorVersion")

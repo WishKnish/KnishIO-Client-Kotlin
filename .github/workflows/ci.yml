@@ -18,6 +18,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   # Catch version drift at commit time, not at release time.
   #
@@ -64,7 +67,7 @@ jobs:
         persist-credentials: false
     
     - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: ${{ matrix.java }}
         distribution: 'temurin'
@@ -116,7 +119,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up JDK 17
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -138,7 +141,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Set up JDK 17
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -166,7 +169,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up JDK 17
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -256,7 +259,7 @@ jobs:
         persist-credentials: false
     
     - name: Set up JDK 17
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -295,6 +298,9 @@ jobs:
     # `version` is a hard dependency, not a courtesy: publishing a tag the manifest does not
     # claim is the failure this pipeline exists to prevent.
     needs: [build, version, android, audit]
+    # Creating the GitHub Release is the only write; every other job keeps the read-only default.
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -332,7 +338,7 @@ jobs:
         cat /tmp/release-notes.md
 
     - name: Set up JDK 17
-      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -374,7 +380,7 @@ jobs:
         path: sbom-out
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
+      uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3  # v3
       with:
         files: |
           build/libs/*.jar

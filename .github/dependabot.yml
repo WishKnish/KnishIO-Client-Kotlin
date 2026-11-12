@@ -9,8 +9,8 @@
 #      schedule rather than ours.
 #
 #   2. Every `uses:` here is pinned to a 40-character commit SHA rather than a mutable tag,
-#      because these workflows hold `id-token: write` (OIDC trusted publishing) and
-#      `contents: write` — a repointed tag could mint a registry token and ship a backdoored
+#      because the release job holds `contents: write` and the Maven Central and signing
+#      secrets — a repointed tag could ship a backdoored
 #      SDK under legitimate provenance. But a SHA pin with no updater is a pin that FREEZES:
 #      it trades a mutable-ref risk for an unpatched-dependency risk. Dependabot understands
 #      SHA pins, bumps them, and rewrites the trailing version comment. The pinning and this
@@ -23,6 +23,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns:
@@ -45,6 +47,21 @@ updates:
       default-days: 7
     groups:
       gradle:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "build"
+
+  # The Android Keystore module is a separate Gradle build (android/settings.gradle.kts) with
+  # its own dependency versions, so the root entry above does not see it.
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      gradle-android:
         patterns:
           - "*"
     commit-message:
