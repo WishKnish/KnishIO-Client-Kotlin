@@ -4,6 +4,10 @@ package wishKnish.knishIO.client.libraries
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import wishKnish.knishIO.client.Atom
 import wishKnish.knishIO.client.Molecule
 import wishKnish.knishIO.client.Wallet
@@ -125,6 +129,23 @@ class CheckMolecule {
       }
     }
 
+    /** The atom's meta as a key → value map (a repeated key keeps its last value), as JS `aggregatedMeta()`. */
+    private fun aggregate(atom: Atom): Map<String, String?> = atom.meta.associate { it.key to it.value }
+
+    private fun parseMetaJson(value: String, onError: (String) -> Exception): JsonElement {
+      return try {
+        Json.parseToJsonElement(value)
+      } catch (e: SerializationException) {
+        throw onError(e.message ?: "invalid JSON")
+      }
+    }
+
+    private fun requireUserToken(atom: Atom, check: String) {
+      if (atom.token != "USER") {
+        throw WrongTokenTypeException("Check::$check() - \"${atom.token}\" is not a valid Token slug for \"${atom.isotope}\" isotope Atoms!")
+      }
+    }
+
     @JvmStatic
     @Throws(
       MolecularHashMissingException::class,
@@ -135,7 +156,7 @@ class CheckMolecule {
     fun isotopeI(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'I' }.forEach {
-        // Token validation removed - JS SDK doesn't enforce specific tokens for testing
+        requireUserToken(it, "isotopeI")
         if (it.index == 0) {
           throw AtomIndexException("Check::isotopeI() - Isotope \"${it.isotope}\" Atoms must have a non-zero index!")
         }
@@ -158,7 +179,7 @@ class CheckMolecule {
           throw WrongTokenTypeException("Check::isotopeU() - \"${it.token}\" is not a valid Token slug for \"${it.isotope}\" isotope Atoms!")
         }
         if (it.index != 0) {
-          throw AtomIndexException("Check::isotopeU() - Isotope \"${it.isotope}\" Atoms must have a non-zero index!")
+          throw AtomIndexException("Check::isotopeU() - Isotope \"${it.isotope}\" Atoms must have an index equal to 0!")
         }
       }
 
@@ -170,18 +191,48 @@ class CheckMolecule {
       MolecularHashMissingException::class,
       AtomsMissingException::class,
       WrongTokenTypeException::class,
-      MetaMissingException::class
+      MetaMissingException::class,
+      PolicyInvalidException::class
     )
     fun isotopeM(molecule: Molecule): Boolean {
       missing(molecule)
-      molecule.atoms.filter { it.isotope == 'M' }.forEach {
-        if (it.meta.isEmpty()) {
+      val policyKeys = listOf("readPolicy", "writePolicy")
+      molecule.atoms.filter { it.isotope == 'M' }.forEach { atom ->
+        if (atom.meta.isEmpty()) {
           throw MetaMissingException()
         }
-        // Token validation removed - JS SDK doesn't enforce specific tokens for testing
+        requireUserToken(atom, "isotopeM")
+
+        val metas = aggregate(atom)
+        policyKeys.forEach { key ->
+          val raw = metas[key]?.takeIf { it.isNotEmpty() } ?: return@forEach
+          val policy = parseMetaJson(raw) { PolicyInvalidException("$key is not valid JSON: $it") }
+          val entries = when (policy) {
+            is JsonObject -> policy.entries.map { it.key to it.value }
+            is JsonArray -> policy.mapIndexed { index, value -> index.toString() to value }
+            else -> listOf()
+          }
+          entries.filter { (name, _) -> name !in policyKeys }.forEach { (name, holders) ->
+            if (name !in metas.keys) {
+              throw PolicyInvalidException("$name is missing from the meta.")
+            }
+            policyHolders(holders).forEach { holder ->
+              if (!Wallet.isBundleHash(holder) && holder !in listOf("all", "self")) {
+                throw PolicyInvalidException("$holder does not correspond to the format of the policy.")
+              }
+            }
+          }
+        }
       }
 
       return true
+    }
+
+    /** The values JS `for (const value of policyValue)` visits: array elements, or a string's characters. */
+    private fun policyHolders(holders: JsonElement): List<String> = when {
+      holders is JsonArray -> holders.map { (it as? JsonPrimitive)?.content ?: it.toString() }
+      holders is JsonPrimitive && holders.isString -> holders.content.map { it.toString() }
+      else -> throw PolicyInvalidException("$holders does not correspond to the format of the policy.")
     }
 
     @JvmStatic
@@ -194,7 +245,7 @@ class CheckMolecule {
     fun isotopeC(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'C' }.forEach {
-        // Token validation removed - JS SDK doesn't enforce specific tokens for testing
+        requireUserToken(it, "isotopeC")
         if (it.index != 0) {
           throw AtomIndexException("Check::isotopeC() - Isotope \"${it.isotope}\" Atoms must have an index equal to 0!")
         }
@@ -214,23 +265,16 @@ class CheckMolecule {
     fun isotopeT(molecule: Molecule): Boolean {
       missing(molecule)
       molecule.atoms.filter { it.isotope == 'T' }.forEach {
-        if (it.metaType.isNullOrEmpty() || it.metaType !!.lowercase() == "wallet") {
-          setOf("position", "bundle").forEach { key ->
-            val metaData = it.meta.find { metaData -> metaData.key == key }
-            if (metaData == null || metaData.value.isNullOrEmpty()) {
-              throw MetaMissingException("Check::isotopeT() - Required meta field \"${key}\" is missing!")
-            }
-          }
-        }
-
-        setOf("token").forEach { key ->
-          val metaData = it.meta.find { metaData -> metaData.key == key }
-          if (metaData == null || metaData.value.isNullOrEmpty()) {
+        val metas = aggregate(it)
+        // JS: String(atom.metaType).toLowerCase() === 'wallet' — a null metaType needs no wallet meta
+        val required = if (it.metaType?.lowercase() == "wallet") listOf("position", "bundle", "token") else listOf("token")
+        required.forEach { key ->
+          if (metas[key].isNullOrEmpty()) {
             throw MetaMissingException("Check::isotopeT() - Required meta field \"${key}\" is missing!")
           }
         }
 
-        // Token validation removed - JS SDK doesn't enforce specific tokens for testing
+        requireUserToken(it, "isotopeT")
 
         if (it.index != 0) {
           throw AtomIndexException("Check::isotopeT() - Isotope \"${it.isotope}\" Atoms must have an index equal to 0!")
@@ -240,38 +284,35 @@ class CheckMolecule {
       return true
     }
 
+    /**
+     * R atoms carry a JS-form `policy` (only `read`/`write` entries) and/or `rule` (a non-empty list
+     * of `{condition, callback}` rules), as JS `CheckMolecule.isotopeR()`.
+     */
     @JvmStatic
     @Throws(
-      MolecularHashMissingException::class, AtomsMissingException::class, MetaMissingException::class
+      MolecularHashMissingException::class, AtomsMissingException::class, MetaMissingException::class,
+      RuleArgumentException::class, CodeException::class
     )
     fun isotopeR(molecule: Molecule): Boolean {
       missing(molecule)
-      molecule.atoms.filter { it.isotope == 'R' }.forEach {
-        setOf("callback", "conditions", "rule").forEach { key ->
-          val metaData =
-            it.meta.find { metaData -> metaData.key == key } ?: throw MetaMissingException("Check::isotopeR() - Required meta field \"${key}\" is missing!")
+      molecule.atoms.filter { it.isotope == 'R' }.forEach { atom ->
+        val metas = aggregate(atom)
 
-          if (key == "conditions") {
-            metaData.value?.let { value ->
-              try {
-                val conditions = Json.parseToJsonElement(value).decode()
+        metas["policy"]?.takeIf { it.isNotEmpty() }?.let { raw ->
+          val policy = parseMetaJson(raw) { MetaMissingException("Check::isotopeR() - Incorrect policy format! $it") }
+          if (policy !is JsonObject || !policy.keys.all { it in listOf("read", "write") }) {
+            throw MetaMissingException("Check::isotopeR() - Mixing rules with politics!")
+          }
+        }
 
-                if (conditions !is List<*>) {
-                  throw MetaMissingException("Check::isotopeR() - The condition field must contain a list!")
-                }
-
-                conditions.forEach { item ->
-                  if (item !is Map<*, *>) {
-                    throw MetaMissingException("Check::isotopeR() - The list of the field condition should contain a map!")
-                  }
-                  if (! item.keys.containsAll(listOf("key", "value", "comparison", "managedBy"))) {
-                    throw MetaMissingException("Check::isotopeR() - Required condition field is missing!")
-                  }
-                }
-              } catch (err: SerializationException) {
-                throw MetaMissingException("Check::isotopeR() - Condition is formatted incorrectly! JSON string expected.")
-              }
-            } ?: throw MetaMissingException("Check::isotopeR() - The condition field cannot be empty!")
+        metas["rule"]?.takeIf { it.isNotEmpty() }?.let { raw ->
+          val rules = parseMetaJson(raw) { MetaMissingException("Check::isotopeR() - Incorrect rule format! $it") }
+          if (rules !is JsonArray) {
+            throw MetaMissingException("Check::isotopeR() - Incorrect rule format!")
+          }
+          rules.forEach { RuleMeta.rule(it) }
+          if (rules.isEmpty()) {
+            throw MetaMissingException("Check::isotopeR() - No rules!")
           }
         }
       }

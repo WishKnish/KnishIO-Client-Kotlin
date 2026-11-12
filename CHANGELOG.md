@@ -22,6 +22,22 @@ not substantiate a detail, the entry says so instead of guessing.
   25.4.4.1.1 → 25.5.5.0.3. They run only the opt-in noble ML-KEM backend
   (`-Dknishio.mlkem.backend=noble`); the default BouncyCastle backend is unchanged.
 
+### Fixed
+
+- `CheckMolecule` (and so `Molecule.check()`) applies the JS reference's isotope rules it had
+  dropped: I, M, C and T atoms must carry the `USER` token (`WrongTokenTypeException`); an M
+  atom's `readPolicy`/`writePolicy` must name keys present in its meta and holders that are a
+  bundle hash, `all` or `self` (new `PolicyInvalidException`); a T atom needs `position`/`bundle`
+  meta only when its `metaType` is `wallet`, so a T atom with no `metaType` verifies; an R atom is
+  checked in the JS form — a `policy` with only `read`/`write` entries and a non-empty `rule`
+  list of `{condition, callback}` rules (new `RuleArgumentException`) — instead of requiring
+  `conditions`/`callback`/`rule` keys no SDK writes. Molecules with forged-token I/M/C/T atoms or
+  malformed policies were accepted before; JS-built R molecules were rejected.
+- `Molecule.createRule(metaType, metaId, rule, policy)` takes the rule list and policy as JSON and
+  writes the `rule` and `policy` metas as JS `Molecule.createRule()` does (signed bytes change;
+  no other SDK reproduced the old R atom). The old `createRule(metaType, metaId, meta)` signature
+  is gone.
+
 ### Security
 
 - The reply to a request `HttpClient` sent in the encrypted (CipherHash) envelope is accepted only

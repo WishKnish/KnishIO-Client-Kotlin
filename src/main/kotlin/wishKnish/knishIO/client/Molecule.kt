@@ -1193,17 +1193,26 @@ import kotlin.math.ceil
     return addUserRemainderAtom(remainderWallet)
   }
 
-  @Throws(MetaMissingException::class)
+  /**
+   * Builds an R atom that attaches [rule] (a list of `{condition: [...], callback: [...]}` rules)
+   * and [policy] (`read`/`write` holder lists) to a meta asset, followed by the ContinuID atom.
+   * The `rule` and `policy` metas are written exactly as JS `Molecule.createRule()` writes them.
+   *
+   * @throws MetaMissingException when a rule has no condition or callback field
+   * @throws RuleArgumentException when a condition or callback is incomplete
+   */
+  @JvmOverloads
+  @Throws(MetaMissingException::class, RuleArgumentException::class, CodeException::class)
   fun createRule(
     metaType: String,
     metaId: String,
-    meta: MutableList<MetaData>
+    rule: kotlinx.serialization.json.JsonArray,
+    policy: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())
   ): Molecule {
-    setOf("conditions", "callback", "rule").forEach { key ->
-      if (meta.none { mataData -> mataData.key == key }) {
-        throw MetaMissingException("Molecule::createRule() - Value for required meta key $key in missing!")
-      }
-    }
+    val rules = kotlinx.serialization.json.JsonArray(rule.map { RuleMeta.rule(it) })
+    val metas = mutableListOf(MetaData(key = "rule", value = rules.toString()))
+    // JS AtomMeta.addPolicy passes the meta array's indexes as the keys to default
+    metas.add(MetaData(key = "policy", value = RuleMeta.policy(policy, metas.indices.map { it.toString() })))
 
     addAtom(
       Atom(
@@ -1211,9 +1220,10 @@ import kotlin.math.ceil
         walletAddress = sourceWallet.address !!,
         isotope = 'R',
         token = sourceWallet.token,
+        batchId = sourceWallet.batchId,
         metaType = metaType,
         metaId = metaId,
-        meta = finalMetas(metas = meta, wallet = sourceWallet),
+        meta = finalMetas(metas = metas, wallet = sourceWallet),
         index = generateIndex()
       )
     )

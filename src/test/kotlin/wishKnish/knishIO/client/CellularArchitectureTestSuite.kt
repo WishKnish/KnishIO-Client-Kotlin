@@ -41,6 +41,9 @@ class CellularArchitectureTestSuite {
         val TEST_SECRET = "cellular-test-secret-2048-chars" + "a".repeat(2048 - 30)
         const val TEST_POSITION = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
         const val TEST_TOKEN = "CELL_TEST"
+        // M atoms must be signed by a USER wallet (JS CheckMolecule.isotopeM), and a USER-signed
+        // molecule carries the ContinuID (I) atom (JS CheckMolecule.continuId).
+        const val SIGNER_TOKEN = "USER"
         
         // Cell slug test cases
         const val CELL_BASE = "app1"
@@ -273,7 +276,7 @@ class CellularArchitectureTestSuite {
         @Test
         @DisplayName("Inter-cell message validation")
         fun testInterCellMessageValidation() {
-            val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+            val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
             val sourceCellSlug = "app1.payments"
             val targetCellSlug = "app1.identity"
             
@@ -283,7 +286,7 @@ class CellularArchitectureTestSuite {
                 position = sourceWallet.position!!,
                 walletAddress = sourceWallet.address!!, 
                 isotope = 'M',
-                token = TEST_TOKEN,
+                token = SIGNER_TOKEN,
                 metaType = "cross-cell-message",
                 metaId = "msg-123",
                 meta = listOf(
@@ -297,6 +300,7 @@ class CellularArchitectureTestSuite {
             
             // Route to target cell
             molecule.cellSlug = targetCellSlug
+            molecule.addUserRemainderAtom()
             molecule.sign()
             
             expectThat(molecule) {
@@ -310,7 +314,7 @@ class CellularArchitectureTestSuite {
         @Test
         @DisplayName("Cell boundary security validation")
         fun testCellBoundarySecurityValidation() {
-            val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+            val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
             val restrictedCell = "restricted.admin.config"
             
             // Create molecule with restricted cell access
@@ -319,7 +323,7 @@ class CellularArchitectureTestSuite {
                 position = sourceWallet.position!!,
                 walletAddress = sourceWallet.address!!,
                 isotope = 'M',
-                token = TEST_TOKEN,
+                token = SIGNER_TOKEN,
                 metaType = "admin-config",
                 metaId = "sensitive-config",
                 meta = listOf(
@@ -330,11 +334,12 @@ class CellularArchitectureTestSuite {
                 )
             ))
             
+            molecule.addUserRemainderAtom()
             molecule.sign()
             
             expectThat(molecule) {
                 get { cellSlug }.isEqualTo(restrictedCell)
-                get { atoms }.hasSize(1)
+                get { atoms }.hasSize(2) // the M atom and the ContinuID atom
                 get { molecularHash }.isNotNull()
             }
             
@@ -351,14 +356,14 @@ class CellularArchitectureTestSuite {
         @DisplayName("Multi-application cell isolation")
         fun testMultiApplicationCellIsolation() = CELL_SLUGS.map { cellSlug ->
             DynamicTest.dynamicTest("Cell isolation for: $cellSlug") {
-                val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+                val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
                 val molecule = Molecule(TEST_SECRET, sourceWallet, cellSlug = cellSlug)
                 
                 molecule.addAtom(Atom(
                     position = sourceWallet.position!!,
                     walletAddress = sourceWallet.address!!,
                     isotope = 'M',
-                    token = TEST_TOKEN,
+                    token = SIGNER_TOKEN,
                     metaType = "app-data",
                     metaId = "data-$cellSlug",
                     meta = listOf(
@@ -376,6 +381,7 @@ class CellularArchitectureTestSuite {
                     get { atoms }.hasSize(1)
                 }
                 
+                molecule.addUserRemainderAtom()
                 molecule.sign()
                 expectThat(molecule.check()).isTrue()
             }
@@ -386,8 +392,8 @@ class CellularArchitectureTestSuite {
         fun testCellBasedAccessControlSimulation() {
             val userPosition = "1111111111111111111111111111111111111111111111111111111111111111"
             val adminPosition = "2222222222222222222222222222222222222222222222222222222222222222"
-            val userWallet = Wallet("user-secret", TEST_TOKEN, userPosition)
-            val adminWallet = Wallet("admin-secret", TEST_TOKEN, adminPosition)
+            val userWallet = Wallet("user-secret", SIGNER_TOKEN, userPosition)
+            val adminWallet = Wallet("admin-secret", SIGNER_TOKEN, adminPosition)
             
             val userCells = listOf("app1.user", "app1.profile")
             val adminCells = listOf("app1.admin", "app1.config", "app1.user")
@@ -399,7 +405,7 @@ class CellularArchitectureTestSuite {
                     position = userWallet.position!!,
                     walletAddress = userWallet.address!!,
                     isotope = 'M',
-                    token = TEST_TOKEN,
+                    token = SIGNER_TOKEN,
                     metaType = "user-operation",
                     metaId = "op-$cellSlug",
                     meta = listOf(
@@ -409,6 +415,7 @@ class CellularArchitectureTestSuite {
                     )
                 ))
                 
+                molecule.addUserRemainderAtom()
                 molecule.sign()
                 expectThat(molecule.check())
                     .describedAs("User operation in $cellSlug should be valid")
@@ -422,7 +429,7 @@ class CellularArchitectureTestSuite {
                     position = adminWallet.position!!,
                     walletAddress = adminWallet.address!!,
                     isotope = 'M',
-                    token = TEST_TOKEN,
+                    token = SIGNER_TOKEN,
                     metaType = "admin-operation",
                     metaId = "admin-op-$cellSlug",
                     meta = listOf(
@@ -432,6 +439,7 @@ class CellularArchitectureTestSuite {
                     )
                 ))
                 
+                molecule.addUserRemainderAtom()
                 molecule.sign()
                 expectThat(molecule.check())
                     .describedAs("Admin operation in $cellSlug should be valid")
@@ -461,7 +469,7 @@ class CellularArchitectureTestSuite {
             )
             
             appData.forEach { (cellSlug, metadata) ->
-                val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+                val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
                 val molecule = Molecule(TEST_SECRET, sourceWallet, cellSlug = cellSlug)
                 
                 molecule.initMeta(
@@ -494,7 +502,7 @@ class CellularArchitectureTestSuite {
         @DisplayName("Large cell slug handling")
         fun testLargeCellSlugHandling() {
             val largeCellSlug = (1..20).joinToString(".") { "module$it" }
-            val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+            val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
             
             val molecule = Molecule(TEST_SECRET, sourceWallet, cellSlug = largeCellSlug)
             
@@ -507,7 +515,7 @@ class CellularArchitectureTestSuite {
                 position = sourceWallet.position!!,
                 walletAddress = sourceWallet.address!!,
                 isotope = 'M',
-                token = TEST_TOKEN,
+                token = SIGNER_TOKEN,
                 metaType = "large-cell-test",
                 metaId = "test-123",
                 meta = listOf(
@@ -516,6 +524,7 @@ class CellularArchitectureTestSuite {
                 )
             ))
             
+            molecule.addUserRemainderAtom()
             molecule.sign()
             expectThat(molecule.check()).isTrue()
         }
@@ -531,14 +540,14 @@ class CellularArchitectureTestSuite {
             )
             
             specialCellSlugs.forEach { cellSlug ->
-                val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+                val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
                 val molecule = Molecule(TEST_SECRET, sourceWallet, cellSlug = cellSlug)
                 
                 molecule.addAtom(Atom(
                     position = sourceWallet.position!!,
                     walletAddress = sourceWallet.address!!,
                     isotope = 'M',
-                    token = TEST_TOKEN,
+                    token = SIGNER_TOKEN,
                     metaType = "special-char-test",
                     metaId = "test-$cellSlug",
                     meta = listOf(
@@ -552,6 +561,7 @@ class CellularArchitectureTestSuite {
                     get { cellSlugBase() }.isEqualTo(cellSlug.split(".").first())
                 }
                 
+                molecule.addUserRemainderAtom()
                 molecule.sign()
                 expectThat(molecule.check())
                     .describedAs("Special character cell slug should be valid: $cellSlug")
@@ -563,7 +573,7 @@ class CellularArchitectureTestSuite {
         @DisplayName("Concurrent cell operations")
         fun testConcurrentCellOperations() {
             val cellSlugs = listOf("app1.worker1", "app1.worker2", "app1.worker3")
-            val sourceWallet = Wallet(TEST_SECRET, TEST_TOKEN, TEST_POSITION)
+            val sourceWallet = Wallet(TEST_SECRET, SIGNER_TOKEN, TEST_POSITION)
             
             // Simulate concurrent operations across multiple cells
             val results = cellSlugs.map { cellSlug ->
@@ -573,7 +583,7 @@ class CellularArchitectureTestSuite {
                         position = sourceWallet.position!!,
                         walletAddress = sourceWallet.address!!,
                         isotope = 'M',
-                        token = TEST_TOKEN,
+                        token = SIGNER_TOKEN,
                         metaType = "concurrent-test",
                         metaId = "test-$cellSlug",
                         meta = listOf(
@@ -581,6 +591,7 @@ class CellularArchitectureTestSuite {
                             MetaData("characters", sourceWallet.characters!!)
                         )
                     ))
+                    molecule.addUserRemainderAtom()
                     molecule.sign()
                     val checkResult = try {
                         molecule.check()
@@ -600,7 +611,7 @@ class CellularArchitectureTestSuite {
                     position = sourceWallet.position!!,
                     walletAddress = sourceWallet.address!!,
                     isotope = 'M',
-                    token = TEST_TOKEN,
+                    token = SIGNER_TOKEN,
                     metaType = "concurrent-test",
                     metaId = "test-$cellSlug",
                     meta = listOf(
@@ -608,6 +619,7 @@ class CellularArchitectureTestSuite {
                         MetaData("characters", sourceWallet.characters!!)
                     )
                 ))
+                molecule.addUserRemainderAtom()
                 molecule.sign()
                 Triple(cellSlug, molecule.molecularHash, molecule.check())
             }
