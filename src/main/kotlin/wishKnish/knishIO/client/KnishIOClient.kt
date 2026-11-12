@@ -288,14 +288,13 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
-   * Retrieves the stored secret for this session
+   * The secret for this session: the in-memory one, else the one the secret storage provider
+   * unwraps for the active bundle (not cached in memory).
    */
   @Throws(UnauthenticatedException::class)
   fun getSecret(): String {
-    if (secret.isEmpty()) {
-      throw UnauthenticatedException("KnishIOClient::getSecret() - Unable to find a stored secret!")
-    }
-    return secret
+    return retrieveSecret()?.takeIf { it.isNotEmpty() }
+      ?: throw UnauthenticatedException("KnishIOClient::getSecret() - Unable to find a stored secret!")
   }
 
   /**
@@ -368,7 +367,11 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   private fun getProfileAuthToken(secret: String, encrypt: Boolean = false): AuthToken {
-    setSecret(secret)
+    // A secret of the storage-backed active bundle is already stored: re-storing would re-seal it
+    // with default StorageOptions (hardware providers refuse that) and keep it in cleartext.
+    if (secretStorage == null || Crypto.generateBundleHash(secret) != bundle) {
+      setSecret(secret)
+    }
 
     // A returning identity signs from its ContinuID pointer with the USER wallet registered there,
     // so validator 0.5.0+ marks the token proven (unproven tokens are guests on permissioned and

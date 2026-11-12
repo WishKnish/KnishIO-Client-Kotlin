@@ -1,7 +1,7 @@
 /*
 Hybrid Cryptography implementation for KnishIO Client
 Supports both post-quantum (ML-KEM768+AES-GCM) and classical (NaCl Box) encryption
-Provides automatic fallback and version negotiation for compatibility
+Encryption never falls back from post-quantum to classical; decryption detects the envelope version
 
 License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 */
@@ -24,8 +24,8 @@ class HybridCrypto {
         const val VERSION_HYBRID = 3
         
         /**
-         * Encrypt message using automatic encryption method selection
-         * Prefers post-quantum encryption but falls back to classical if needed
+         * Encrypt message for [recipientPublicKey]. POST_QUANTUM_ONLY and HYBRID encrypt post-quantum
+         * and throw when that fails (no silent downgrade to classical); CLASSICAL_ONLY uses NaCl.
          */
         @Throws(Exception::class)
         fun encryptMessage(
@@ -35,19 +35,11 @@ class HybridCrypto {
             senderPrivateKey: String? = null
         ): Map<String, String> {
             return when (encryptionMode) {
-                EncryptionMode.POST_QUANTUM_ONLY -> {
+                EncryptionMode.POST_QUANTUM_ONLY, EncryptionMode.HYBRID -> {
                     encryptPostQuantum(message, recipientPublicKey)
                 }
                 EncryptionMode.CLASSICAL_ONLY -> {
                     encryptClassical(message, recipientPublicKey, senderPrivateKey)
-                }
-                EncryptionMode.HYBRID -> {
-                    // Try post-quantum first, fallback to classical
-                    try {
-                        encryptPostQuantum(message, recipientPublicKey)
-                    } catch (e: Exception) {
-                        encryptClassical(message, recipientPublicKey, senderPrivateKey)
-                    }
                 }
             }
         }
@@ -207,7 +199,7 @@ class HybridCrypto {
 enum class EncryptionMode {
     POST_QUANTUM_ONLY,  // Use only ML-KEM768 + AES-GCM
     CLASSICAL_ONLY,     // Use only NaCl Box/Sealed Box
-    HYBRID              // Try post-quantum first, fallback to classical
+    HYBRID              // Post-quantum for encryption (a failure throws); decryption reads either kind
 }
 
 /**

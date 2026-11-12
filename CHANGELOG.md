@@ -62,6 +62,14 @@ not substantiate a detail, the entry says so instead of guessing.
   `CodeException("CipherHash: reply could not be decrypted")`. Bootstrap operations sent unwrapped
   (`__schema`, `ContinuId`, `AccessToken`, U-isotope `ProposeMolecule`) are unaffected. This is the
   rule the PHP and C SDKs already apply.
+- `Wallet.encryptStringHybrid` and `HybridCrypto.encryptMessage` no longer fall back to classical
+  NaCl when post-quantum encryption fails; the failure is thrown. A recipient key the
+  post-quantum path could not use used to produce a NaCl sealed box silently.
+  `EncryptionMode.HYBRID` now encrypts post-quantum only; `CLASSICAL_ONLY` is unchanged.
+- A client whose secret lives only in a `SecretStorageProvider` works: `getSecret()` unwraps it
+  from the provider for the active bundle (it threw `UnauthenticatedException`), and a profile
+  login no longer re-stores that secret with default `StorageOptions` (which hardware providers
+  refuse) or keeps it in memory in cleartext.
 
 ## [1.5.2] — 2026-10-31
 

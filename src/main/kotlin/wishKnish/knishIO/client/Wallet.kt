@@ -683,33 +683,26 @@ class Wallet @JvmOverloads constructor(
   }
   
   /**
-   * Encrypts a string using hybrid cryptography (supports both classical and post-quantum)
+   * Encrypts a string with hybrid cryptography. A wallet holding a post-quantum key encrypts for
+   * the first of [publicKeys] in its [encryptionMode]; a post-quantum failure is thrown, never
+   * downgraded to classical NaCl. A wallet without a post-quantum key uses classical encryption.
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
   fun encryptStringHybrid(
     message: String,
     vararg publicKeys: String
   ): Map<String, String> {
-    return try {
-      // Try to use the first public key as post-quantum if available
-      if (publicKeys.isNotEmpty() && pqPublicKey != null) {
-        HybridCrypto.encryptMessage(
-          message, 
-          publicKeys[0], 
-          encryptionMode,
-          getMyEncPrivateKey()
-        )
-      } else {
-        // Fallback to classical encryption
-        val classicalResult = encryptString(message, *publicKeys)
-        // Convert string result to map format for consistency
-        mapOf("data" to classicalResult, "version" to "1", "algorithm" to "NaCl-Box")
-      }
-    } catch (e: Exception) {
-      // Fallback to classical encryption
-      val classicalResult = encryptString(message, *publicKeys)
-      mapOf("data" to classicalResult, "version" to "1", "algorithm" to "NaCl-Box")
+    if (publicKeys.isNotEmpty() && pqPublicKey != null) {
+      return HybridCrypto.encryptMessage(
+        message,
+        publicKeys[0],
+        encryptionMode,
+        getMyEncPrivateKey()
+      )
     }
+    val classicalResult = encryptString(message, *publicKeys)
+    // Convert string result to map format for consistency
+    return mapOf("data" to classicalResult, "version" to "1", "algorithm" to "NaCl-Box")
   }
   
   /**
