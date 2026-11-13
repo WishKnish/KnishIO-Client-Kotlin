@@ -16,6 +16,22 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-11-12
+
+### Upgrade notes
+
+- GraalVM Polyglot and GraalJS, `bcpkix-jdk18on`, `bcutil-jdk18on` and
+  `ktor-network-tls-certificates` are no longer dependencies of the published jar; the opt-in noble
+  ML-KEM backend needs the two GraalVM artifacts added by the application (see Changed).
+- `SelfTestKt` and `SecretStorageCliKt` moved out of the published jar into the
+  `KnishIO-Client-Kotlin-<version>-harness.jar` release asset (see Changed).
+- `Molecule.createRule(metaType, metaId, rule, policy)` replaces the old signature, and
+  `createToken`, `requestTokens` and `TokenUnit` change signed bytes (see Fixed).
+- A reply to a request sent in the CipherHash envelope is accepted only as an encrypted envelope; a
+  plaintext reply now fails (see Security).
+- `Wallet.encryptStringHybrid` and `HybridCrypto.encryptMessage` no longer fall back to classical
+  encryption (see Security).
+
 ### Changed
 
 - GraalVM Polyglot and GraalJS (`org.graalvm.polyglot:polyglot`, `org.graalvm.polyglot:js`) are no
@@ -664,7 +680,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.6.0
 [1.5.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.2
 [1.5.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.1
 [1.5.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.0

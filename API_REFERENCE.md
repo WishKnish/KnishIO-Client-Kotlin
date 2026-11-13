@@ -1,6 +1,6 @@
 # Knish.IO Kotlin SDK API Reference
 
-Reference for `io.knish:knishio-client-kotlin` 1.5.2. All classes are under the package
+Reference for `io.knish:knishio-client-kotlin` 1.6.0. All classes are under the package
 `wishKnish.knishIO.client`; the generated KDoc (`./gradlew dokkaGenerate`, output in
 `build/dokka/html`) lists every public member. Parts of the JavaScript reference SDK that this
 SDK does not have are listed in the [README](README.md#not-implemented).
