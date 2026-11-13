@@ -18,12 +18,27 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ### Changed
 
-- GraalVM Polyglot and GraalJS (`org.graalvm.polyglot:polyglot`, `org.graalvm.polyglot:js`)
-  25.4.4.1.1 → 25.5.5.0.3. They run only the opt-in noble ML-KEM backend
-  (`-Dknishio.mlkem.backend=noble`); the default BouncyCastle backend is unchanged.
+- GraalVM Polyglot and GraalJS (`org.graalvm.polyglot:polyglot`, `org.graalvm.polyglot:js`) are no
+  longer dependencies of the published artifact (they are `compileOnly`, built against 25.5.5.0.3).
+  They run only the opt-in noble ML-KEM backend (`-Dknishio.mlkem.backend=noble`); an application
+  that selects it adds the two artifacts itself, and selecting it without them now fails at once
+  with an `IllegalStateException` naming them. The default BouncyCastle backend is unchanged. The
+  noble bundle's GraalJS context may now reach only `java.security.SecureRandom` (it had full
+  host access).
+- `bcpkix-jdk18on`, `bcutil-jdk18on` and `ktor-network-tls-certificates` are no longer
+  dependencies; nothing in the SDK used them.
+- The self-test (`SelfTestKt`, `SelfTest.kt`) and the secret-storage CLI (`SecretStorageCliKt`)
+  are no longer in the published jar, which now holds only `wishKnish.*` classes. They are in
+  `KnishIO-Client-Kotlin-<version>-harness.jar`, attached to each GitHub Release, and in the
+  local `./gradlew shadowJar` jar; `./gradlew selftest` runs as before. The published jar's
+  manifest carries `Implementation-Version`.
 
 ### Fixed
 
+- `CheckMolecule.isotopeV` without a sender wallet no longer throws `TransferRemainderException`
+  when the last V atom is non-zero. That atom is a transfer's remainder, so ordinary balanced
+  transfers checked without a wallet were rejected; the validator does not apply the rule and the
+  JS SDK has dropped it too. Conservation is still enforced.
 - `CheckMolecule` (and so `Molecule.check()`) applies the JS reference's isotope rules it had
   dropped: I, M, C and T atoms must carry the `USER` token (`WrongTokenTypeException`); an M
   atom's `readPolicy`/`writePolicy` must name keys present in its meta and holders that are a

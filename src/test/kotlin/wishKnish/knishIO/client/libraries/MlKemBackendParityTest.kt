@@ -86,4 +86,14 @@ class MlKemBackendParityTest {
     System.clearProperty(MlKemBackend.BACKEND_PROPERTY)
     assertEquals("bouncycastle", MlKemBackend.select().name, "Default backend must be bouncycastle")
   }
+
+  @Test
+  @DisplayName("selecting noble without GraalVM on the classpath fails with the artifacts to add")
+  fun testNobleWithoutGraalVmNamesTheArtifacts() {
+    val ex = assertThrows(IllegalStateException::class.java) {
+      MlKemBackend.requireNobleRuntime("no.such.graalvm.Context")
+    }
+    assertTrue(ex.message!!.contains("org.graalvm.polyglot:polyglot"))
+    assertTrue(ex.message!!.contains("org.graalvm.polyglot:js"))
+  }
 }

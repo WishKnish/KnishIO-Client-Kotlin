@@ -16,9 +16,16 @@ class NobleMLKEMBridge {
     
     companion object {
         private val context: Context by lazy {
+            // The bundle's only host use is `new (Java.type('java.security.SecureRandom'))().nextInt(256)`
+            // (its crypto.getRandomValues polyfill): allow exactly that, not the whole JVM.
             Context.newBuilder("js")
-                .allowHostAccess(HostAccess.ALL)
-                .allowHostClassLookup { true }
+                .allowHostAccess(
+                    HostAccess.newBuilder()
+                        .allowAccess(java.security.SecureRandom::class.java.getConstructor())
+                        .allowAccess(java.util.Random::class.java.getMethod("nextInt", Int::class.javaPrimitiveType))
+                        .build()
+                )
+                .allowHostClassLookup { it == "java.security.SecureRandom" }
                 .build()
         }
         

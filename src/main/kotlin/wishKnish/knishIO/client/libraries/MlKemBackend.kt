@@ -34,11 +34,26 @@ interface MlKemBackend {
       if (!prop.isNullOrBlank()) {
         return when (prop) {
           "bouncycastle" -> BouncyCastleMlKemBackend
-          "noble" -> NobleMlKemBackend
+          "noble" -> { requireNobleRuntime(); NobleMlKemBackend }
           else -> throw IllegalArgumentException("KnishIO: unknown $BACKEND_PROPERTY '$prop'; expected 'noble' or 'bouncycastle'")
         }
       }
       return BouncyCastleMlKemBackend
+    }
+
+    /**
+     * The noble backend runs on GraalJS, which the SDK does not bring in (compileOnly): an
+     * application selecting it adds org.graalvm.polyglot:polyglot and org.graalvm.polyglot:js.
+     * Without them, fail at selection with that instruction instead of a NoClassDefFoundError
+     * on the first ML-KEM call.
+     */
+    internal fun requireNobleRuntime(className: String = "org.graalvm.polyglot.Context") {
+      try {
+        Class.forName(className, false, MlKemBackend::class.java.classLoader)
+      } catch (e: ClassNotFoundException) {
+        throw IllegalStateException(
+          "KnishIO: $BACKEND_PROPERTY=noble needs org.graalvm.polyglot:polyglot and org.graalvm.polyglot:js on the runtime classpath", e)
+      }
     }
   }
 }

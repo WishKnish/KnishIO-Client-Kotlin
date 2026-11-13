@@ -35,7 +35,7 @@ collect "build.gradle.kts version" \
 # SelfTest.kt reports this into kotlin-results.json; the gauntlet's coherence gate compares it
 # against the manifest, so the two must never drift.
 collect "SelfTest.kt SDK_VERSION" \
-  "$(sed -n 's/^const val SDK_VERSION *= *"\([^"]*\)".*/\1/p' src/main/kotlin/SelfTest.kt | head -1)"
+  "$(sed -n 's/^const val SDK_VERSION *= *"\([^"]*\)".*/\1/p' src/harness/kotlin/SelfTest.kt | head -1)"
 # The Android composite module carries its own version and pins the core artifact; both must
 # move with the core, or the module's POM would depend on the previous release.
 collect "android/build.gradle.kts version" \

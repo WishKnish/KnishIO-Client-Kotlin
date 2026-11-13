@@ -55,7 +55,9 @@ import java.net.URI
 Cryptography runs on the JVM: SHAKE256, WOTS+ signatures and ML-KEM (FIPS 203) come from
 BouncyCastle, AES-GCM from the JDK. This SDK has no native `kcore` backend (the JS, PHP, Python
 and Rust SDKs can load one); the opt-in `-Dknishio.mlkem.backend=noble` runs the noble ML-KEM
-bundle under GraalJS instead, with byte-identical results.
+bundle under GraalJS instead, with byte-identical results. The SDK does not bring GraalJS in: an
+application that selects noble adds `org.graalvm.polyglot:polyglot` and `org.graalvm.polyglot:js`
+(the SDK is built against 25.5.5.0.3) to its own dependencies.
 
 ## Basic Usage
 
@@ -495,7 +497,7 @@ Master secrets are stored at rest in the cross-SDK AES-256-GCM envelope (PBKDF2-
 
 `hardwareBacked` is derived by the provider from the platform, never accepted from the caller; software providers always report `false`. A hardware provider refuses to store without a recovery passphrase unless `allowUnrecoverable` is set — the recovery envelope (`knishio:recovery:<bundleHash>`, `providerType: "aes-gcm"`) is *software* custody whose strength is bounded by that passphrase: enforce passphrase entropy or keep it on a second device.
 
-`AndroidKeystoreSecretStorageProvider` ships in the separate AAR `io.knish:knishio-client-kotlin-android` (minSdk 31), which depends on the core artifact with GraalVM excluded. ML-KEM runs on the BouncyCastle backend (`MlKemBackend`) on the JVM and on Android; on the JVM, `-Dknishio.mlkem.backend=noble` selects the GraalJS-evaluated noble backend instead. Both backends' keygen, encapsulation and decapsulation are byte-identical and are asserted against the frozen `mlkem768`/`mlkem1024` vectors.
+`AndroidKeystoreSecretStorageProvider` ships in the separate AAR `io.knish:knishio-client-kotlin-android` (minSdk 31), which depends on the core artifact. ML-KEM runs on the BouncyCastle backend (`MlKemBackend`) on the JVM and on Android; on the JVM, `-Dknishio.mlkem.backend=noble` selects the GraalJS-evaluated noble backend instead (the application adds the GraalJS artifacts). Both backends' keygen, encapsulation and decapsulation are byte-identical and are asserted against the frozen `mlkem768`/`mlkem1024` vectors.
 
 Android backup note: place the `FileStorageBackend` directory under `context.noBackupFilesDir` and exclude it in `dataExtractionRules` — a restored blob is undecryptable without the on-device Keystore KEK, so this is hygiene, not a security control.
 

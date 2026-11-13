@@ -8,7 +8,7 @@ SDK does not have are listed in the [README](README.md#not-implemented).
 Cryptography runs on the JVM: SHAKE256 and WOTS+ one-time signatures, ML-KEM (FIPS 203) from
 BouncyCastle, AES-256-GCM from the JDK. There is no native `kcore` backend; the opt-in
 `-Dknishio.mlkem.backend=noble` system property runs the noble ML-KEM bundle under GraalJS
-instead.
+instead; the application adds `org.graalvm.polyglot:polyglot` and `org.graalvm.polyglot:js` for it.
 
 ## Table of Contents
 

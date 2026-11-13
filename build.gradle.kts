@@ -55,23 +55,24 @@ dependencies {
   
   // BouncyCastle with post-quantum cryptography support
   implementation("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion")
-  implementation("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion")
-  implementation("org.bouncycastle:bcutil-jdk18on:$bouncyCastleVersion")
-  
+
   // NOTE: asia.hombre:kyber (KyberKotlin) removed — it had ZERO references in
   // src/. ML-KEM runs on BouncyCastle (above) by default.
 
   // GraalJS runs the optional noble ML-KEM backend (-Dknishio.mlkem.backend=noble), which
   // evaluates the bundled noble-ml-kem-bundle.js; the default backend is BouncyCastle.
-  implementation("org.graalvm.polyglot:polyglot:25.5.5.0.3")
-  implementation("org.graalvm.polyglot:js:25.5.5.0.3")
+  // compileOnly: an application that selects noble adds these two artifacts itself, so the
+  // published POM no longer pulls GraalJS/Truffle into every consumer. The tests run both backends.
+  compileOnly("org.graalvm.polyglot:polyglot:25.5.5.0.3")
+  compileOnly("org.graalvm.polyglot:js:25.5.5.0.3")
+  testImplementation("org.graalvm.polyglot:polyglot:25.5.5.0.3")
+  testImplementation("org.graalvm.polyglot:js:25.5.5.0.3")
   
   implementation("io.ktor:ktor-client-core:$ktorVersion")
   implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
   implementation("io.ktor:ktor-client-logging:$ktorVersion")
   implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
   implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-  implementation("io.ktor:ktor-network-tls-certificates:$ktorVersion")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
   // kotlinx-coroutines-android removed — Android dispatcher artifact, unused in a JVM SDK.
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutinesVersion")
@@ -91,6 +92,29 @@ dependencies {
 kotlin {
   jvmToolchain(17)
 }
+
+// Dev harnesses — the self-test (SelfTest.kt, unnamed package, main class SelfTestKt) and the
+// secret-storage CLI used by the monorepo's cross-SDK envelope matrix. They live in their own
+// source set so they are not in the published jar: `harnessJar` builds
+// KnishIO-Client-Kotlin-<version>-harness.jar, which is attached to the GitHub Release (never
+// Maven Central), and the local `-all.jar` (shadowJar) carries them too.
+val harness: SourceSet by sourceSets.creating {
+  compileClasspath += sourceSets["main"].output
+  runtimeClasspath += sourceSets["main"].output
+}
+configurations[harness.implementationConfigurationName].extendsFrom(configurations["implementation"])
+configurations[harness.runtimeOnlyConfigurationName].extendsFrom(configurations["runtimeOnly"])
+kotlin.target.compilations["harness"].associateWith(kotlin.target.compilations["main"])
+
+val harnessJar by tasks.registering(Jar::class) {
+  group = "build"
+  description = "Builds the self-test / secret-storage CLI harness jar (GitHub Release asset only)"
+  archiveClassifier.set("harness")
+  from(harness.output)
+}
+tasks.assemble { dependsOn(harnessJar) }
+// Lets a consumer of the published jar read the SDK version at runtime (edge-kit's bench does).
+tasks.jar { manifest { attributes("Implementation-Version" to project.version) } }
 
 // NOTE: sources + javadoc jars are produced by the Vanniktech plugin's
 // configure(KotlinJvm(...)) below — do NOT also call java.withSourcesJar()/
@@ -150,12 +174,12 @@ jacoco {
 // performance) are the enforced gate; the crypto/DLT firehose (complexity,
 // MagicNumber, line-length/formatting) is relaxed in config/detekt/detekt.yml —
 // mirrors the Rust clippy::all (not pedantic) + Python ruff F (not E501) philosophy.
-// Scope = src/main/kotlin minus SelfTest.kt (dev tooling); detekt is read-only static
+// Scope = src/main/kotlin and the harness minus SelfTest.kt (dev tooling); detekt is read-only static
 // analysis (no --auto-correct) so it cannot move the frozen self-test molecular hashes.
 detekt {
   buildUponDefaultConfig = true
   config.setFrom(files("config/detekt/detekt.yml"))
-  source.setFrom(files("src/main/kotlin", "android/src/main/kotlin"))
+  source.setFrom(files("src/main/kotlin", "src/harness/kotlin", "android/src/main/kotlin"))
   ignoreFailures = false
 }
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
@@ -260,8 +284,8 @@ mavenPublishing {
 // `java` component, and the Vanniktech plugin publishes that whole component — so
 // the fat jar was uploaded to Central, where at 0.9.1 it bundled the GraalVM JS
 // engine (~87 MB) + BouncyCastle + Ktor and hit ~208 MB, past Sonatype's 80 MB
-// limit. A library only needs the thin jar; consumers resolve GraalVM/BouncyCastle/
-// Ktor transitively via the POM. `./gradlew shadowJar` still works locally for any
+// limit. A library only needs the thin jar; consumers resolve BouncyCastle/Ktor transitively
+// via the POM (GraalVM is compileOnly). `./gradlew shadowJar` still works locally for any
 // standalone/CLI use — this only removes the fat jar from the *published* artifact.
 (components["java"] as AdhocComponentWithVariants)
   .withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
@@ -271,6 +295,8 @@ mavenPublishing {
 // whose real jars (js-language, truffle-runtime, …) are still merged; only the two POM stubs
 // are skipped. GradleUp/shadow#1716.
 tasks.shadowJar {
+  // The local fat jar keeps the harness (scripts/secret-storage-matrix.sh runs SecretStorageCliKt from it).
+  from(harness.output)
   dependencies {
     exclude(dependency("org.graalvm.polyglot:js:.*"))
     exclude(dependency("org.graalvm.js:js:.*"))
@@ -288,15 +314,15 @@ tasks.register<JavaExec>("selftest") {
   description = "Run the SDK self-test to validate core functionality against reference values"
   group = "verification"
   
-  // Only compile main sources, skip tests
-  dependsOn(tasks.compileKotlin, tasks.processResources, tasks.classes)
-  
+  // Only compile the harness and main sources, skip tests
+  dependsOn(tasks.named("harnessClasses"))
+
   // Set working directory to project root for file access
   workingDir = projectDir
-  
+
   // Run the self-test class
   mainClass.set("SelfTestKt")
-  classpath = sourceSets["main"].runtimeClasspath
+  classpath = harness.runtimeClasspath
   
   // Clean runtime environment - eliminate external library warnings
   jvmArgs(
