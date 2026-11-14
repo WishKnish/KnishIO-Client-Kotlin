@@ -38,7 +38,7 @@ open class ResponseProposeMolecule(
       Molecule().apply {
         molecularHash = it.molecularHash
         status = it.status
-        createdAt = it.createdAt !!
+        it.createdAt?.let { ts -> createdAt = ts }
       }
     }
   }

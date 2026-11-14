@@ -7,8 +7,11 @@ import io.mockk.unmockkConstructor
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
+import strikt.assertions.isA
 import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
+import strikt.assertions.isNotNull
+import strikt.assertions.isNull
 import strikt.assertions.isTrue
 import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
 import wishKnish.knishIO.client.data.json.query.ContinuId
@@ -44,6 +47,64 @@ class SecretHandlingTest {
       expectThat(viaWallet.isFailure).describedAs("Wallet.encryptStringHybrid -> ${viaWallet.getOrNull()}").isTrue()
       val viaHybrid = runCatching { HybridCrypto.encryptMessage("hello", key, EncryptionMode.HYBRID) }
       expectThat(viaHybrid.isFailure).describedAs("HybridCrypto.encryptMessage -> ${viaHybrid.getOrNull()}").isTrue()
+    }
+  }
+
+  private fun recipient() = Wallet(Crypto.generateSecret("fleet-audit-2026-11-recipient"), "USER", "bb".repeat(32))
+
+  /** A wallet without a post-quantum key: [Wallet.encryptStringHybrid] writes a `NaCl-Box` envelope. */
+  private fun classicalSender() = Wallet(secret, "USER", "aa".repeat(32)).apply { pqPrivateKey = null; pqPublicKey = null }
+
+  @Test
+  fun `an envelope that claims post-quantum is never decrypted classically`() {
+    val recipient = recipient()
+    val classical = classicalSender().encryptString("forged", recipient.getMyEncPublicKey()!!)
+    val downgrade = mapOf("version" to "2", "data" to classical)
+
+    expectThat(recipient.decryptStringHybrid(downgrade)).isNull()
+    expectThat(runCatching { HybridCrypto.decryptMessage(downgrade, recipient.getMyEncPrivateKey()!!, recipient.pqPrivateKey) }.isFailure).isTrue()
+
+    // An unknown version is refused rather than tried both ways.
+    val sealed = HybridCrypto.encryptMessage("forged", recipient.getMyEncPublicKey()!!, EncryptionMode.CLASSICAL_ONLY)
+    val unknown = runCatching { HybridCrypto.decryptMessage(sealed + ("version" to "9"), recipient.getMyEncPrivateKey()!!, recipient.pqPrivateKey) }
+    expectThat(unknown.exceptionOrNull()).describedAs("decryptMessage(version 9) -> ${unknown.getOrNull()}").isNotNull().isA<IllegalArgumentException>()
+  }
+
+  @Test
+  fun `hybrid round trips still decrypt for wallets with and without a post-quantum key`() {
+    val pqSender = Wallet(secret, "USER", "aa".repeat(32))
+    val recipient = recipient()
+    val pq = pqSender.encryptStringHybrid("hello", recipient.getPostQuantumPublicKey()!!)
+    expectThat(pq["version"]).isEqualTo("2")
+    expectThat(recipient.decryptStringHybrid(pq)).isEqualTo("hello")
+
+    val box = classicalSender().encryptStringHybrid("hello", recipient.getMyEncPublicKey()!!)
+    expectThat(box["algorithm"]).isEqualTo("NaCl-Box")
+    expectThat(recipient.decryptStringHybrid(box)).isEqualTo("hello")
+    val keyless = recipient().apply { pqPrivateKey = null; pqPublicKey = null }
+    expectThat(keyless.decryptStringHybrid(box)).isEqualTo("hello")
+
+    val sealed = HybridCrypto.encryptMessage("hello", recipient.getMyEncPublicKey()!!, EncryptionMode.CLASSICAL_ONLY)
+    for (mode in listOf(EncryptionMode.HYBRID, EncryptionMode.CLASSICAL_ONLY)) {
+      val wallet = recipient().apply { encryptionMode = mode }
+      expectThat(wallet.decryptStringHybrid(sealed)).describedAs("$mode, NaCl-SealedBox").isEqualTo("hello")
+      expectThat(wallet.decryptStringHybrid(box)).describedAs("$mode, NaCl-Box").isEqualTo("hello")
+    }
+  }
+
+  @Test
+  fun `a POST_QUANTUM_ONLY wallet refuses classical envelopes`() {
+    val recipient = recipient().apply { encryptionMode = EncryptionMode.POST_QUANTUM_ONLY }
+    val box = classicalSender().encryptStringHybrid("hello", recipient.getMyEncPublicKey()!!)
+    val sealed = HybridCrypto.encryptMessage("hello", recipient.getMyEncPublicKey()!!, EncryptionMode.CLASSICAL_ONLY)
+
+    expectThat(recipient.decryptStringHybrid(box)).describedAs("NaCl-Box").isNull()
+    expectThat(recipient.decryptStringHybrid(sealed)).describedAs("NaCl-SealedBox").isNull()
+    listOf("NaCl-Box" to box, "NaCl-SealedBox" to sealed).forEach { (kind, envelope) ->
+      val direct = runCatching {
+        HybridCrypto.decryptMessage(envelope, recipient.getMyEncPrivateKey()!!, recipient.pqPrivateKey, EncryptionMode.POST_QUANTUM_ONLY)
+      }
+      expectThat(direct.exceptionOrNull()).describedAs("$kind -> ${direct.getOrNull()}").isNotNull().isA<IllegalArgumentException>()
     }
   }
 

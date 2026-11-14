@@ -540,7 +540,8 @@ class KnishIOClientTest {
 
     private class Ledger(
         val balance: (BalanceVariable) -> String = { "null" },
-        val wallets: String = "[]"
+        val wallets: String = "[]",
+        val proposalCreatedAt: String? = null
     ) {
         val proposals = mutableListOf<Molecule>()
         val balanceQueries = mutableListOf<BalanceVariable>()
@@ -579,7 +580,8 @@ class KnishIOClientTest {
             every { anyConstructed<HttpClient>().mutate(any()) } answers {
                 val molecule = firstArg<MoleculeMutation>().variables.molecule
                 ledger.proposals.add(molecule)
-                """{"data":{"ProposeMolecule":{"molecularHash":"${molecule.molecularHash}","status":"accepted"}}}"""
+                val createdAt = ledger.proposalCreatedAt?.let { ""","createdAt":"$it"""" } ?: ""
+                """{"data":{"ProposeMolecule":{"molecularHash":"${molecule.molecularHash}","status":"accepted"$createdAt}}}"""
             }
             val client = KnishIOClient(listOf(testUri))
             client.setSecret(testSecret)
@@ -613,6 +615,36 @@ class KnishIOClientTest {
 
         expectThrows<WalletShadowException> { withLedger(ledger) { it.claimShadowWallet("SHDW") } }
         expectThat(ledger.proposals).isEmpty()
+    }
+
+    @Test
+    fun `queryShadowWallets returns only the shadow wallets of the bundle`() {
+        val ledger = Ledger(
+            wallets = "[${walletJson("SHDW", pointerPosition, "5")},${walletJson("SHDW", null, "10", "batch-shadow-1")}]"
+        )
+
+        val shadows = withLedger(ledger) { it.queryShadowWallets("SHDW") }
+
+        expectThat(shadows).hasSize(1)
+        expectThat(shadows.single()) {
+            get { batchId }.isEqualTo("batch-shadow-1")
+            get { isShadow() }.isTrue()
+        }
+    }
+
+    @Test
+    fun `a proposal reply becomes a molecule with and without createdAt`() {
+        listOf(null, "1700000000000").forEach { createdAt ->
+            val ledger = Ledger(proposalCreatedAt = createdAt)
+
+            val molecule = withLedger(ledger) { it.createMeta("T", "1", mutableListOf(MetaData("k", "v"))) }.molecule()
+
+            expectThat(molecule).describedAs("createdAt=$createdAt").isNotNull().and {
+                get { molecularHash }.isEqualTo(ledger.proposals.single().molecularHash)
+                get { status }.isEqualTo("accepted")
+            }
+            createdAt?.let { expectThat(molecule!!.createdAt).isEqualTo(it) }
+        }
     }
 
     @Test

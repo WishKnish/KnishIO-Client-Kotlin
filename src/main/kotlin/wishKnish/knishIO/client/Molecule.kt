@@ -97,11 +97,9 @@ import kotlin.math.ceil
       sourceWallet = Wallet(secret, sourceWallet.token ?: "USER", null, sourceWallet.batchId, sourceWallet.characters, mlkemParameterSet = mlkemParameterSet, otsVersion = sourceWallet.otsVersion)
     }
     
-    if (sourceWallet.position == null && molecularHash == null) {
-      throw IllegalArgumentException("SourceWallet parameter not initialized by valid wallet")
-    }
-
-    if (molecularHash == null) {
+    // JS `new Molecule({})`: without a source wallet or remainder wallet the molecule is an empty
+    // shell (e.g. ResponseProposeMolecule.molecule()); signing it still requires a secret.
+    if (molecularHash == null && (sourceWallet.position != null || remainderWallet != null)) {
       // Set the remainder wallet for this transaction
       remainderWallet = remainderWallet ?: Wallet.create(
         secretOrBundle = secret,

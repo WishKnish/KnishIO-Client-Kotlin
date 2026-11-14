@@ -706,28 +706,32 @@ class Wallet @JvmOverloads constructor(
   }
   
   /**
-   * Decrypts a message using hybrid cryptography
+   * Decrypts an envelope from [encryptStringHybrid] or [HybridCrypto.encryptMessage]. A `NaCl-Box`
+   * envelope (written by a wallet without a post-quantum key) is decrypted with [decryptString];
+   * any other envelope goes to [HybridCrypto.decryptMessage] by its version, with no classical
+   * retry. A wallet in [EncryptionMode.POST_QUANTUM_ONLY] decrypts post-quantum envelopes only.
+   * Returns [fallbackValue] when the envelope cannot be decrypted or is refused.
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
   fun decryptStringHybrid(
     encryptedMessage: Map<String, String>,
     fallbackValue: String? = null
   ): String? {
+    if (encryptedMessage["algorithm"] == "NaCl-Box") {
+      if (encryptionMode == EncryptionMode.POST_QUANTUM_ONLY) {
+        return fallbackValue
+      }
+      return encryptedMessage["data"]?.let { decryptString(it, fallbackValue) } ?: fallbackValue
+    }
     return try {
       HybridCrypto.decryptMessage(
         encryptedMessage,
         getMyEncPrivateKey() ?: "",
-        pqPrivateKey
+        pqPrivateKey,
+        encryptionMode
       )
     } catch (e: Exception) {
-      // Try classical decryption as fallback
-      try {
-        encryptedMessage["data"]?.let { data ->
-          decryptString(data, fallbackValue) as? String
-        } ?: fallbackValue
-      } catch (e2: Exception) {
-        fallbackValue
-      }
+      fallbackValue
     }
   }
   

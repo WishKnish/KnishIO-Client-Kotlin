@@ -14,6 +14,7 @@ import org.bouncycastle.util.encoders.Hex
  */
 class NobleMLKEMBridge {
     
+    // A GraalJS Context admits one thread at a time: every method that enters it is @Synchronized.
     companion object {
         private val context: Context by lazy {
             // The bundle's only host use is `new (Java.type('java.security.SecureRandom'))().nextInt(256)`
@@ -46,6 +47,7 @@ class NobleMLKEMBridge {
          * Generate an ML-KEM key pair from seed at the given parameter set, using the noble
          * JavaScript implementation. Defaults to ML-KEM-1024; pass 768 for the step-back.
          */
+        @Synchronized
         fun generateMLKEMKeyPairFromSeed(seed: ByteArray, parameterSet: Int = 1024): KeyPair {
             val seedHex = Hex.toHexString(seed)
             
@@ -65,6 +67,7 @@ class NobleMLKEMBridge {
         /**
          * Encapsulate to generate shared secret and ciphertext
          */
+        @Synchronized
         fun encapsulate(publicKey: PublicKey): Pair<ByteArray, ByteArray> {
             val publicKeyHex = Hex.toHexString(publicKey.encoded)
             
@@ -83,6 +86,7 @@ class NobleMLKEMBridge {
         /**
          * Decapsulate to recover shared secret from ciphertext
          */
+        @Synchronized
         fun decapsulate(cipherText: ByteArray, privateKey: PrivateKey): ByteArray {
             val cipherTextHex = Hex.toHexString(cipherText)
             val secretKeyHex = Hex.toHexString(privateKey.encoded)
@@ -97,6 +101,7 @@ class NobleMLKEMBridge {
         /**
          * Generate seed using Noble SHAKE256 (identical to JavaScript SDK generateSecret)
          */
+        @Synchronized
         fun generateSeed(input: String, lengthInBits: Int): String {
             // Call JavaScript generateSecret function for deterministic compatibility
             return nobleMLKEM.getMember("generateSecret")

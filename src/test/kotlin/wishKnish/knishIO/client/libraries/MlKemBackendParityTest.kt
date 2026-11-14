@@ -10,6 +10,9 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.security.SecureRandom
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Tag("mlkem")
 class MlKemBackendParityTest {
@@ -65,6 +68,32 @@ class MlKemBackendParityTest {
       assertEquals(expectedCtSize, bcCt.size)
       val nobleRecoveredSs = NobleMlKemBackend.decapsulate(bcCt, nobleDk)
       assertArrayEquals(bcSs, nobleRecoveredSs, "Noble must decapsulate BC's ciphertext for ML-KEM-$parameterSet")
+    }
+  }
+
+  @Test
+  @DisplayName("Noble backend survives concurrent keygen, encapsulate and decapsulate calls")
+  fun testNobleConcurrentCalls() {
+    val threads = 8
+    val iterations = 1
+    val barrier = CyclicBarrier(threads)
+    val pool = Executors.newFixedThreadPool(threads)
+    try {
+      val results = (0 until threads).map { thread ->
+        pool.submit<Unit> {
+          val random = SecureRandom()
+          barrier.await()
+          repeat(iterations) { i ->
+            val seed = ByteArray(64).also { random.nextBytes(it) }
+            val (ek, dk) = NobleMlKemBackend.keygenFromSeed(seed, 768)
+            val (sharedSecret, cipherText) = NobleMlKemBackend.encapsulate(ek)
+            assertArrayEquals(sharedSecret, NobleMlKemBackend.decapsulate(cipherText, dk), "thread $thread iteration $i")
+          }
+        }
+      }
+      results.forEach { it.get(10, TimeUnit.MINUTES) }
+    } finally {
+      pool.shutdownNow()
     }
   }
 

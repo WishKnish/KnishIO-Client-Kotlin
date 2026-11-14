@@ -16,6 +16,44 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Fixed
+
+- the `MetaType` and `WalletBundle` queries spelled GraphQL list types with spaces inside the
+  brackets (`[ String! ]`). The Rust validator's parser rejects that ("expected type_") although
+  GraphQL allows it, so these queries failed against it; They are now spelled `[String!]`.
+- `requestTokens("TOKEN")` and `requestTokens("TOKEN", amount = 10)` compile and request tokens
+  for the client's own bundle, as JS `requestTokens` does without `to`. Both overloads defaulted
+  `to`, so any call without it was ambiguous and did not compile. The `to: String` overload now
+  requires `to` (empty still means the own bundle); the `to: Wallet?` overload is unchanged.
+- `ResponseProposeMolecule.molecule()` returns the proposed molecule's hash, status and
+  `createdAt`. It always threw: `Molecule()` without a source wallet threw
+  `IllegalArgumentException("SourceWallet parameter not initialized by valid wallet")`, and a reply
+  without `createdAt` threw `NullPointerException`. `Molecule()` without a source or remainder
+  wallet is now an empty molecule, as JS `new Molecule({})` is.
+- `queryShadowWallets()` returns only shadow wallets (`isShadow()`: no position, no address). It
+  returned every wallet of the bundle for the token.
+- The opt-in noble ML-KEM backend can be called from several threads. Concurrent keygen,
+  encapsulate or decapsulate calls entered its single GraalJS context together and failed with
+  `IllegalStateException` ("Multi threaded access requested … not allowed for language(s) js");
+  every `NobleMLKEMBridge` entry point is now `@Synchronized`.
+
+### Security
+
+- `Wallet.decryptStringHybrid` no longer decrypts an envelope classically after the hybrid path
+  fails: a classical ciphertext labelled `version` `"2"` was decrypted with NaCl and returned. A
+  `NaCl-Box` envelope (what `encryptStringHybrid` writes for a wallet without a post-quantum key)
+  is decrypted with `decryptString`; every other envelope goes through
+  `HybridCrypto.decryptMessage` only, and a failure returns `fallbackValue`. A wallet in
+  `EncryptionMode.POST_QUANTUM_ONLY` returns `fallbackValue` for classical envelopes (`NaCl-Box`,
+  or `version` `"1"` or missing) without attempting to decrypt them.
+  `HybridCrypto.decryptMessage` throws `IllegalArgumentException` for an unknown version instead
+  of trying post-quantum and then classical decryption, and gains a last parameter
+  `encryptionMode: EncryptionMode = EncryptionMode.HYBRID` (additive, `@JvmOverloads`; the 2- and
+  3-argument calls are unchanged); with `POST_QUANTUM_ONLY` it refuses classical envelopes with
+  `IllegalArgumentException("Classical envelope refused in POST_QUANTUM_ONLY mode")`. Its classical
+  path throws `GeneralSecurityException("Classical decryption failed")` when nothing decrypts (it
+  returned the text `"null"`) and returns a sealed string without the JSON quotes it kept.
+
 ## [1.6.0] — 2026-11-12
 
 ### Upgrade notes

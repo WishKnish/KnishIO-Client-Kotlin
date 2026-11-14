@@ -730,7 +730,7 @@ class KnishIOClient @JvmOverloads constructor(
       WalletListVariable(bundleHash = bundle ?: bundle(), token = token)
     ) as ResponseWalletList
 
-    return response.payload()
+    return response.payload().filter { it.isShadow() }
   }
 
   @JvmOverloads
@@ -874,18 +874,19 @@ class KnishIOClient @JvmOverloads constructor(
 
   /**
    * Builds and executes a Molecule that requests token payment from the node. [to] is a bundle
-   * hash, or a secret from which a new recipient wallet is derived; null or empty requests
-   * tokens for this client's own bundle.
+   * hash, or a secret from which a new recipient wallet is derived; empty requests tokens for this
+   * client's own bundle. Omit [to] (the `Wallet?` overload) to request for the own bundle.
    */
+  @JvmOverloads
   fun requestTokens(
     token: String,
-    to: String? = null,
+    to: String,
     amount: Number? = null,
     units: MutableList<TokenUnit> = mutableListOf(),
     meta: MutableList<MetaData> = mutableListOf(),
     batchId: String? = null
   ): ResponseProposeMolecule {
-    return requestTokensFor(token, to?.takeIf { it.isNotEmpty() }, amount, units, meta, batchId)
+    return requestTokensFor(token, to.takeIf { it.isNotEmpty() }, amount, units, meta, batchId)
   }
 
   /** JS `requestTokens`: unit meta first, then the recipient's `position`/`bundle`. */

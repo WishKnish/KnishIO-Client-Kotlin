@@ -8,6 +8,8 @@ License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 
 package wishKnish.knishIO.client.libraries
 
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import java.security.*
 import kotlin.jvm.Throws
 
@@ -45,16 +47,24 @@ class HybridCrypto {
         }
         
         /**
-         * Decrypt message using automatic method detection
+         * Decrypt message by its envelope `version`: 2 is post-quantum, 1 (or a missing version) is
+         * classical. Any other version throws; nothing is retried with the other method. In
+         * [EncryptionMode.POST_QUANTUM_ONLY] a classical envelope is refused.
          */
+        @JvmOverloads
         @Throws(Exception::class)
         fun decryptMessage(
             encryptedMessage: Map<String, String>,
             recipientPrivateKey: String,
-            postQuantumPrivateKey: PrivateKey? = null
+            postQuantumPrivateKey: PrivateKey? = null,
+            encryptionMode: EncryptionMode = EncryptionMode.HYBRID
         ): String {
             val version = encryptedMessage["version"]?.toIntOrNull() ?: VERSION_NACL_BOX
-            
+
+            if (encryptionMode == EncryptionMode.POST_QUANTUM_ONLY && version != VERSION_POST_QUANTUM) {
+                throw IllegalArgumentException("Classical envelope refused in POST_QUANTUM_ONLY mode")
+            }
+
             return when (version) {
                 VERSION_POST_QUANTUM -> {
                     if (postQuantumPrivateKey == null) {
@@ -65,18 +75,7 @@ class HybridCrypto {
                 VERSION_NACL_BOX -> {
                     decryptClassical(encryptedMessage, recipientPrivateKey)
                 }
-                else -> {
-                    // Try both methods for maximum compatibility
-                    try {
-                        if (postQuantumPrivateKey != null) {
-                            decryptPostQuantum(encryptedMessage, postQuantumPrivateKey)
-                        } else {
-                            decryptClassical(encryptedMessage, recipientPrivateKey)
-                        }
-                    } catch (e: Exception) {
-                        decryptClassical(encryptedMessage, recipientPrivateKey)
-                    }
-                }
+                else -> throw IllegalArgumentException("Unsupported encryption version: $version")
             }
         }
         
@@ -147,8 +146,11 @@ class HybridCrypto {
             // Generate public key from private key for NaCl sealed box decryption
             val publicKey = soda.generatePublicKey(privateKey)
             
-            // Decrypt using Soda's decrypt method
+            // Decrypt using Soda's decrypt method; Soda returns the sealed JSON value, so a sealed
+            // string comes back as its content. No result (or JSON null) is a failure, not "null".
             return when (val decrypted = soda.decrypt(encryptedData, privateKey, publicKey)) {
+                null, is JsonNull -> throw GeneralSecurityException("Classical decryption failed")
+                is JsonPrimitive -> decrypted.content
                 is String -> decrypted
                 else -> decrypted.toString()
             }

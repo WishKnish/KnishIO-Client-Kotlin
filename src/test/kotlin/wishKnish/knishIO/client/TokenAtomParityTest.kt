@@ -138,6 +138,21 @@ class TokenAtomParityTest {
   }
 
   @Test
+  fun `requestTokens without a recipient requests for the client's own bundle`() {
+    val own = requestTokensAtom { it.requestTokens("TEST") }
+    val withAmount = requestTokensAtom { it.requestTokens("TEST", amount = 250) }
+
+    listOf(own to "0", withAmount to "250").forEach { (atom, value) ->
+      expectThat(atom) {
+        get { isotope }.isEqualTo('T')
+        get { metaType }.isEqualTo("walletBundle")
+        get { metaId }.isEqualTo(Crypto.generateBundleHash(secret))
+        get { this.value }.isEqualTo(value)
+      }
+    }
+  }
+
+  @Test
   fun `served unit metas survive into a transfer as JS sends them`() {
     val served = TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"{\"color\":\"red\",\"fragmentZone\":2}"}""")
     expectThat(Wallet.tokenUnitsJson(listOf(served))).isEqualTo("""[["u1","Unit 1",{"color":"red","fragmentZone":2}]]""")
