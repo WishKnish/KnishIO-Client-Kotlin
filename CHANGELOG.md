@@ -16,6 +16,17 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-11-13
+
+### Upgrade notes
+
+- `requestTokens(token, to: String, ...)` now requires `to`; omit `to` entirely to request tokens
+  for your own bundle (see Fixed).
+- `decryptStringHybrid` no longer retries a failed envelope classically, and a wallet in
+  `POST_QUANTUM_ONLY` mode refuses classical envelopes (see Security).
+- `queryShadowWallets` returns only shadow wallets, and `Molecule()` without arguments no longer
+  throws (see Fixed).
+
 ### Fixed
 
 - the `MetaType` and `WalletBundle` queries spelled GraphQL list types with spaces inside the
@@ -718,7 +729,8 @@ milestone. Runbook: `docs/sdk-release-audit-2026-06-29.md` (monorepo).
 > real releases because this file defines `[1.0.0]:` and `[1.1.0]:` link targets
 > at the bottom; the link destinations are correct, the surrounding plan text is not.
 
-[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/WishKnish/KnishIO-Client-Kotlin/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.6.1
 [1.6.0]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.6.0
 [1.5.2]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.2
 [1.5.1]: https://github.com/WishKnish/KnishIO-Client-Kotlin/releases/tag/v1.5.1
