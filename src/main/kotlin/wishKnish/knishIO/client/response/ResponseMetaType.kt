@@ -30,11 +30,9 @@ class ResponseMetaType(
   }
 
   override fun payload(): Response? {
-    val metaTypeData = data()
-
-    return metaTypeData?.let {
-      val metaData = it.last()
-      Response(metaData.instances, metaData.instanceCount, metaData.paginatorInfo)
+    // An empty MetaType list has no payload, as JS ResponseMetaType.payload() returns null.
+    return data()?.lastOrNull()?.let {
+      Response(it.instances, it.instanceCount, it.paginatorInfo)
     }
   }
 }

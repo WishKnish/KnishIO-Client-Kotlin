@@ -1,7 +1,8 @@
 /*
 Hybrid Cryptography implementation for KnishIO Client
 Supports both post-quantum (ML-KEM768+AES-GCM) and classical (NaCl Box) encryption
-Encryption never falls back from post-quantum to classical; decryption detects the envelope version
+Encryption never falls back from post-quantum to classical; decryption detects the envelope version,
+and an envelope without a version is post-quantum (never decrypted classically)
 
 License: https://github.com/WishKnish/KnishIO-Client-Kotlin/blob/master/LICENSE
 */
@@ -47,9 +48,10 @@ class HybridCrypto {
         }
         
         /**
-         * Decrypt message by its envelope `version`: 2 is post-quantum, 1 (or a missing version) is
-         * classical. Any other version throws; nothing is retried with the other method. In
-         * [EncryptionMode.POST_QUANTUM_ONLY] a classical envelope is refused.
+         * Decrypt message by its envelope `version`: 2 (or a missing version) is post-quantum, 1 is
+         * classical. Any other version, or one that is not a number, throws; nothing is retried
+         * with the other method. In [EncryptionMode.POST_QUANTUM_ONLY] a classical envelope is
+         * refused.
          */
         @JvmOverloads
         @Throws(Exception::class)
@@ -59,7 +61,9 @@ class HybridCrypto {
             postQuantumPrivateKey: PrivateKey? = null,
             encryptionMode: EncryptionMode = EncryptionMode.HYBRID
         ): String {
-            val version = encryptedMessage["version"]?.toIntOrNull() ?: VERSION_NACL_BOX
+            val rawVersion = encryptedMessage["version"]
+            val version = if (rawVersion == null) VERSION_POST_QUANTUM
+                else rawVersion.toIntOrNull() ?: throw IllegalArgumentException("Unsupported encryption version: $rawVersion")
 
             if (encryptionMode == EncryptionMode.POST_QUANTUM_ONLY && version != VERSION_POST_QUANTUM) {
                 throw IllegalArgumentException("Classical envelope refused in POST_QUANTUM_ONLY mode")

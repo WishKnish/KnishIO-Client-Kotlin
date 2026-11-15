@@ -707,9 +707,10 @@ class Wallet @JvmOverloads constructor(
   
   /**
    * Decrypts an envelope from [encryptStringHybrid] or [HybridCrypto.encryptMessage]. A `NaCl-Box`
-   * envelope (written by a wallet without a post-quantum key) is decrypted with [decryptString];
-   * any other envelope goes to [HybridCrypto.decryptMessage] by its version, with no classical
-   * retry. A wallet in [EncryptionMode.POST_QUANTUM_ONLY] decrypts post-quantum envelopes only.
+   * envelope with `version` `"1"` (written by a wallet without a post-quantum key) is decrypted
+   * with [decryptString]; any other envelope goes to [HybridCrypto.decryptMessage] by its version
+   * (a missing version is post-quantum), with no classical retry. A wallet in
+   * [EncryptionMode.POST_QUANTUM_ONLY] decrypts post-quantum envelopes only.
    * Returns [fallbackValue] when the envelope cannot be decrypted or is refused.
    */
   @Throws(IllegalArgumentException::class, GeneralSecurityException::class)
@@ -717,7 +718,7 @@ class Wallet @JvmOverloads constructor(
     encryptedMessage: Map<String, String>,
     fallbackValue: String? = null
   ): String? {
-    if (encryptedMessage["algorithm"] == "NaCl-Box") {
+    if (encryptedMessage["algorithm"] == "NaCl-Box" && encryptedMessage["version"] == "1") {
       if (encryptionMode == EncryptionMode.POST_QUANTUM_ONLY) {
         return fallbackValue
       }

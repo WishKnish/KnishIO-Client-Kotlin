@@ -71,6 +71,19 @@ class SecretHandlingTest {
   }
 
   @Test
+  fun `an envelope without a version is never decrypted classically`() {
+    val recipient = recipient()
+    val sealed = HybridCrypto.encryptMessage("forged", recipient.getMyEncPublicKey()!!, EncryptionMode.CLASSICAL_ONLY) - "version"
+    val box = classicalSender().encryptStringHybrid("forged", recipient.getMyEncPublicKey()!!) - "version"
+
+    listOf("NaCl-SealedBox" to sealed, "NaCl-Box" to box).forEach { (kind, envelope) ->
+      expectThat(recipient.decryptStringHybrid(envelope)).describedAs("$kind without version").isNull()
+      val direct = runCatching { HybridCrypto.decryptMessage(envelope, recipient.getMyEncPrivateKey()!!, recipient.pqPrivateKey) }
+      expectThat(direct.isFailure).describedAs("$kind without version -> ${direct.getOrNull()}").isTrue()
+    }
+  }
+
+  @Test
   fun `hybrid round trips still decrypt for wallets with and without a post-quantum key`() {
     val pqSender = Wallet(secret, "USER", "aa".repeat(32))
     val recipient = recipient()

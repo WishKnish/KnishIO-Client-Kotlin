@@ -6,9 +6,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+// MetaType instanceCount entries: the validator's InstanceCount.value is an integer.
 @Serializable data class KeyValueInt @JvmOverloads constructor(
   @JvmField val key: String? = null,
-  @JvmField val value: String? = null
+  @JvmField val value: Int? = null
 ) : IGraphql {
   companion object {
     private val jsonFormat: Json

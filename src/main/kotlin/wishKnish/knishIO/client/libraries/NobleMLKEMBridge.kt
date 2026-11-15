@@ -97,16 +97,5 @@ class NobleMLKEMBridge {
             
             return Hex.decode(sharedSecretHex)
         }
-        
-        /**
-         * Generate seed using Noble SHAKE256 (identical to JavaScript SDK generateSecret)
-         */
-        @Synchronized
-        fun generateSeed(input: String, lengthInBits: Int): String {
-            // Call JavaScript generateSecret function for deterministic compatibility
-            return nobleMLKEM.getMember("generateSecret")
-                .execute(input, lengthInBits)
-                .asString()
-        }
     }
 }

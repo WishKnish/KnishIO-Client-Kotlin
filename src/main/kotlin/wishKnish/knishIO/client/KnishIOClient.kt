@@ -599,7 +599,8 @@ class KnishIOClient @JvmOverloads constructor(
   }
 
   /**
-   * Retrieves metadata for the given metaType and provided parameters
+   * Retrieves metadata for the given metaType and provided parameters. [latest] defaults to
+   * `true` (only the newest value per key), and is sent as `latest == true`, as JS `queryMeta` does.
    */
   @JvmOverloads
   fun queryMeta(
@@ -607,7 +608,7 @@ class KnishIOClient @JvmOverloads constructor(
     metaIds: List<String> = listOf(),
     keys: List<String> = listOf(),
     values: List<String> = listOf(),
-    latest: Boolean? = null,
+    latest: Boolean? = true,
     latestMetas: Boolean? = null,
     filter: List<MetaFilter> = listOf(),
     queryArgs: QueryArgs? = null,
@@ -620,7 +621,7 @@ class KnishIOClient @JvmOverloads constructor(
         metaIds = metaIds,
         keys = keys,
         values = values,
-        latest = latest,
+        latest = latest == true,
         latestMetas = latestMetas,
         filter = filter,
         queryArgs = queryArgs,

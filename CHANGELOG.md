@@ -16,6 +16,47 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- `queryMeta` now defaults to `latest = true` and returns only the newest value per key, as JS
+  `queryMeta` does; pass `latest = false` for every value (see Fixed).
+- A hybrid envelope without a `version` is treated as post-quantum and is never decrypted
+  classically (see Security).
+- `KeyValueInt.value` (MetaType `instanceCount` entries) is now an `Int?`, the type the validator
+  sends; it was a `String?` (see Fixed).
+
+### Removed
+
+- `NobleMLKEMBridge.generateSeed`. It always threw (the bundled `generateSecret` finds no SHAKE256
+  implementation) and had no caller; seeds come from `Crypto.generateSecret`.
+
+### Fixed
+
+- `queryMeta` works against the Rust validator. Four defects stopped it:
+  - the reply's `MetaType` list was dropped: the response `Data` property was named `metaTypes`,
+    so decoding ignored the `MetaType` key and `Response.data()` threw "Response does not match
+    the key". The property is now `MetaType`, as `Balance` and `Wallet` are named after their
+    reply keys;
+  - `MetaTypeVariable.latest` was omitted when null, and the validator's `metas(latest:)` takes a
+    non-null Boolean ("Expected input type \"Boolean\", found null"). `latest` is now a `Boolean`
+    that is always sent, `latest == true` as JS sends `latest === true`;
+  - `Errors.path` was a `List<String>`, so an error whose path holds an index
+    (`["MetaType",0,"instances"]`) failed to decode and hid the server's message. It is now a
+    `List<JsonPrimitive>`;
+  - `KeyValueInt.value` (the `instanceCount` entries) was a `String?`, and the validator sends an
+    integer, so every reply that carried a count failed to decode. It is now an `Int?`.
+- `ResponseMetaType.payload()` returns `null` for an empty `MetaType` list, as JS does; it threw
+  `NoSuchElementException`.
+
+### Security
+
+- A hybrid envelope without a `version` is no longer decrypted classically. Missing `version`
+  selected NaCl in `HybridCrypto.decryptMessage`, and `Wallet.decryptStringHybrid` decrypted any
+  envelope labelled `NaCl-Box` whatever its version. A missing `version` now selects
+  post-quantum (as JS, which decrypts every message with ML-KEM), a non-numeric one throws
+  `IllegalArgumentException`, and the `NaCl-Box` route requires `version` `"1"`. Every envelope
+  the Kotlin SDK writes carries a version, so none of them changes.
+
 ## [1.6.1] — 2026-11-13
 
 ### Upgrade notes

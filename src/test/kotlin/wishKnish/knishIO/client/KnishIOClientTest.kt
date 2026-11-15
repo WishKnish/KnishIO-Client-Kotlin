@@ -9,14 +9,18 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
 import strikt.api.*
 import strikt.assertions.*
+import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.data.graphql.types.AccessToken
 import wishKnish.knishIO.client.data.json.mutation.MoleculeMutation
 import wishKnish.knishIO.client.data.json.query.Balance
 import wishKnish.knishIO.client.data.json.query.ContinuId
+import wishKnish.knishIO.client.data.json.query.MetaType
+import wishKnish.knishIO.client.data.json.response.query.metaType.MetaTypeResponse
 import wishKnish.knishIO.client.data.json.query.WalletList
 import wishKnish.knishIO.client.data.json.variables.BalanceVariable
 import wishKnish.knishIO.client.data.json.variables.ContinuIdVariable
+import wishKnish.knishIO.client.data.json.variables.MetaTypeVariable
 import wishKnish.knishIO.client.data.json.variables.MoleculeMutationVariable
 import wishKnish.knishIO.client.exception.AtomsMissingException
 import wishKnish.knishIO.client.exception.WalletShadowException
@@ -541,10 +545,12 @@ class KnishIOClientTest {
     private class Ledger(
         val balance: (BalanceVariable) -> String = { "null" },
         val wallets: String = "[]",
-        val proposalCreatedAt: String? = null
+        val proposalCreatedAt: String? = null,
+        val metaTypes: String = "[]"
     ) {
         val proposals = mutableListOf<Molecule>()
         val balanceQueries = mutableListOf<BalanceVariable>()
+        val metaTypeQueries = mutableListOf<MetaTypeVariable>()
     }
 
     private val bundleHash = Crypto.generateBundleHash(testSecret)
@@ -574,6 +580,10 @@ class KnishIOClientTest {
                         """{"data":{"Balance":${ledger.balance(request.variables)}}}"""
                     }
                     is WalletList -> """{"data":{"Wallet":${ledger.wallets}}}"""
+                    is MetaType -> {
+                        ledger.metaTypeQueries.add(request.variables)
+                        """{"data":{"MetaType":${ledger.metaTypes}}}"""
+                    }
                     else -> throw IllegalStateException("unexpected query ${request::class.simpleName}")
                 }
             }
@@ -769,5 +779,44 @@ class KnishIOClientTest {
             )
         }
         expectThat(iAtom.isotope).isEqualTo('I')
+    }
+
+    // The validator's reply shape: instanceCount values are integers (InstanceCount.value: i32).
+    private val metaTypeReply =
+        """[{"metaType":"T","instances":[{"metaType":"T","metaId":"i","createdAt":"1","metas":[{"molecularHash":"h","position":"p","key":"k","value":"v","createdAt":"1"}]}],"instanceCount":[{"key":"total","value":1}],"paginatorInfo":{"currentPage":1,"total":1}}]"""
+
+    @Test
+    fun `queryMeta reads the MetaType reply and always sends latest, true by default as JS`() {
+        val ledger = Ledger(metaTypes = metaTypeReply)
+
+        val payload = withLedger(ledger) { it.queryMeta(metaType = "T", metaIds = listOf("i")) }
+        expectThat(payload).isNotNull().and {
+            get { instances?.map { it.metaId } }.isEqualTo(listOf("i"))
+            get { instances?.single()?.metas?.single()?.value }.isEqualTo("v")
+            get { instanceCount?.map { it.key to it.value } }.isEqualTo(listOf("total" to 1))
+        }
+        expectThat(Json.encodeToString(MetaTypeVariable.serializer(), ledger.metaTypeQueries.single()))
+            .contains("\"latest\":true")
+
+        val explicit = Ledger(metaTypes = metaTypeReply)
+        withLedger(explicit) { it.queryMeta(metaType = "T", metaIds = listOf("i"), latest = false) }
+        expectThat(Json.encodeToString(MetaTypeVariable.serializer(), explicit.metaTypeQueries.single()))
+            .contains("\"latest\":false")
+    }
+
+    @Test
+    fun `queryMeta returns no payload for an empty MetaType list as JS`() {
+        val payload = withLedger(Ledger(metaTypes = "[]")) { it.queryMeta(metaType = "T") }
+        expectThat(payload).isNull()
+    }
+
+    @Test
+    fun `a GraphQL error path with integer segments decodes`() {
+        val response = MetaTypeResponse.jsonToObject(
+            """{"data":null,"errors":[{"message":"m","path":["MetaType",0,"instances"]}]}"""
+        )
+        expectThat(response.errors).hasSize(1)
+        expectThat(response.errors[0].message).isEqualTo("m")
+        expectThat(response.errors[0].path.map { it.content }).isEqualTo(listOf("MetaType", "0", "instances"))
     }
 }

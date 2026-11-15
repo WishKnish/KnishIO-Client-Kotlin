@@ -7,8 +7,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import wishKnish.knishIO.client.data.graphql.types.MetaType
 
-
-@Serializable data class Data @JvmOverloads constructor(@JvmField var metaTypes: List<MetaType>? = null) {
+// Property MUST be named `MetaType` — it is both the JSON key the validator returns
+// (data.MetaType) and the segment Response.data() navigates by reflection (dataKey
+// "data.MetaType"). A mismatched name (was `metaTypes`) left it null on deserialize
+// AND threw "Response does not match the key" on navigation.
+@Serializable data class Data @JvmOverloads constructor(@JvmField var MetaType: List<MetaType>? = null) {
   companion object {
     private val jsonFormat: Json
       get() = Json {
@@ -19,8 +22,8 @@ import wishKnish.knishIO.client.data.graphql.types.MetaType
 
     @JvmStatic
     @JvmOverloads
-    fun create(metaTypes: List<MetaType>? = null): Data {
-      return Data(metaTypes)
+    fun create(metaType: List<MetaType>? = null): Data {
+      return Data(metaType)
     }
 
     @JvmStatic
