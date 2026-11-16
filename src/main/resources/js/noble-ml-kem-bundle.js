@@ -1543,38 +1543,6 @@
             const engine = (cipherText.length === 1568 && secretKey.length === 3168) ? globalThis.ml_kem1024 : globalThis.ml_kem768;
             const sharedSecret = engine.decapsulate(cipherText, secretKey);
             return bytesToHex(sharedSecret);
-        },
-
-        // Generate seed using SHAKE256 (identical to JavaScript SDK generateSecret)
-        generateSecret: function(input, lengthInBits) {
-            // Replicate the exact JavaScript SDK generateSecret logic
-            // This ensures identical behavior across both SDKs
-            
-            // Simple string to bytes conversion for GraalVM compatibility
-            const inputBytes = new Uint8Array(input.length);
-            for (let i = 0; i < input.length; i++) {
-                inputBytes[i] = input.charCodeAt(i);
-            }
-            
-            const outputBytes = lengthInBits / 8; // Convert bits to bytes
-            
-            // Use the bundled shake256 implementation
-            // Find the shake256 function from the bundle
-            let shake256Function = null;
-            if (typeof shake256 !== 'undefined') {
-                shake256Function = shake256;
-            } else if (typeof global !== 'undefined' && global.shake256) {
-                shake256Function = global.shake256;
-            } else {
-                // Fallback to the ML-KEM internal shake implementation
-                throw new Error('SHAKE256 implementation not found');
-            }
-            
-            const hash = shake256Function.create({ dkLen: outputBytes });
-            hash.update(inputBytes);
-            const output = hash.digest();
-            
-            return bytesToHex(output);
         }
     };
 

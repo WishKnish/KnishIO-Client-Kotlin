@@ -28,7 +28,8 @@ not substantiate a detail, the entry says so instead of guessing.
 ### Removed
 
 - `NobleMLKEMBridge.generateSeed`. It always threw (the bundled `generateSecret` finds no SHAKE256
-  implementation) and had no caller; seeds come from `Crypto.generateSecret`.
+  implementation) and had no caller; seeds come from `Crypto.generateSecret`. The bundle's unused
+  `NobleMLKEM.generateSecret` member (`noble-ml-kem-bundle.js`) is removed with it.
 
 ### Fixed
 
