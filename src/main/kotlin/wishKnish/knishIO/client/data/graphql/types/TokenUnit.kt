@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import wishKnish.knishIO.client.libraries.RuleMeta
 
 
 /**
@@ -42,7 +43,7 @@ object TokenUnitMetasSerializer : KSerializer<JsonObject> {
   }
 
   override fun serialize(encoder: Encoder, value: JsonObject) {
-    delegate.serialize(encoder, value)
+    delegate.serialize(encoder, RuleMeta.jsOrdered(value) as JsonObject)
   }
 }
 
@@ -77,12 +78,12 @@ object TokenUnitMetasSerializer : KSerializer<JsonObject> {
 
   /**
    * The unit as the JS reference writes it into a `tokenUnits` meta (`TokenUnit.toData()`):
-   * `[id, name, metas]`. [extraMetas] are added after the unit's own metas (JS `fuseToken` adds
-   * `fusedTokenUnits` this way).
+   * `[id, name, metas]`, the metas in `JSON.stringify` key order. [extraMetas] are added after the
+   * unit's own metas (JS `fuseToken` adds `fusedTokenUnits` this way).
    */
   @JvmOverloads
   fun toTriple(extraMetas: JsonObject = JsonObject(emptyMap())): JsonArray {
-    return JsonArray(listOf(JsonPrimitive(id), JsonPrimitive(name), JsonObject(metas + extraMetas)))
+    return JsonArray(listOf(JsonPrimitive(id), JsonPrimitive(name), RuleMeta.jsOrdered(JsonObject(metas + extraMetas))))
   }
 
   private fun toJson(): String {

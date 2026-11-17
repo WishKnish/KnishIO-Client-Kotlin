@@ -168,4 +168,16 @@ class TokenAtomParityTest {
 
     expectThat(digest(molecule.atoms)).isEqualTo("0184b48c9937f195e483f3dede0093a97bcd1755b2gb3bdaea439220cg191172")
   }
+
+  @Test
+  fun `served unit metas are signed in JS key order`() {
+    // The JS SDK's TokenUnit.createFromGraphQL + JSON.stringify([unit.toData()]) printed these strings.
+    val served = TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"{\"a\":2,\"10\":1,\"x\":{\"b\":1,\"2\":0,\"e\":{}},\"01\":3}"}""")
+    expectThat(Wallet.tokenUnitsJson(listOf(served)))
+      .isEqualTo("""[["u1","Unit 1",{"10":1,"a":2,"x":{"2":0,"b":1,"e":{}},"01":3}]]""")
+
+    val longKey = TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"{\"b\":1,\"12345678901234567890123\":2,\"3\":0}"}""")
+    expectThat(Wallet.tokenUnitsJson(listOf(longKey)))
+      .isEqualTo("""[["u1","Unit 1",{"3":0,"b":1,"12345678901234567890123":2}]]""")
+  }
 }

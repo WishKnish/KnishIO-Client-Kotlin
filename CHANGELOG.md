@@ -33,6 +33,15 @@ not substantiate a detail, the entry says so instead of guessing.
 
 ### Fixed
 
+- **Signed bytes:** a token unit's `metas` are signed in `JSON.stringify` key order, as JS signs
+  them: array-index keys ascending first, then the other keys in document order, recursively. The
+  validator serves `metas` with keys sorted bytewise, and Kotlin signed that order, so
+  `{"a":2,"10":1}` went out where JS sends `{"10":1,"a":2}`. `TokenUnit.toTriple` and the unit's
+  serialized `metas` use `RuleMeta.jsOrdered`; units with `{}` metas sign the same bytes as before.
+  `RuleMeta`'s array-index check no longer throws `NumberFormatException` on a digit key longer
+  than 19 digits (such a key is an ordinary name in JS). Number text stays kotlinx's (`1.0` where
+  JS writes `1`).
+
 - `queryMeta` works against the Rust validator. Four defects stopped it:
   - the reply's `MetaType` list was dropped: the response `Data` property was named `metaTypes`,
     so decoding ignored the `MetaType` key and `Response.data()` threw "Response does not match

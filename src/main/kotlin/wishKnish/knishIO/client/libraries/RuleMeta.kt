@@ -33,7 +33,9 @@ object RuleMeta {
     else -> true
   }
 
-  private fun isArrayIndex(key: String): Boolean = ARRAY_INDEX.matches(key) && key.toLong() < 4294967295L
+  /** A JS array index: `0..4294967294` without leading zeros (longer digit strings are names). */
+  private fun isArrayIndex(key: String): Boolean =
+    ARRAY_INDEX.matches(key) && key.length <= 10 && key.toLong() < 4294967295L
 
   /**
    * [element] with every object's keys in the order `JSON.stringify` writes them: integer-like keys
