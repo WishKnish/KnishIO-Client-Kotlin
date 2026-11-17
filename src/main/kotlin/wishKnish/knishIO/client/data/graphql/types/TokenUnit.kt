@@ -20,8 +20,9 @@ import wishKnish.knishIO.client.libraries.RuleMeta
 /**
  * A unit's `metas` as a JSON object. The validator serves them as a single GraphQL String (a
  * serialized JSON object, or null); JS `TokenUnit.createFromGraphQL` parses that string, so this
- * does the same. An object is kept as it is; null, an empty string or anything that is not a JSON
- * object reads as `{}`.
+ * does the same. An object is kept as it is; null, an empty string or a value that is not a JSON
+ * object reads as `{}`. A string that is not JSON throws [SerializationException], as JS
+ * `JSON.parse` throws.
  */
 object TokenUnitMetasSerializer : KSerializer<JsonObject> {
   private val delegate = JsonObject.serializer()
@@ -36,11 +37,7 @@ object TokenUnitMetasSerializer : KSerializer<JsonObject> {
     } ?: JsonObject(emptyMap())
   }
 
-  private fun parseObject(text: String): JsonObject? = try {
-    Json.parseToJsonElement(text) as? JsonObject
-  } catch (e: SerializationException) {
-    null
-  }
+  private fun parseObject(text: String): JsonObject? = Json.parseToJsonElement(text) as? JsonObject
 
   override fun serialize(encoder: Encoder, value: JsonObject) {
     delegate.serialize(encoder, RuleMeta.jsOrdered(value) as JsonObject)

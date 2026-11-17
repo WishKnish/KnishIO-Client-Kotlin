@@ -24,6 +24,9 @@ not substantiate a detail, the entry says so instead of guessing.
   classically (see Security).
 - `KeyValueInt.value` (MetaType `instanceCount` entries) is now an `Int?`, the type the validator
   sends; it was a `String?` (see Fixed).
+- Decoding a `Balance`, wallet-list or batch reply throws `SerializationException` when a token
+  unit's `metas` string is text the kotlinx JSON parser rejects (for example `{bad` or `{}x`), as
+  JS `JSON.parse` throws; such metas read as `{}` before (see Fixed).
 
 ### Removed
 
@@ -32,6 +35,13 @@ not substantiate a detail, the entry says so instead of guessing.
   `NobleMLKEM.generateSecret` member (`noble-ml-kem-bundle.js`) is removed with it.
 
 ### Fixed
+
+- `TokenUnitMetasSerializer` no longer turns unit `metas` the kotlinx JSON parser rejects into
+  `{}`: the `SerializationException` propagates out of the reply decoding, as JS
+  `TokenUnit.createFromGraphQL` throws (by code reading, nothing on the path from `queryBalance`,
+  `queryWallets`, `queryShadowWallets` or `claimShadowWallet` catches it). Metas that parse to a
+  value other than an object still read as `{}`, and literals the parser accepts leniently
+  (`nullx`, `NaN`, `Infinity`) still read as `{}` where JS throws.
 
 - **Signed bytes:** a token unit's `metas` are signed in `JSON.stringify` key order, as JS signs
   them: array-index keys ascending first, then the other keys in document order, recursively. The

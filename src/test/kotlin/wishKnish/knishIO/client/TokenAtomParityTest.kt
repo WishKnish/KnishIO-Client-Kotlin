@@ -5,11 +5,13 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.spyk
 import io.mockk.unmockkObject
+import kotlinx.serialization.SerializationException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import strikt.api.expect
 import strikt.api.expectThat
+import strikt.api.expectThrows
 import strikt.assertions.isEqualTo
 import wishKnish.knishIO.client.data.MetaData
 import wishKnish.knishIO.client.data.graphql.types.TokenUnit
@@ -179,5 +181,21 @@ class TokenAtomParityTest {
     val longKey = TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"{\"b\":1,\"12345678901234567890123\":2,\"3\":0}"}""")
     expectThat(Wallet.tokenUnitsJson(listOf(longKey)))
       .isEqualTo("""[["u1","Unit 1",{"3":0,"b":1,"12345678901234567890123":2}]]""")
+  }
+
+  @Test
+  fun `served unit metas that are not JSON throw as in JS`() {
+    // JS TokenUnit.createFromGraphQL runs JSON.parse on the served string and throws SyntaxError.
+    expectThrows<SerializationException> {
+      TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"{bad"}""")
+    }
+  }
+
+  @Test
+  fun `served unit metas that parse to a falsy value read as an empty object`() {
+    listOf("null", "false", "0", "\\\"\\\"", "").forEach { metas ->
+      val unit = TokenUnit.jsonToObject("""{"id":"u1","name":"Unit 1","metas":"$metas"}""")
+      expectThat(Wallet.tokenUnitsJson(listOf(unit))).describedAs(metas).isEqualTo("""[["u1","Unit 1",{}]]""")
+    }
   }
 }
