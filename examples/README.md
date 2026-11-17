@@ -20,7 +20,7 @@ Copy the file into a Kotlin/JVM project that depends on the SDK:
 
 ```kotlin
 dependencies {
-    implementation("io.knish:knishio-client-kotlin:1.6.1")
+    implementation("io.knish:knishio-client-kotlin:1.7.0")
 }
 ```
 
