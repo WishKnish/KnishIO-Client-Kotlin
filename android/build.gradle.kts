@@ -103,14 +103,14 @@ dependencies {
   api("io.knish:knishio-client-kotlin:1.7.0") {
     exclude(group = "org.graalvm.polyglot")
   }
-  implementation("org.bouncycastle:bcprov-jdk18on:1.86")
+  implementation("org.bouncycastle:bcprov-jdk18on:1.87")
 
 
-  testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
   testImplementation("junit:junit:4.13.2")
   androidTestImplementation("androidx.test.ext:junit:1.2.1")
   androidTestImplementation("androidx.test:runner:1.6.2")
-  androidTestImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+  androidTestImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
 }
 
 tasks.withType<Test>().configureEach {
