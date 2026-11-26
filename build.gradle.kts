@@ -19,7 +19,7 @@ plugins {
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
   // CycloneDX SBOM for dependency auditing (CI runs osv-scanner against the BOM;
   // Gradle has no committed lockfile, so the SBOM is the scannable dependency graph).
-  id("org.cyclonedx.bom") version "3.5.1"
+  id("org.cyclonedx.bom") version "3.6.1"
   `java-library`
 }
 
@@ -44,8 +44,8 @@ repositories {
 dependencies {
   val ktorVersion = "3.6.1"
   val coroutinesVersion = "1.11.0"
-  val serializationVersion = "1.12.0"
-  val bouncyCastleVersion = "1.86"
+  val serializationVersion = "1.13.0"
+  val bouncyCastleVersion = "1.87"
 
   // NaCl crypto_box is implemented on BouncyCastle (libraries/NaClBox.kt), replacing
   // the former JitPack `tweetnacl-java`; byte-parity is pinned by the `nacl`
@@ -79,12 +79,12 @@ dependencies {
   // slf4j-jdk14 removed — a library must not ship an SLF4J *binding* (forces JUL on
   // consumers); no slf4j usage in main (Ktor uses its own Logger).
   implementation("com.google.code.gson:gson:2.15.0")
-  implementation("com.graphql-java:graphql-java:26.1")
+  implementation("com.graphql-java:graphql-java:26.2")
   
   // Testing dependencies
   testImplementation(kotlin("test"))
   testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-  testImplementation("io.mockk:mockk:1.14.11")
+  testImplementation("io.mockk:mockk:1.14.12")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
   testImplementation("io.strikt:strikt-core:0.35.1")
 }
